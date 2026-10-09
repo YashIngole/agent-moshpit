@@ -73,6 +73,10 @@ The look is dark, the office after hours: graphite rooms, matte desks, and the o
 
 ## Tests
 
+`npm run test:launch` checks the launch form with demo catalogs: provider-specific drafts, refresh adding a new model and a new effort level, duplication, reset, custom sandbox controls, narrow windows and failed discovery. The production picker has no baked-in model list.
+
+`cargo test --manifest-path src-tauri/Cargo.toml catalog::tests::installed_clis_return_live_catalogs_without_inference -- --ignored` checks the real installed CLIs without sending a user prompt. After building the desktop app, `node tools/e2e/live-catalogs.mjs` checks real desktop IPC, catalogs and permission choices without creating any agent. Set `MOSHPIT_APP` when the executable is outside the default target directory. The reliability suite also checks launch overrides across agent restart and a full app reload.
+
 ```sh
 cd src-tauri && cargo test     # the core: desks, status, the program table, terminals
 npm test                       # the window's layout of panes, file paths, links, words, looks and times

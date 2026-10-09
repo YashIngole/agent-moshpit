@@ -6,9 +6,11 @@
 //! window may call. The work is in `engine`.
 
 mod editor;
+mod catalog;
 mod engine;
 mod harness;
 mod link;
+mod launch;
 mod model;
 mod office;
 mod proctree;
@@ -507,6 +509,12 @@ fn snapshot(handle: State<'_, Handle>) -> Snapshot {
     handle.snapshot()
 }
 
+#[tauri::command]
+async fn model_catalog(handle: State<'_, Handle>, harness: String, cwd: String, profile: String, refresh: bool) -> Result<catalog::Catalog, String> {
+    let handle = handle.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || handle.model_catalog(&harness, &cwd, &profile, refresh)).await.map_err(|_| "The model catalog could not be read.".to_string())?
+}
+
 /// Seat a new agent and start its program in a terminal of the size given.
 #[tauri::command]
 async fn new_agent(handle: State<'_, Handle>, spec: NewAgent, cols: u16, rows: u16) -> Result<String, String> {
@@ -889,6 +897,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             snapshot,
+            model_catalog,
             new_agent,
             install,
             update,

@@ -5,10 +5,10 @@ import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
 import { groupProjects } from './projects'
 import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
-import type { Agent, Editor, Harness, Job, NewAgentSpec, Newer, Phase, Snapshot } from './types'
+import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 
 /** The side panel, when there is one. Terminals are not a panel: they are the room. */
-export type Panel = { kind: 'new'; cwd: string; harness: string } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | null
+export type Panel = { kind: 'new'; cwd: string; harness: string; launch?: LaunchOptions } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | null
 
 /** Whether a terminal is an install or an update rather than a desk's. */
 export const isJob = (id: string) => id.startsWith('job-')
@@ -20,6 +20,7 @@ export interface NewAgentDraft {
   cwd: string
   title: string
   worktree: boolean
+  launches: Record<string, LaunchOptions>
 }
 
 /** One choice in a small menu. */
@@ -53,7 +54,7 @@ export interface Toast {
   action?: { label: string; run: () => void }
 }
 
-const NO_DRAFT: NewAgentDraft = { harness: '', task: '', cwd: '', title: '', worktree: false }
+const NO_DRAFT: NewAgentDraft = { harness: '', task: '', cwd: '', title: '', worktree: false, launches: {} }
 const FOLDERS_KEY = 'moshpit.folders'
 const MOST_FOLDERS = 6
 const VIEW_KEY = 'moshpit.view'
@@ -189,7 +190,7 @@ class Office {
 
   clearNewDraft() {
     // Which program, and whether to work on a copy, are kept for the next agent: people start several alike.
-    this.newDraft = { ...NO_DRAFT, harness: this.newDraft.harness, worktree: this.newDraft.worktree }
+    this.newDraft = { ...NO_DRAFT, harness: this.newDraft.harness, worktree: this.newDraft.worktree, launches: this.newDraft.launches }
   }
 
   /** An agent was started in this folder: offer it first next time. */
@@ -853,10 +854,10 @@ class Office {
   // ── the side panel ─────────────────────────────────────────────────────
 
   /** The New agent form, in a folder and with a program already chosen when they are given. */
-  openNew(cwd = '', harness = '') {
+  openNew(cwd = '', harness = '', launch?: LaunchOptions) {
     this.#rememberFocus()
     this.menu = null
-    this.panel = { kind: 'new', cwd, harness }
+    this.panel = { kind: 'new', cwd, harness, launch }
   }
 
   closePanel() {

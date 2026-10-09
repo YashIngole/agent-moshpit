@@ -9,7 +9,7 @@
 // The terminals here are typed by hand: they show what a program might print and
 // echo what is typed into them. Nothing is started and nothing is sent anywhere.
 import type { Bridge, OnTerminal } from './bridge'
-import type { Agent, Harness, Job, NewAgentSpec, Phase, Snapshot } from './types'
+import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
 import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, type VoiceSettings, type VoiceView } from './voice'
 
@@ -17,6 +17,7 @@ const MIN = 60_000
 
 const program = (over: Partial<Harness> & Pick<Harness, 'id' | 'name' | 'tag'>): Harness => ({
   installed: true,
+  launch: 'none',
   version: '',
   takes_task: false,
   worktree: false,
@@ -28,8 +29,8 @@ const program = (over: Partial<Harness> & Pick<Harness, 'id' | 'name' | 'tag'>):
 })
 
 const HARNESSES: Harness[] = [
-  program({ id: 'claude', name: 'Claude Code', tag: 'Claude', version: '2.1.290', latest: '2.1.294', outdated: true, takes_task: true, worktree: true, install_line: 'npm install -g @anthropic-ai/claude-code', update_line: 'claude update' }),
-  program({ id: 'codex', name: 'Codex', tag: 'Codex', version: '0.161.0', latest: '0.161.0', takes_task: true, worktree: true, install_line: 'npm install -g @openai/codex', update_line: 'codex update' }),
+  program({ id: 'claude', launch: 'claude', name: 'Claude Code', tag: 'Claude', version: '2.1.290', latest: '2.1.294', outdated: true, takes_task: true, worktree: true, install_line: 'npm install -g @anthropic-ai/claude-code', update_line: 'claude update' }),
+  program({ id: 'codex', launch: 'codex', name: 'Codex', tag: 'Codex', version: '0.161.0', latest: '0.161.0', takes_task: true, worktree: true, install_line: 'npm install -g @openai/codex', update_line: 'codex update' }),
   program({ id: 'antigravity', name: 'Antigravity CLI', tag: 'Antigravity', version: '1.2.4', takes_task: true, update_line: 'agy update' }),
   program({ id: 'hermes', name: 'Hermes', tag: 'Hermes', version: '0.21.2', worktree: true, update_line: 'hermes update' }),
   program({ id: 'gemini', name: 'Gemini CLI', tag: 'Gemini', version: '0.2.1', latest: '0.63.0', outdated: true, takes_task: true, install_line: 'npm install -g @google/gemini-cli', update_line: 'npm install -g @google/gemini-cli@latest' }),
@@ -214,6 +215,36 @@ export function demoBridge(): Bridge {
     onOpenDesk: () => () => {},
     // `&open=demo-4` stands for a click on a notification about that desk.
     takeOpening: async () => params.get('open'),
+    modelCatalog: async (harness, _cwd, _profile, refresh) => {
+      if (params.has('catalog-fails')) throw 'The model catalog could not be read. Try Refresh, or enter a model ID.'
+      const claude = harness === 'claude'
+      const models: ModelChoice[] = claude
+        ? [{ id: 'opus', name: 'Opus', description: 'Demo model catalog', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], resolved: 'claude-opus-demo', auto_mode: true }]
+        : [{ id: 'codex-demo', name: 'Codex demo', description: 'Demo model catalog', efforts: ['low', 'medium', 'high', 'xhigh'], resolved: 'codex-demo', auto_mode: null }]
+      if (refresh && params.has('catalog-new')) models.push({ id: 'newly-released-model', name: 'Newly released model', description: 'A new entry returned by the provider', efforts: ['new-effort'], resolved: 'newly-released-model', auto_mode: true })
+      return {
+        models,
+        permissions: [
+          { id: '', name: 'Use CLI settings', description: 'Inherits your configured permission settings.' },
+          ...(claude ? [
+            { id: 'default', name: 'Manual', description: 'Asks you to approve actions that need permission.' },
+            { id: 'auto', name: 'Auto', description: 'Reviews actions automatically.' },
+            { id: 'acceptEdits', name: 'Accept edits', description: 'Accepts edits; other actions follow your rules.' },
+            { id: 'plan', name: 'Plan', description: 'Explores the project and prepares a plan.' },
+            { id: 'dontAsk', name: "Don't ask", description: 'Denies actions that would need a permission prompt.' },
+            { id: 'bypassPermissions', name: 'Bypass permissions', description: 'Skips permission checks for this session.' }
+          ] : [
+            { id: 'workspace', name: 'Workspace with approvals', description: 'Works in the workspace sandbox and can request approval.' },
+            { id: 'read-only', name: 'Read-only sandbox', description: 'Starts in a read-only sandbox and can request approval.' },
+            { id: 'auto', name: 'Automatic approval review', description: 'Reviews approvals in the workspace sandbox.' },
+            { id: 'yolo', name: 'YOLO / full access', description: 'Skips approvals and runs without the Codex sandbox.' },
+            { id: 'custom', name: 'Custom sandbox and approvals', description: 'Choose sandbox and approval policy under Advanced.' }
+          ])
+        ],
+        features: claude ? ['model', 'effort', 'additional_dirs', 'tools', 'chrome', 'instructions'] : ['model', 'effort', 'additional_dirs', 'profile', 'search'],
+        fetched_ms: Date.now(), source: 'Demo model catalog', problem: ''
+      }
+    },
     install: async harness => job(harness, 'install'),
     update: async harness => job(harness, 'update'),
     forgetJob: id => {
@@ -229,7 +260,7 @@ export function demoBridge(): Bridge {
       // Named the way the core names a desk: from the task, else program and folder, numbered when taken.
       const auto = uniqueTitle(spec.prompt.trim() ? titleFrom(spec.prompt) : `${kind.tag} in ${repo}`, agents.map(a => a.title))
       const title = spec.title?.trim() ? shorten(spec.title, 60) : auto
-      const fresh = { ...agent(100 + made, title, kind.id, repo, 'main', 'starting', 0), id: `demo-new-${made}`, project: spec.cwd, cwd: spec.cwd }
+      const fresh = { ...agent(100 + made, title, kind.id, repo, 'main', 'starting', 0), id: `demo-new-${made}`, project: spec.cwd, cwd: spec.cwd, launch: structuredClone(spec.launch ?? {}) }
       given.set(fresh.id, auto)
       agents = [...agents, fresh]
       publish()

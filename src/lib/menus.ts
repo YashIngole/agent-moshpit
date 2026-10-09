@@ -13,7 +13,7 @@ export function deskItems(agent: Agent): MenuItem[] {
   if (!shown && (office.terminals || office.stowed.rows.length > 0)) {
     items.push({ label: 'Open beside the others', hint: 'Ctrl+Enter, or Ctrl and a click', run: () => office.show(agent.id, true) })
   }
-  items.push({ label: 'Start another like this', hint: `${agent.harness_name} in ${agent.repo || agent.cwd}, with a task of its own`, run: () => office.openNew(agent.cwd, agent.harness) })
+  items.push({ label: 'Start another like this', hint: `${agent.harness_name} in ${agent.repo || agent.cwd}, with a task of its own`, run: () => office.openNew(agent.cwd, agent.harness, agent.launch) })
   items.push({ label: 'Rename', hint: 'F2', run: () => office.startRename(agent.id) })
   if (agent.running) {
     // A right-click away from Paste: someone in the middle of something is asked about first.

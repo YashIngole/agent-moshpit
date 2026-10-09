@@ -43,7 +43,7 @@ You also need at least one agent CLI, installed and signed in the way its makers
 
 ## Quick start
 
-1. Press **+ new agent** (or `n`), pick a program and a folder, and give it a task if you like.
+1. Press **+ new agent** (or `n`), pick a program and a folder, and give it a task if you like. For Claude and Codex, choose a model, effort and permissions, or inherit your CLI settings. The model picker reads the CLI's catalog; **Refresh** finds new releases.
 2. The agent takes a desk and its terminal opens beside the floor. Type to it as you would in any terminal.
 3. Hold `Ctrl` and click another desk to open it beside the first. `Ctrl` + `` ` `` goes back to the floor.
 4. When a hand goes up, press **open their terminal** on the amber band and answer the question.

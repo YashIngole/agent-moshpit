@@ -4,7 +4,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
-import type { Editor, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
+import type { Editor, ModelCatalog, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
 import type { VoiceModel, VoiceSettings, VoiceView } from './voice'
 
 /**
@@ -37,6 +37,8 @@ export interface Bridge {
   takeOpening(): Promise<string | null>
   /** Seat a new agent and start its program in a terminal of this size. Resolves with the desk's id. */
   newAgent(spec: NewAgentSpec, cols: number, rows: number): Promise<string>
+  /** Read available models and launch capabilities, without sending a task. */
+  modelCatalog(harness: string, cwd: string, profile: string, refresh: boolean): Promise<ModelCatalog>
   /** Install a program, or update it, in a terminal of its own. Resolves with that terminal's id. */
   install(harness: string, cols: number, rows: number): Promise<string>
   update(harness: string, cols: number, rows: number): Promise<string>
@@ -133,6 +135,7 @@ function tauriBridge(): Bridge {
     onOpenDesk: fn => subscribe<null>('office:open-desk', () => fn(), fn),
     takeOpening: () => invoke<string | null>('take_opening'),
     newAgent: (spec, cols, rows) => invoke<string>('new_agent', { spec, cols, rows }),
+    modelCatalog: (harness, cwd, profile, refresh) => invoke<ModelCatalog>('model_catalog', { harness, cwd, profile, refresh }),
     install: (harness, cols, rows) => invoke<string>('install', { harness, cols, rows }),
     update: (harness, cols, rows) => invoke<string>('update', { harness, cols, rows }),
     forgetJob: job => void invoke('forget_job', { job }),

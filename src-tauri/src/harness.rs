@@ -74,6 +74,10 @@ pub struct Harness {
     pub tag: String,
     /// What is typed to start it: "claude".
     pub program: String,
+    /// The adapter for per-desk launch settings and live model discovery.
+    /// Custom rows can opt in without depending on their id or program name.
+    #[serde(default)]
+    pub launch: crate::launch::Provider,
     /// Words passed every time, before anything else.
     #[serde(default)]
     pub args: Vec<String>,
@@ -118,6 +122,7 @@ fn row(id: &str, name: &str, tag: &str, program: &str) -> Harness {
         name: name.into(),
         tag: tag.into(),
         program: program.into(),
+        launch: crate::launch::Provider::None,
         args: Vec::new(),
         task: TaskArg::None,
         resume: Vec::new(),
@@ -154,6 +159,7 @@ fn words(list: &[&str]) -> Vec<String> {
 pub fn built_in() -> Vec<Harness> {
     vec![
         Harness {
+            launch: crate::launch::Provider::Claude,
             task: TaskArg::Last,
             resume: words(&["--resume", "{session}"]),
             session: SessionFrom::Given,
@@ -168,6 +174,7 @@ pub fn built_in() -> Vec<Harness> {
         },
         Harness {
             // Codex rings its terminal when it wants an answer or has finished, if asked to.
+            launch: crate::launch::Provider::Codex,
             args: words(&["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]"]),
             task: TaskArg::Last,
             resume: words(&["resume", "{session}"]),

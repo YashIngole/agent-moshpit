@@ -25,6 +25,8 @@ export interface Agent {
   resume_note: string
   /** Its terminal printed something since you last had it in front of you. */
   unread: boolean
+  /** Explicit settings at launch; the program can change them in its terminal. */
+  launch?: LaunchOptions
 }
 
 /** One program an agent can be, and whether it is on this computer. */
@@ -33,6 +35,7 @@ export interface Harness {
   name: string
   tag: string
   installed: boolean
+  launch?: 'none' | 'claude' | 'codex'
   /** Empty until it has answered, or when it did not. */
   version: string
   /** Whether the first thing to do can be handed over when it starts. */
@@ -99,4 +102,44 @@ export interface NewAgentSpec {
   prompt: string
   title?: string
   worktree?: boolean
+  launch?: LaunchOptions
+}
+
+export interface LaunchOptions {
+  model?: string
+  effort?: string
+  permission?: string
+  sandbox?: string
+  approval?: string
+  profile?: string
+  search?: boolean | null
+  additional_dirs?: string[]
+  allowed_tools?: string[]
+  disallowed_tools?: string[]
+  chrome?: boolean | null
+  instructions?: string
+}
+
+export interface ModelChoice {
+  id: string
+  name: string
+  description: string
+  efforts: string[]
+  resolved: string
+  auto_mode: boolean | null
+}
+
+export interface PermissionChoice {
+  id: string
+  name: string
+  description: string
+}
+
+export interface ModelCatalog {
+  models: ModelChoice[]
+  permissions: PermissionChoice[]
+  features: string[]
+  fetched_ms: number
+  source: string
+  problem: string
 }

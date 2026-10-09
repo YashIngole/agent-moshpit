@@ -16,3 +16,7 @@ Thumbs.db
 
 # The app's own window with its demo data, built into the site by `npm run build:site`
 site/demo/
+
+# Wrangler's local preview state and deployment cache
+.wrangler/
+.playwright-mcp/

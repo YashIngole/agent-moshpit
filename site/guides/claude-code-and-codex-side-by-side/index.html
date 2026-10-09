@@ -23,6 +23,10 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Run Claude Code and Codex side by side in one window" />
+    <meta name="twitter:description" content="Both at once in the same project: shared instructions, a worktree each, and the two terminals next to each other." />
+    <meta name="twitter:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta name="twitter:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -140,8 +144,8 @@
           <div class="text">
             <h2 id="instructions">One instructions file for both</h2>
             <p>
-              Codex reads <code>AGENTS.md</code> before it does any work. Claude Code's own file is <code>CLAUDE.md</code>, and since version 2.1.277 it also reads <code>AGENTS.md</code> when the project has no <code>CLAUDE.md</code>.
-              So the simplest arrangement is one <code>AGENTS.md</code> at the root of the repository and nothing else.
+              Codex reads <code>AGENTS.md</code> before it does any work. Claude Code's own file is <code>CLAUDE.md</code>. Since version 2.1.277, its default settings also read <code>AGENTS.md</code> when there is no <code>CLAUDE.md</code> or <code>CLAUDE.local.md</code> in the working folder or above it.
+              One <code>AGENTS.md</code> at the root can therefore work for both. If Claude does not load it, use the import below; Anthropic's <a href="https://code.claude.com/docs/en/memory#my-agents-md-isnt-loading">troubleshooting steps</a> cover versions and settings that change this.
             </p>
             <p>
               If the project already has a <code>CLAUDE.md</code>, Claude Code reads that and leaves <code>AGENTS.md</code> alone. Keep the shared rules in <code>AGENTS.md</code> and pull them in with one line:

@@ -4,11 +4,11 @@
 [![Latest release](https://img.shields.io/github/v/release/YashIngole/agent-moshpit)](https://github.com/YashIngole/agent-moshpit/releases/latest)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-A small desktop office for coding agents. Claude Code, Codex, Antigravity CLI and the rest run as the real command-line programs, each in a terminal inside one window, and each is drawn as a person at a desk. One look tells you who is working, who is done, and who needs you.
+Run multiple Claude Code, Codex and other coding agents side by side in one desktop window. Each is the real command-line program in its own terminal, drawn as a person at a desk. One look tells you who is working, who is done, and which agent is waiting for you.
 
 ![The Agent Moshpit window: agents at their desks on the left, three of their terminals in a grid beside them, and an amber band across the top naming the agent who needs you](docs/terminals.png)
 
-**[Download](https://agentmoshpit.com)** · [Guide](docs/guide.md) · [Release notes](https://github.com/YashIngole/agent-moshpit/releases)
+**[Download](https://agentmoshpit.com)** · [Guide](docs/guide.md) · [Parallel-agent guides](https://agentmoshpit.com/guides/) · [Release notes](https://github.com/YashIngole/agent-moshpit/releases)
 
 ## Features
 

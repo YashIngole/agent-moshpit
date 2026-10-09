@@ -23,6 +23,10 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Get notified when Claude Code or Codex is waiting for input" />
+    <meta name="twitter:description" content="The terminal bell, hooks and Codex's notify settings, on Windows, macOS and Linux, and what to do when several agents are running at once." />
+    <meta name="twitter:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta name="twitter:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -219,7 +223,7 @@ notification_method = "bel"</code></pre>
               <li><code>notification_method</code> is <code>auto</code>, <code>osc9</code> or <code>bel</code>. <code>auto</code> prefers a desktop notification where the terminal seems to support one, and falls back to the bell.</li>
               <li><code>notification_condition</code> says whether they come only when the terminal is not in front, or always.</li>
             </ul>
-            <p>For anything those cannot do there is <code>notify</code>, which runs a program of yours and hands it one argument, a description of the event in JSON:</p>
+            <p>For anything those cannot do there is <code>notify</code>, which runs a program of yours and hands it one argument, a description of the event in JSON. Put it at the top level of <code>config.toml</code>, before <code>[tui]</code> or any other section:</p>
             <pre class="code"><code>notify = ["python3", "/home/you/bin/codex-done.py"]</code></pre>
             <p>
               As <a href="https://developers.openai.com/codex/config-advanced#notifications">OpenAI's page</a> stands today, <code>notify</code> is run when a turn completes and not when Codex asks for approval.
@@ -233,7 +237,7 @@ notification_method = "bel"</code></pre>
           <div class="text">
             <h2 id="several">With several agents, a bell is not enough</h2>
             <p>
-              Every way above answers “did something stop?”. None of them answers “which one?”.
+              A basic bell or generic notification answers “did something stop?”, but leaves you to find the session.
               A bell is a bell. A notification that says an agent needs your attention does not say which of five tabs to open, unless you write the script that puts the folder's name in it.
               And two agents that stop a minute apart give you one notification you dismiss and one you never see.
             </p>

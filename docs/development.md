@@ -50,7 +50,7 @@ src/             the window, in Svelte 5
                    file paths and links, words, looks, the shared beat, demo data
   styles/          the colours, type and spacing (tokens.css)
 tools/e2e/       the tests that drive the window and the real app, and the stand-in programs they use
-site/            agentmoshpit.com: one static page. `npm run build:site` builds the window with its demo
+site/            agentmoshpit.com: the static home page and guides. `npm run build:site` builds the window with its demo
                  data into site/demo, which the page shows live; `node tools/site-shots.mjs` takes its pictures
 docs/            the guide, the programs, the known limits and this file; the plan for this version,
                  its mockups, the release notes, and two reviews with their screenshots
@@ -90,6 +90,8 @@ Every test of the real app runs it as its own named office with its own data fol
 The download buttons link to `https://github.com/YashIngole/agent-moshpit/releases/latest/download/<file>`. The release workflow names the files without a version, so those addresses always lead to the newest release. One line of the site does name a version: `softwareVersion` in the home page's structured data. Change it when a release is published.
 
 For search engines there are `site/robots.txt` and `site/sitemap.xml`; a new page goes into the sitemap by hand, and a changed one gets a new `lastmod`. Each guide says at its top when it was last checked against the programs it describes. When Claude Code, Codex or the app changes what a guide says, check it again and change that date and the two in its structured data. The guides' pictures are the `guide-*.webp` that `node tools/site-shots.mjs --guides` takes.
+
+After building the demo, serve the actual Cloudflare configuration locally with `npx wrangler dev --config tools/cloudflare/site.jsonc --local --port 4177`, then run `node tools/check-site.mjs http://127.0.0.1:4177`. It checks the sitemap, each page's metadata and structured data, internal links and fragments, image assets, headings, reading without JavaScript, indexing headers, the install scripts and a real 404 response. After deploying, run `node tools/check-site.mjs https://agentmoshpit.com` against the live site.
 
 It is hosted on Cloudflare as static files. With a Cloudflare login (`npx wrangler login`):
 

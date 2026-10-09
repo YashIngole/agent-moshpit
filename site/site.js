@@ -5,7 +5,7 @@
 // 2. The picture of the app at the top is replaced by the app's own window, running
 //    here with its demo data (site/demo, made by `npm run build:site`).
 //
-// Nothing is sent anywhere, nothing is stored, and nothing is loaded from elsewhere.
+// This script sends nothing anywhere and stores nothing.
 ;(() => {
   'use strict'
 

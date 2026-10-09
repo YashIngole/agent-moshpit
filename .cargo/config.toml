@@ -1,6 +1,9 @@
 # Distributable CPU baseline: never inherit the builder's instruction set.
 # Linux CI uses packaged bindings; Windows/macOS generate target bindings.
 [env]
+# The pinned native engine uses C++17 filesystem (available since macOS 10.15).
+# Match Tauri's bundle minimum for direct Cargo builds as well.
+MACOSX_DEPLOYMENT_TARGET = "10.15"
 GGML_NATIVE = "OFF"
 GGML_SSE42 = "OFF"
 GGML_AVX_VNNI = "OFF"

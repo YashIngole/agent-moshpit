@@ -1,5 +1,6 @@
 # Known limits
 
+- macOS builds require 10.15 or newer (Apple Silicon requires macOS 11 or newer).
 - Not used by hand on macOS or Linux. CI builds both and runs the automated checks there, and that is all that is known about them.
 - Local voice's native microphone permissions, default-device routing and unplug/reconnect behavior have not been checked by hand on any OS. Windows validation uses demo audio and an explicit prerecorded-WAV debug fixture. Release CI checks platform compilation; that does not establish microphone behavior. See the [voice validation record](reviews/voice-validation-2026-10-09.md).
 - Voice is CPU-only and capped at 60 seconds. Energy filtering rejects silence/short clips but is not a speech detector and cannot guarantee no hallucinations. Accent, Hindi/Hinglish, vocabulary accuracy and general latency/RSS remain unestablished; a prerecorded English fixture is not a speech-quality benchmark.

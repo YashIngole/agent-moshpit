@@ -129,8 +129,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Refresh Windows native build configuration
-        if: runner.os == 'Windows'
+      - name: Refresh platform native build configuration
+        if: runner.os != 'Linux'
         run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys --release --target ${{ matrix.target }}
 
       - uses: tauri-apps/tauri-action@v1

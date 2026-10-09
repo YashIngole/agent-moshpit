@@ -10,6 +10,9 @@
 //! programs' versions. A build being worked on never asks. `MOSHPIT_UPDATE_URL`
 //! names somewhere else to ask, and then it is asked whatever the other two say:
 //! that is how the tests show the office a newer version without a network.
+//! With `MOSHPIT_UPDATE_ONLY_FETCH` an update is fetched and checked and then left
+//! alone, so a release's signed files can be tried against the key without
+//! installing anything (`tools/e2e/update-fetch.mjs`).
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -109,6 +112,9 @@ pub async fn install(app: &AppHandle) -> Result<(), String> {
 async fn put_in_place(app: &AppHandle) -> Result<(), String> {
     let update = ask(app).await.ok_or("No newer version was found just now. Nothing was changed.")?;
     let bytes = update.download(|_, _| {}, || {}).await.map_err(|why| format!("The update could not be fetched ({why}). Nothing was changed."))?;
+    if std::env::var_os("MOSHPIT_UPDATE_ONLY_FETCH").is_some() {
+        return Err(format!("Version {} was fetched and passed its check ({} bytes). It was not put in place: this office was only asked to fetch it.", update.version, bytes.len()));
+    }
     // On Windows this does not come back: the installer takes over (see `updater`).
     update.install(bytes).map_err(|why| format!("The update could not be put in place ({why}). Nothing was changed."))?;
     crate::put_away(app);

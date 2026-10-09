@@ -193,6 +193,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | --- | --- |
 | `MOSHPIT_NO_UPDATE_CHECK` | Set to anything, the office never asks for newer versions: not npm about the agent programs, and not GitHub about itself. |
 | `MOSHPIT_UPDATE_URL` | Ask this address about newer versions of the office instead of its releases on GitHub. Used by the tests. |
+| `MOSHPIT_UPDATE_ONLY_FETCH` | Set to anything, an update is fetched and checked and then left alone. Used by the tests. |
 | `MOSHPIT_DATA_DIR` | Keep the office's files in this folder instead of the app's data folder. |
 | `MOSHPIT_INSTANCE` | A name (letters and digits) that makes this a separate office next to the one already open: its own window, data folder, window title ("Agent Moshpit (name)") and notification address. `--instance name` on the command line does the same. Used by the tests. |
 | `MOSHPIT_DEVTOOLS` | Set to anything, the webview's browser keys are left on (F5 reloads the window; in a debug build F12 opens the developer tools), for working on the window itself. Windows. |

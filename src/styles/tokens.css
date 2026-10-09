@@ -15,8 +15,6 @@
   /* the rooms */
   --bg: #0a0c0f;
   --carpet: #111418;
-  --carpet-line: #161a1f;
-  --carpet-deep: #0a0c0f;
   --grid: rgba(255, 255, 255, 0.028);
   --wall: #252b33;
   --chrome: #0d0f12;
@@ -109,8 +107,6 @@
   --r-3: 12px;
   --bar: 52px;
   --panel-width: 380px;
-  /* the floor beside terminals that have been given the room */
-  --strip: 264px;
 
   /* motion */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);

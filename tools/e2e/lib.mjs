@@ -34,9 +34,14 @@ export function launch({ port = 9223, env = {}, args = [] } = {}) {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
       ...env
     },
-    stdio: 'ignore',
+    stdio: process.env.CI ? 'inherit' : 'ignore',
     windowsHide: false
   })
+  if (process.env.CI) {
+    console.log(`Desktop test process ${child.pid}: ${appPath()}`)
+    child.on('error', error => console.error(`Desktop startup error: ${error.message}`))
+    child.on('exit', (code, signal) => console.log(`Desktop process ${child.pid} exited: code=${code}, signal=${signal}`))
+  }
   return { child, port }
 }
 

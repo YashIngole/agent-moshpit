@@ -317,11 +317,14 @@ fn open_window(app: &AppHandle) {
         if let Some((x, y)) = remembered.as_ref().and_then(|p| on_screen(&app, p)) {
             builder = builder.position(x, y);
         }
-        if let Ok(window) = builder.build() {
-            app.state::<voice::Voice>().window(true);
-            allow_clipboard(&window);
-            quiet_browser(&window);
-            app.state::<Handle>().attention(true, true);
+        match builder.build() {
+            Ok(window) => {
+                app.state::<voice::Voice>().window(true);
+                allow_clipboard(&window);
+                quiet_browser(&window);
+                app.state::<Handle>().attention(true, true);
+            }
+            Err(error) => eprintln!("Agent Moshpit could not open its window: {error}"),
         }
     });
 }

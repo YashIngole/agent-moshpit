@@ -316,6 +316,15 @@ fn open_window(app: &AppHandle) {
             // The window shows this app and nothing else. A link in a terminal is opened
             // in the browser, never followed here; this is the second lock.
             .on_navigation(|url| is_own_page(url.scheme(), url.host_str()));
+        // WebView2 150 ignores environment browser flags in elevated hosts,
+        // including hosted Windows CI. Pass the isolated debug fixture's port
+        // through its API; release builds never enable this test hook.
+        #[cfg(all(windows, debug_assertions))]
+        if instance_name().is_some() && std::env::var_os("MOSHPIT_DATA_DIR").is_some() {
+            if let Some(port) = std::env::var("MOSHPIT_TEST_DEBUG_PORT").ok().and_then(|s| s.parse::<u16>().ok()).filter(|p| *p != 0) {
+                builder = builder.additional_browser_args(&format!("--remote-debugging-port={port}"));
+            }
+        }
         if let Some((x, y)) = remembered.as_ref().and_then(|p| on_screen(&app, p)) {
             builder = builder.position(x, y);
         }

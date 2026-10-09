@@ -32,6 +32,7 @@ export function launch({ port = 9223, env = {}, args = [] } = {}) {
       // Tests never ask npm for versions: no network, and no processes the test did not start.
       MOSHPIT_NO_UPDATE_CHECK: '1',
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
+      MOSHPIT_TEST_DEBUG_PORT: String(port),
       ...env
     },
     stdio: process.env.CI ? 'inherit' : 'ignore',

@@ -94,6 +94,8 @@ node tools/e2e/terminals.mjs
 
 Every test of the real app runs it as its own named office with its own data folder (`MOSHPIT_INSTANCE`, `MOSHPIT_DATA_DIR`), so an office you have open is left alone, and none of them asks npm for versions.
 
+The Windows debug build accepts `MOSHPIT_TEST_DEBUG_PORT` only for a named office with an explicit data directory. Test helpers pass this port through the WebView2 API because Runtime 150+ ignores environment browser flags in elevated hosts such as GitHub runners. Release builds do not read this test variable.
+
 ### Voice checks without a microphone
 
 Unit tests cover actual PCM formats/channel boundaries, 60-second bounds, silence/short rejection, ANSI/control sanitization, state cancellation, pinned file size/hash, atomic completion, hidden panes, restarted PTY generations, and excluding voice echo from saved screens. `npm run test:ui` adds deterministic demo listening/transcribing/failure/download/remove/cancel tests; it stubs clipboard writes and never uses a microphone or downloads a model.

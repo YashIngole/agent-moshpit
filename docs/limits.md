@@ -9,12 +9,14 @@
 - **Work on a separate copy** has not been run end to end. The office passes the program its own flag; the worktree is the program's doing.
 - Installing a real package with npm from inside the app has not been run; a stand-in installer was.
 - Claude Code's status has not been watched through real work in a test, because that means giving it a real task.
-- Programs known only by name, and Gemini CLI, always start afresh. Codex carries on only after the office has read which session it began. Antigravity CLI and Hermes carry on their latest conversation, not a particular desk's.
+- Programs known only by name, and Gemini CLI, always start afresh. Codex carries on only after the office verifies the session ID reported by its own terminal; legacy guessed IDs require an explicit `/resume` selection. Antigravity CLI and Hermes carry on their latest conversation, not a particular desk's.
 - Antigravity CLI's row was written from Google's documentation and has not been run by the makers: how it takes a task (`--prompt-interactive`) and carries on (`--continue`) may need correcting.
 - A desk's last screen is written when the office quits, not while it runs, so after a crash an away desk shows an older screen or none.
 - On Windows, a program that can only be started through `cmd.exe` cannot be handed a task containing characters `cmd.exe` would read as commands. The office says so and asks you to type the task in the terminal.
 - Updating a program while agents are running it can fail on Windows until they stop.
-- The tray icon and its menu are not covered by any automated test.
+- The native tray click itself is not automated. Pending New agent delivery and listener-registration races are covered.
 - One window, no sounds.
 - Installers are not signed with a certificate (the macOS app is signed ad hoc only), so Windows and macOS warn the first time.
-- Updating from inside the app is new in 0.3.0, and is checked only as far as this: the real app, asked by a test, finds a newer version and offers it without fetching anything. Fetching a real update and putting it in place has not been run by hand on any system. Version 0.2.0 has no updater: get 0.3.0 from the download page.
+- The real Windows app fetched the published v0.3.0 installer and verified its signature on 9 October 2026; changing one byte was rejected. The test explicitly prevented installation. Full installer handoff and replacement remain unverified on every platform. Version 0.2.0 has no updater: get 0.3.0 from the download page.
+
+- The Linux GTK dependency tree has two RustSec informational warnings: GLib iterator unsoundness and unmaintained proc-macro-error. See [the dependency audit](development.md#reliability-checks-added-on-9-october-2026).

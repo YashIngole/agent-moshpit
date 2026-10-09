@@ -14,6 +14,7 @@ mod office;
 mod proctree;
 mod pty;
 mod status;
+mod storage;
 #[cfg(windows)]
 mod toast;
 mod update;
@@ -29,9 +30,7 @@ use tauri::image::Image;
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{
-    AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window, WindowEvent,
-};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window, WindowEvent};
 
 const WINDOW: &str = "main";
 const TRAY: &str = "main";
@@ -45,7 +44,7 @@ static HAS_TRAY: AtomicBool = AtomicBool::new(false);
 /// The real `Shell`: the window, the tray and the notification centre.
 struct Desktop {
     app: AppHandle,
-    desks: PathBuf,
+    desks: storage::DeskStore,
     /// The folder each desk's last screen is kept in between runs.
     screens: PathBuf,
     /// (need you, working, done) as last shown on the tray, to skip no-op updates.
@@ -61,6 +60,9 @@ struct Address {
 
 /// A desk a click on a notification asked for, until the window takes it.
 struct Opening(Mutex<Option<String>>);
+
+#[derive(Default)]
+struct NewAgentRequest(AtomicBool);
 
 /// Bring the office to the front, with this desk's terminal open when one is named.
 fn open_desk(app: &AppHandle, desk: Option<String>) {
@@ -109,7 +111,9 @@ impl Shell for Desktop {
                 let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
             }
         }
-        let Some(tray) = self.app.tray_by_id(TRAY) else { return };
+        let Some(tray) = self.app.tray_by_id(TRAY) else {
+            return;
+        };
         let (need, working, done) = counts;
         let mut parts: Vec<String> = Vec::new();
         if need > 0 {
@@ -134,13 +138,26 @@ impl Shell for Desktop {
         notify(&self.app, title, body, Some(desk));
     }
 
-    fn save(&self, desks: &[SavedDesk]) {
-        if let Ok(text) = serde_json::to_string_pretty(desks) {
-            write_whole(&self.desks, &text);
+    fn save(&self, revision: u64, desks: &[SavedDesk]) {
+        if let Err(error) = self.desks.save(revision, desks) {
+            if self.desks.blocked() {
+                return;
+            } // The more useful startup recovery message is already retained.
+            let problem = harness::Problem { text: format!("Changes could not be saved: {error}. Check that the office's data folder is writable before quitting."), file: self.desks.path.to_string_lossy().into_owned(), line: None };
+            let problems = self.app.state::<StartupProblems>();
+            let mut known = problems.0.lock().unwrap();
+            if !known.iter().any(|p| p.text == problem.text && p.file == problem.file) {
+                known.retain(|p| p.file != problem.file);
+                known.push(problem.clone());
+                let _ = self.app.emit("office:storage-problem", problem);
+            }
         }
     }
 
     fn save_screens(&self, screens: &[(String, Vec<u8>)]) {
+        if self.desks.preserve_screens() {
+            return;
+        }
         let _ = std::fs::create_dir_all(&self.screens);
         // A screen kept for a desk that has gone goes with it.
         if let Ok(entries) = std::fs::read_dir(&self.screens) {
@@ -194,7 +211,7 @@ struct Chosen {
 }
 
 /// What was wrong as the office started, said once the window asks.
-struct StartupProblems(Vec<harness::Problem>);
+struct StartupProblems(Mutex<Vec<harness::Problem>>);
 
 /// Write beside the file and rename, so a crash never leaves half a file.
 fn write_whole(path: &Path, text: &str) {
@@ -237,12 +254,7 @@ impl WindowMemory {
         if size.width == 0 || size.height == 0 {
             return;
         }
-        let placement = Placement {
-            width: f64::from(size.width) / scale,
-            height: f64::from(size.height) / scale,
-            x: position.x,
-            y: position.y,
-        };
+        let placement = Placement { width: f64::from(size.width) / scale, height: f64::from(size.height) / scale, x: position.x, y: position.y };
         *self.last.lock().unwrap() = Some(placement);
     }
 
@@ -316,7 +328,9 @@ const OWN_ORIGINS: &[&str] = &["http://tauri.localhost", "https://tauri.localhos
 /// Whether an address WebView2 asks about is this app's own page.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn own_address(uri: &str) -> bool {
-    let Some((scheme, rest)) = uri.split_once("://") else { return false };
+    let Some((scheme, rest)) = uri.split_once("://") else {
+        return false;
+    };
     let host = rest.split(['/', '?', '#']).next().unwrap_or("");
     let host = host.rsplit_once(':').filter(|(_, port)| port.chars().all(|c| c.is_ascii_digit())).map_or(host, |(name, _)| name);
     is_own_page(&scheme.to_ascii_lowercase(), Some(&host.to_ascii_lowercase()))
@@ -328,12 +342,12 @@ fn own_address(uri: &str) -> bool {
 #[cfg(windows)]
 fn allow_clipboard(window: &WebviewWindow) {
     let _ = window.with_webview(|webview| unsafe {
-        use webview2_com::Microsoft::Web::WebView2::Win32::{
-            ICoreWebView2Profile4, ICoreWebView2_13, COREWEBVIEW2_PERMISSION_KIND, COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ, COREWEBVIEW2_PERMISSION_STATE_ALLOW,
-        };
+        use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Profile4, ICoreWebView2_13, COREWEBVIEW2_PERMISSION_KIND, COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ, COREWEBVIEW2_PERMISSION_STATE_ALLOW};
         use webview2_com::{PermissionRequestedEventHandler, SetPermissionStateCompletedHandler};
         use windows_core::{Interface, HSTRING, PWSTR};
-        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        let Ok(core) = webview.controller().CoreWebView2() else {
+            return;
+        };
         // Said up front, so the page knows it may (and `navigator.permissions` says so)...
         if let Ok(profile) = core.cast::<ICoreWebView2_13>().and_then(|core| core.Profile()).and_then(|p| p.cast::<ICoreWebView2Profile4>()) {
             for origin in OWN_ORIGINS {
@@ -409,6 +423,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => open_window(app),
             "new" => {
+                app.state::<NewAgentRequest>().0.store(true, Ordering::SeqCst);
                 open_window(app);
                 let _ = app.emit("office:new-agent", ());
             }
@@ -635,7 +650,9 @@ fn picture_kind(bytes: &[u8]) -> Option<&'static str> {
 
 /// Clear away pictures pasted long ago.
 fn clear_old_pastes(dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir.join("pasted")) else { return };
+    let Ok(entries) = std::fs::read_dir(dir.join("pasted")) else {
+        return;
+    };
     for entry in entries.flatten() {
         let old = entry.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|age| age > PASTED_KEPT);
         if old {
@@ -647,7 +664,7 @@ fn clear_old_pastes(dir: &Path) {
 /// Whatever was wrong as the office started, for the window to say.
 #[tauri::command]
 fn startup_problems(problems: State<'_, StartupProblems>) -> Vec<harness::Problem> {
-    problems.0.clone()
+    problems.0.lock().unwrap().clone()
 }
 
 #[tauri::command]
@@ -666,6 +683,11 @@ fn set_close_quits(chosen: State<'_, Chosen>, on: bool) {
 }
 
 /// The desk a click on a notification asked for, once: the window opens its terminal.
+#[tauri::command]
+fn take_new_agent(request: State<'_, NewAgentRequest>) -> bool {
+    request.0.swap(false, Ordering::SeqCst)
+}
+
 #[tauri::command]
 fn take_opening(opening: State<'_, Opening>) -> Option<String> {
     opening.0.lock().unwrap().take()
@@ -841,6 +863,7 @@ pub fn run() {
             save_pasted_image,
             startup_problems,
             take_opening,
+            take_new_agent,
             settings,
             set_close_quits,
             dismiss,
@@ -887,6 +910,7 @@ pub fn run() {
             let known = exe.as_deref().is_some_and(|exe| link::register(&scheme, exe, instance_name().as_deref()));
             // Started by a click on a notification from before: that desk is opened.
             let launched: Vec<String> = std::env::args().collect();
+            app.manage(NewAgentRequest::default());
             app.manage(Opening(Mutex::new(link::asked(&launched, &scheme).flatten())));
             app.manage(Address { scheme: scheme.clone(), known });
 
@@ -896,8 +920,7 @@ pub fn run() {
                 None => app.path().app_data_dir()?,
             };
             let _ = std::fs::create_dir_all(&dir);
-            let desks = dir.join("desks.json");
-            let saved: Vec<SavedDesk> = load_json(&desks).unwrap_or_default();
+            let (desks, saved, storage_problem) = storage::DeskStore::load(dir.join("desks.json"));
             let chosen = dir.join("settings.json");
             app.manage(Chosen { now: Mutex::new(load_json(&chosen).unwrap_or_default()), path: chosen });
             let memory = WindowMemory { path: dir.join("window.json"), last: Mutex::new(None) };
@@ -906,10 +929,13 @@ pub fn run() {
 
             let screens = dir.join("screens");
             let kept = kept_screens(&screens, &saved);
+            let (table, mut problems) = harness::table_checked(&dir.join("harnesses.json"));
+            if let Some(text) = storage_problem {
+                problems.push(harness::Problem { text, file: desks.path.to_string_lossy().into_owned(), line: None });
+            }
+            app.manage(StartupProblems(Mutex::new(problems)));
             let shell = Arc::new(Desktop { app: app.handle().clone(), desks, screens, shown: Mutex::new(None) });
-            let (table, problems) = harness::table_checked(&dir.join("harnesses.json"));
             app.manage(engine::start(shell, table, saved, kept));
-            app.manage(StartupProblems(problems));
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
 

@@ -21,7 +21,7 @@ pub trait Shell: Send + Sync + 'static {
     fn snapshot(&self, snapshot: &Snapshot);
     /// Say something in the notification centre about a desk; a click on it opens that desk.
     fn notify(&self, title: &str, body: &str, desk: &str);
-    fn save(&self, desks: &[SavedDesk]);
+    fn save(&self, revision: u64, desks: &[SavedDesk]);
     /// What each desk's terminal last showed, kept for the next run. Tests keep nothing.
     fn save_screens(&self, _screens: &[(String, Vec<u8>)]) {}
 }
@@ -94,13 +94,14 @@ struct State {
     told: Option<(Vec<crate::model::AgentView>, Vec<HarnessView>, Vec<JobView>)>,
     /// The desks as last saved, those held aside among them, to save only what changed.
     saved: Vec<SavedDesk>,
+    revision: u64,
     looks: u64,
 }
 
 /// Something to tell the desktop. Queued, and said by a thread that holds no lock.
 enum Out {
     Snapshot(Snapshot),
-    Save(Vec<SavedDesk>),
+    Save(u64, Vec<SavedDesk>),
     /// A title, what it says, and the desk it is about.
     Notify(String, String, String),
 }
@@ -153,17 +154,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             kept.screen = Some(printed);
         }
     }
-    let state = State {
-        office: Office::restore(seated, now_ms()),
-        watched: HashSet::new(),
-        focused: false,
-        installed: HashMap::new(),
-        latest: HashMap::new(),
-        jobs: Vec::new(),
-        told: None,
-        saved,
-        looks: 0,
-    };
+    let state = State { office: Office::restore(seated, now_ms()), watched: HashSet::new(), focused: false, installed: HashMap::new(), latest: HashMap::new(), jobs: Vec::new(), told: None, saved, revision: 0, looks: 0 };
     let home = harness::home_dir().unwrap_or_default();
     // The desktop is told things by this thread alone. Showing a snapshot or a
     // notice waits for the app's main thread, which may itself be waiting for the
@@ -174,7 +165,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
         for message in queued {
             match message {
                 Out::Snapshot(snapshot) => teller.snapshot(&snapshot),
-                Out::Save(desks) => teller.save(&desks),
+                Out::Save(revision, desks) => teller.save(revision, &desks),
                 Out::Notify(title, body, desk) => teller.notify(&title, &body, &desk),
             }
         }
@@ -187,6 +178,9 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
     std::thread::spawn(move || {
         while !looker.inner.stopping.load(Ordering::Relaxed) {
             std::thread::sleep(LOOK_EVERY);
+            if looker.inner.stopping.load(Ordering::Relaxed) {
+                break;
+            }
             looker.look();
         }
     });
@@ -239,13 +233,12 @@ impl Handle {
         let (program, args) = harness::command_line(&found, &args)?;
 
         let id = new_id();
-        let desk = SavedDesk { id: id.clone(), harness: kind.id.clone(), title, title_locked: named, auto_title: auto, cwd: cwd.clone(), session, created_ms: now_ms() };
-        let asks = status::asks_trust(kind.trust, &self.inner.home, Path::new(&cwd));
+        let desk = SavedDesk { id: id.clone(), harness: kind.id.clone(), title, title_locked: named, auto_title: auto, cwd: cwd.clone(), session_verified: session.is_some(), session, created_ms: now_ms() };
         // Starting a program takes a moment; the lock is not held for it.
         self.inner.terms.start(&id, Launch { program, args, cwd, cols, rows })?;
         let mut state = self.inner.state.lock().unwrap();
         state.office.add(desk, now_ms());
-        state.office.started(&id, !task.is_empty(), asks, now_ms());
+        state.office.started(&id, !task.is_empty(), false, now_ms());
         self.place(&mut state, &id);
         self.publish(&mut state);
         Ok(id)
@@ -260,8 +253,12 @@ impl Handle {
         let (kind, cwd, session) = {
             let state = self.inner.state.lock().unwrap();
             let desk = state.office.get(id).ok_or("That desk is gone.")?;
-            (self.kind(&desk.saved.harness)?.clone(), desk.saved.cwd.clone(), desk.saved.session.clone())
+            let kind = self.kind(&desk.saved.harness)?;
+            (kind.clone(), desk.saved.cwd.clone(), desk.saved.resume_session(kind).map(str::to_string))
         };
+        if cwd.is_empty() || !Path::new(&cwd).is_dir() {
+            return Err(format!("The saved folder no longer exists: {cwd}. Restore it, or start a new desk in the project's new folder."));
+        }
         let found = self.locate(&kind)?;
         // Carry on when it can; otherwise a fresh start in the same folder.
         let (args, fresh) = match harness::resume_args(&kind, session.as_deref()) {
@@ -272,8 +269,6 @@ impl Handle {
             }
         };
         let (program, args) = harness::command_line(&found, &args)?;
-        let cwd = if Path::new(&cwd).is_dir() { cwd } else { String::new() };
-        let asks = !cwd.is_empty() && status::asks_trust(kind.trust, &self.inner.home, Path::new(&cwd));
 
         let outcome = self.inner.terms.start(id, Launch { program, args, cwd, cols, rows });
         let mut state = self.inner.state.lock().unwrap();
@@ -283,7 +278,7 @@ impl Handle {
                 if let Some(fresh) = fresh {
                     state.office.set_session(id, &fresh);
                 }
-                state.office.started(id, false, asks, now);
+                state.office.started(id, false, false, now);
                 Ok(())
             }
             Err(why) => {
@@ -371,9 +366,29 @@ impl Handle {
         self.inner.terms.resize(id, cols, rows);
     }
 
+    /// Capture a final CLI session switch before stop/exit can leave an older ID saved.
+    fn final_session(&self, state: &mut State, id: &str) {
+        let Some(desk) = state.office.get(id) else { return };
+        if !self.kind(&desk.saved.harness).is_ok_and(|h| h.session == SessionFrom::CodexRollouts) {
+            return;
+        }
+        let Some((_, title, _)) = self.inner.terms.signal(id, now_ms()) else { return };
+        if status::session_prefix(&title).is_none() || (desk.saved.session_verified && desk.saved.session.as_deref().is_some_and(|s| status::session_title_matches(&title, s))) {
+            return;
+        }
+        state.office.unverify_session(id);
+        if let Some(session) = status::codex_session(&self.inner.home, &title) {
+            state.office.set_session(id, &session);
+        }
+    }
+
     /// End a desk's program. The desk stays, asleep.
     pub fn stop(&self, id: &str) {
-        self.inner.state.lock().unwrap().office.will_stop(id);
+        {
+            let mut state = self.inner.state.lock().unwrap();
+            self.final_session(&mut state, id);
+            state.office.will_stop(id);
+        }
         self.inner.terms.stop(id);
     }
 
@@ -402,15 +417,13 @@ impl Handle {
     pub fn quit_words(&self) -> Option<String> {
         let state = self.inner.state.lock().unwrap();
         let n = state.office.busy();
+        let jobs: Vec<_> = state.jobs.iter().filter(|j| j.running).map(|j| format!("{} {}", self.kind(&j.harness).map_or(j.harness.as_str(), |h| h.name.as_str()), j.kind.word())).collect();
+        let job_warning = if jobs.is_empty() { String::new() } else { format!("Still running: {}. Quitting interrupts these installations or updates; you may need to run them again.", jobs.join(", ")) };
         if n == 0 {
-            return None;
+            return (!jobs.is_empty()).then_some(job_warning);
         }
         let busy: Vec<_> = state.office.desks().iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::NeedsYou | Phase::Starting)).collect();
-        let afresh: Vec<String> = busy
-            .iter()
-            .filter(|d| !self.kind(&d.saved.harness).is_ok_and(|h| harness::can_resume(h, d.saved.session.as_deref())))
-            .map(|d| d.saved.title.clone())
-            .collect();
+        let afresh: Vec<String> = busy.iter().filter(|d| !self.kind(&d.saved.harness).is_ok_and(|h| harness::can_resume(h, d.saved.resume_session(h)))).map(|d| d.saved.title.clone()).collect();
         let head = if n == 1 { "1 agent is still busy. Quitting ends its program.".to_string() } else { format!("{n} agents are still busy. Quitting ends their programs.") };
         let tail = match (afresh.len(), n) {
             (0, 1) => " Its conversation is kept: Carry on, on its desk, picks it up again.".to_string(),
@@ -419,7 +432,7 @@ impl Handle {
             (a, b) if a == b => " Their programs cannot carry on a conversation, so they start afresh next time.".to_string(),
             _ => format!(" {} will start afresh next time; the others carry on where they left off.", afresh.join(", ")),
         };
-        Some(head + &tail)
+        Some(format!("{head}{tail}{}", if job_warning.is_empty() { String::new() } else { format!(" {job_warning}") }))
     }
 
     /// Take the desk away, ending its program. The conversation is the program's to keep.
@@ -446,7 +459,9 @@ impl Handle {
     pub fn watch(&self, ids: Vec<String>) {
         let mut state = self.inner.state.lock().unwrap();
         state.watched = ids.into_iter().collect();
-        self.see(&mut state);
+        if state.focused {
+            self.see(&mut state);
+        }
     }
 
     /// The window came to the front, went behind, or closed.
@@ -465,12 +480,21 @@ impl Handle {
     pub fn shutdown(&self) {
         self.inner.stopping.store(true, Ordering::Relaxed);
         self.inner.terms.stop_all();
-        let state = self.inner.state.lock().unwrap();
-        self.inner.shell.save(&self.to_save(&state));
+        let mut state = self.inner.state.lock().unwrap();
+        let ids: Vec<String> = state.office.desks().iter().map(|d| d.saved.id.clone()).collect();
+        for id in ids {
+            self.final_session(&mut state, &id);
+        }
+        state.revision += 1;
+        let revision = state.revision;
+        let saved = self.to_save(&state);
         // Only desks' screens: an install's terminal is not kept.
         let mut screens: Vec<(String, Vec<u8>)> = self.inner.terms.screens(SCREEN_HISTORY).into_iter().filter(|(id, _)| state.office.get(id).is_some()).collect();
         // And those of the desks held aside, as they were: a screen not handed over is deleted.
         screens.extend(self.inner.aside.iter().filter_map(|a| Some((a.desk.id.clone(), a.screen.clone()?))));
+        drop(state);
+        // Saving can report a storage error to the desktop; never hold the engine lock for that.
+        self.inner.shell.save(revision, &saved);
         self.inner.shell.save_screens(&screens);
     }
 
@@ -489,6 +513,7 @@ impl Handle {
             std::thread::spawn(move || again.find_program(&harness));
             return;
         }
+        self.final_session(&mut state, id);
         let change = state.office.exited(id, ok, now_ms());
         self.tell(&state, change);
         self.publish(&mut state);
@@ -502,10 +527,18 @@ impl Handle {
         state.looks += 1;
         let slow = state.looks.is_multiple_of(SLOW_EVERY);
         for (id, pid) in pids {
-            let Some(desk) = state.office.get(&id) else { continue };
-            let Ok(kind) = self.kind(&desk.saved.harness) else { continue };
-            let (cwd, started, has_session) = (desk.saved.cwd.clone(), desk.started_ms, desk.saved.session.is_some());
-            let Some((mut signal, _title, printed)) = self.inner.terms.signal(&id, now) else { continue };
+            let Some(desk) = state.office.get(&id) else {
+                continue;
+            };
+            let Ok(kind) = self.kind(&desk.saved.harness) else {
+                continue;
+            };
+            let session = desk.saved.resume_session(kind).map(str::to_string);
+            let mut cwd = desk.saved.cwd.clone();
+            let Some((mut signal, title, printed)) = self.inner.terms.signal(&id, now) else {
+                continue;
+            };
+            state.office.observed_trust(&id, self.inner.terms.trust_prompt(&id, kind.trust));
 
             if kind.status == StatusFrom::ClaudeSessions {
                 if let Some(session) = status::read_claude_session(&self.inner.home, pid) {
@@ -517,27 +550,29 @@ impl Handle {
                     state.office.suggest_title(&id, &session.name);
                     state.office.set_session(&id, &session.session_id);
                     if slow && !session.cwd.is_empty() {
-                        let (repo, branch) = status::project(Path::new(&session.cwd));
-                        state.office.set_place(&id, repo, branch);
+                        cwd = session.cwd;
                     }
                 }
             }
-            if slow && kind.session == SessionFrom::CodexRollouts && !has_session {
-                if let Some(session) = status::codex_session(&self.inner.home, &cwd, started) {
-                    state.office.set_session(&id, &session);
+            if kind.session == SessionFrom::CodexRollouts && !session.as_deref().is_some_and(|s| status::session_title_matches(&title, s)) {
+                if status::session_prefix(&title).is_some() {
+                    state.office.unverify_session(&id);
                 }
+                if slow {
+                    if let Some(session) = status::codex_session(&self.inner.home, &title) {
+                        state.office.set_session(&id, &session);
+                    }
+                }
+            }
+            if slow {
+                let (project, repo, branch) = status::project(Path::new(&cwd));
+                state.office.set_place(&id, project, repo, branch);
             }
             let watched = state.focused && state.watched.contains(&id);
             // Before the look: what it printed while it was still drawing its opening screen is not news.
             state.office.heard(&id, printed, watched, now);
             let change = state.office.observe(&id, &signal, watched, now);
             self.tell(&state, change);
-        }
-        if slow {
-            let ids: Vec<String> = state.office.desks().iter().filter(|d| d.running && d.branch.is_empty()).map(|d| d.saved.id.clone()).collect();
-            for id in ids {
-                self.place(&mut state, &id);
-            }
         }
         self.publish(&mut state);
     }
@@ -577,9 +612,11 @@ impl Handle {
 
     /// Work out which project and branch a desk's folder is.
     fn place(&self, state: &mut State, id: &str) {
-        let Some(cwd) = state.office.get(id).map(|d| d.saved.cwd.clone()) else { return };
-        let (repo, branch) = status::project(Path::new(&cwd));
-        state.office.set_place(id, repo, branch);
+        let Some(cwd) = state.office.get(id).map(|d| d.saved.cwd.clone()) else {
+            return;
+        };
+        let (project, repo, branch) = status::project(Path::new(&cwd));
+        state.office.set_place(id, project, repo, branch);
     }
 
     fn refresh_places(&self) {
@@ -592,6 +629,9 @@ impl Handle {
 
     /// Send the window the office as it stands, if it differs from what it has.
     fn publish(&self, state: &mut State) {
+        if self.inner.stopping.load(Ordering::Relaxed) {
+            return;
+        }
         let picture = self.picture(state);
         let now = (picture.agents.clone(), picture.harnesses.clone(), picture.jobs.clone());
         if state.told.as_ref() != Some(&now) {
@@ -600,7 +640,8 @@ impl Handle {
         }
         let saved = self.to_save(state);
         if saved != state.saved {
-            self.say(Out::Save(saved.clone()));
+            state.revision += 1;
+            self.say(Out::Save(state.revision, saved.clone()));
             state.saved = saved;
         }
     }
@@ -648,14 +689,7 @@ impl Handle {
         let jobs = state
             .jobs
             .iter()
-            .map(|j| JobView {
-                id: j.id.clone(),
-                harness: j.harness.clone(),
-                harness_name: self.kind(&j.harness).map_or_else(|_| j.harness.clone(), |h| h.name.clone()),
-                kind: j.kind.word().to_string(),
-                running: j.running,
-                ok: j.ok,
-            })
+            .map(|j| JobView { id: j.id.clone(), harness: j.harness.clone(), harness_name: self.kind(&j.harness).map_or_else(|_| j.harness.clone(), |h| h.name.clone()), kind: j.kind.word().to_string(), running: j.running, ok: j.ok })
             .collect();
         Snapshot { agents: state.office.views(&self.inner.table), harnesses, jobs, now_ms: now_ms() }
     }
@@ -682,7 +716,9 @@ impl Handle {
 
     /// Look for one program again, and ask its version.
     fn find_program(&self, harness_id: &str) {
-        let Ok(kind) = self.kind(harness_id) else { return };
+        let Ok(kind) = self.kind(harness_id) else {
+            return;
+        };
         let found = harness::find(&kind.program);
         let version = found.as_ref().map(harness::version).unwrap_or_default();
         let mut state = self.inner.state.lock().unwrap();
@@ -694,7 +730,9 @@ impl Handle {
 
     /// Ask npm for the newest version of every installed program it publishes.
     fn check_updates(&self) {
-        let Some(npm) = harness::find("npm") else { return };
+        let Some(npm) = harness::find("npm") else {
+            return;
+        };
         let asks: Vec<(String, String)> = {
             let state = self.inner.state.lock().unwrap();
             self.inner
@@ -788,7 +826,7 @@ mod tests {
         fn notify(&self, title: &str, body: &str, _desk: &str) {
             self.notices.lock().unwrap().push((title.into(), body.into()));
         }
-        fn save(&self, desks: &[SavedDesk]) {
+        fn save(&self, _revision: u64, desks: &[SavedDesk]) {
             *self.saved.lock().unwrap() = desks.to_vec();
         }
         fn save_screens(&self, screens: &[(String, Vec<u8>)]) {
@@ -848,11 +886,15 @@ mod tests {
         // Typed into, it answers; watched from a terminal, that is seen.
         let seen = Arc::new(Mutex::new(Vec::new()));
         let into = seen.clone();
-        engine.attach(&id, Box::new(move |bytes: &[u8]| {
-            into.lock().unwrap().extend_from_slice(bytes);
-            true
-        }))
-        .unwrap();
+        engine
+            .attach(
+                &id,
+                Box::new(move |bytes: &[u8]| {
+                    into.lock().unwrap().extend_from_slice(bytes);
+                    true
+                }),
+            )
+            .unwrap();
         engine.write(&id, b"echo from-the-desk\r\n").unwrap();
         assert!(until(|| String::from_utf8_lossy(&seen.lock().unwrap()).contains("from-the-desk")));
 
@@ -903,11 +945,15 @@ mod tests {
         assert!(until(|| job(&engine).is_some_and(|j| !j.running && j.ok == Some(true))), "{:?}", job(&engine));
         let seen = Arc::new(Mutex::new(Vec::new()));
         let into = seen.clone();
-        engine.attach(&id, Box::new(move |bytes: &[u8]| {
-            into.lock().unwrap().extend_from_slice(bytes);
-            true
-        }))
-        .unwrap();
+        engine
+            .attach(
+                &id,
+                Box::new(move |bytes: &[u8]| {
+                    into.lock().unwrap().extend_from_slice(bytes);
+                    true
+                }),
+            )
+            .unwrap();
         assert!(until(|| String::from_utf8_lossy(&seen.lock().unwrap()).contains("updated-ok")));
         // A job is not a desk.
         assert!(engine.snapshot().agents.is_empty());
@@ -922,9 +968,19 @@ mod tests {
     fn desks_from_before_come_back_asleep() {
         let shell = Arc::new(Quiet::default());
         let saved = vec![
-            SavedDesk { id: "a".into(), harness: "shell".into(), title: "Old friend".into(), title_locked: true, auto_title: String::new(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), session: None, created_ms: 1 },
+            SavedDesk {
+                id: "a".into(),
+                harness: "shell".into(),
+                title: "Old friend".into(),
+                title_locked: true,
+                auto_title: String::new(),
+                cwd: std::env::temp_dir().to_string_lossy().into_owned(),
+                session: None,
+                session_verified: false,
+                created_ms: 1,
+            },
             // A desk whose kind of program is no longer in the table cannot be shown as anything.
-            SavedDesk { id: "b".into(), harness: "gone".into(), title: "Stranger".into(), title_locked: false, auto_title: String::new(), cwd: String::new(), session: None, created_ms: 2 },
+            SavedDesk { id: "b".into(), harness: "gone".into(), title: "Stranger".into(), title_locked: false, auto_title: String::new(), cwd: String::new(), session: None, session_verified: false, created_ms: 2 },
         ];
         let engine = start(shell, vec![shell_kind()], saved, vec![("a".to_string(), b"said before the restart\r\n".to_vec())]);
         let agents = engine.snapshot().agents;
@@ -934,10 +990,13 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let into = seen.clone();
         engine
-            .attach("a", Box::new(move |bytes: &[u8]| {
-                into.lock().unwrap().extend_from_slice(bytes);
-                true
-            }))
+            .attach(
+                "a",
+                Box::new(move |bytes: &[u8]| {
+                    into.lock().unwrap().extend_from_slice(bytes);
+                    true
+                }),
+            )
             .unwrap();
         assert!(String::from_utf8_lossy(&seen.lock().unwrap()).contains("said before the restart"));
         assert!(!engine.snapshot().agents[0].running);
@@ -947,7 +1006,17 @@ mod tests {
     #[test]
     fn a_desk_whose_program_is_not_in_the_table_is_kept_until_it_is() {
         let cwd = std::env::temp_dir().to_string_lossy().into_owned();
-        let desk = |id: &str, harness: &str, title: &str| SavedDesk { id: id.into(), harness: harness.into(), title: title.into(), title_locked: true, auto_title: String::new(), cwd: cwd.clone(), session: Some(format!("session-{id}")), created_ms: 1 };
+        let desk = |id: &str, harness: &str, title: &str| SavedDesk {
+            id: id.into(),
+            harness: harness.into(),
+            title: title.into(),
+            title_locked: true,
+            auto_title: String::new(),
+            cwd: cwd.clone(),
+            session: Some(format!("session-{id}")),
+            session_verified: true,
+            created_ms: 1,
+        };
         // "mine" is a program the user added in harnesses.json, which this time could not be read.
         let before = vec![desk("a", "shell", "Old friend"), desk("b", "mine", "Stranger"), desk("c", "shell", "Another")];
         let stranger = before[1].clone();
@@ -991,13 +1060,63 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let into = seen.clone();
         engine
-            .attach("b", Box::new(move |bytes: &[u8]| {
-                into.lock().unwrap().extend_from_slice(bytes);
-                true
-            }))
+            .attach(
+                "b",
+                Box::new(move |bytes: &[u8]| {
+                    into.lock().unwrap().extend_from_slice(bytes);
+                    true
+                }),
+            )
             .unwrap();
         assert_eq!(*seen.lock().unwrap(), last_screen);
         engine.shutdown();
+    }
+
+    #[test]
+    fn a_missing_saved_folder_never_falls_back_to_home() {
+        let cwd = std::env::temp_dir().join(format!("moshpit-missing-{}", new_id())).to_string_lossy().into_owned();
+        let saved: SavedDesk = serde_json::from_value(serde_json::json!({"id":"lost", "harness":"shell", "title":"Lost", "cwd":cwd})).unwrap();
+        let engine = start(Arc::new(Quiet::default()), vec![shell_kind()], vec![saved], vec![]);
+        assert!(engine.wake("lost", 80, 24).unwrap_err().contains("folder"));
+        let snapshot = engine.snapshot();
+        assert_eq!(snapshot.agents[0].cwd, cwd);
+        assert!(!snapshot.agents[0].running);
+        assert!(engine.inner.terms.pids().is_empty());
+        engine.shutdown();
+    }
+
+    #[test]
+    fn running_jobs_are_included_in_quit_and_update_warnings() {
+        let mut kind = shell_kind();
+        kind.update = if cfg!(windows) { vec!["/d".into(), "/q".into()] } else { vec![] };
+        // Exercise the warning with a job that is still running, without relying on process timing.
+        let engine = start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
+        engine.inner.state.lock().unwrap().jobs.push(Job { id: "job-update-shell".into(), harness: "shell".into(), kind: JobKind::Update, running: true, ok: None });
+        assert!(engine.quit_words().unwrap().contains("A Shell update"));
+        engine.inner.state.lock().unwrap().jobs[0].running = false;
+        assert!(engine.quit_words().is_none());
+        engine.shutdown();
+    }
+
+    #[test]
+    fn branch_refresh_follows_checkouts_for_every_adapter() {
+        let dir = std::env::temp_dir().join(format!("moshpit-branch-{}", new_id()));
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        std::fs::write(dir.join(".git/HEAD"), "ref: refs/heads/before\n").unwrap();
+        let mut kind = shell_kind();
+        // Claude must also refresh its saved cwd when no session file exists yet.
+        kind.status = StatusFrom::ClaudeSessions;
+        let engine = start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
+        let id = engine.new_agent(NewAgent { harness: "shell".into(), cwd: dir.to_string_lossy().into_owned(), prompt: String::new(), title: "Branch".into(), worktree: false }, 80, 24).unwrap();
+        assert_eq!(engine.snapshot().agents[0].branch, "before");
+        std::fs::write(dir.join(".git/HEAD"), "ref: refs/heads/after\n").unwrap();
+        for _ in 0..SLOW_EVERY {
+            engine.look();
+        }
+        assert_eq!(engine.snapshot().agents[0].branch, "after");
+        engine.stop(&id);
+        engine.shutdown();
+        assert!(until(|| std::fs::remove_dir_all(&dir).is_ok()));
     }
 
     #[test]

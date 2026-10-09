@@ -2,7 +2,7 @@
   // The small menu at the end of the top bar: the layout of the terminals, which
   // programs are on this computer, what version this is, and the way out. Quit
   // lives here as well as in the tray, because not every desktop has a tray.
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { ids } from '../lib/layout'
   import { office } from '../lib/office.svelte'
@@ -30,17 +30,44 @@
   }
 
   function onKey(event: KeyboardEvent) {
+    if (!open) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        void show(event.key === 'ArrowUp')
+      }
+      return
+    }
     if (event.key === 'Escape' && open) {
+      event.preventDefault()
       event.stopPropagation()
       close(true)
+    } else if (event.key === 'Tab') {
+      close(true)
+    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault()
+      event.stopPropagation()
+      const list = items()
+      const at = list.indexOf(document.activeElement as HTMLElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? list.length - 1 : (at + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length
+      list[next]?.focus()
     }
+  }
+
+  function items() {
+    return [...(root?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') ?? [])]
+  }
+
+  async function show(last = false) {
+    open = true
+    await tick()
+    if (open) { const list = items(); list[last ? list.length - 1 : 0]?.focus() }
   }
 </script>
 
 <svelte:document onpointerdown={onDocumentPointer} />
 
 <div class="menu" bind:this={root} onkeydown={onKey} role="presentation">
-  <button type="button" class="more" aria-label="More" aria-haspopup="menu" aria-expanded={open} onclick={() => (open ? close() : (open = true))}>
+  <button type="button" class="more" aria-label="More" aria-haspopup="menu" aria-expanded={open} onclick={() => (open ? close() : void show())}>
     <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
     {#if office.outdated.length > 0 || office.newer}<i class="news" title="Updates are out"></i>{/if}
   </button>
@@ -49,10 +76,10 @@
       {#if office.newer}
         <button
           type="button"
-          role="menuitem"
+          role="menuitem" tabindex="-1"
           disabled={office.updating}
           onclick={() => {
-            close()
+            close(true)
             void office.updateOffice()
           }}
         >
@@ -62,9 +89,9 @@
       {/if}
       <button
         type="button"
-        role="menuitem"
+        role="menuitem" tabindex="-1"
         onclick={() => {
-          close()
+          close(true)
           office.openPrograms()
         }}
       >
@@ -74,9 +101,9 @@
       {#if panes > 1}
         <button
           type="button"
-          role="menuitem"
+          role="menuitem" tabindex="-1"
           onclick={() => {
-            close()
+            close(true)
             office.evenOut()
           }}
         >
@@ -86,10 +113,10 @@
       {/if}
       <button
         type="button"
-        role="menuitemcheckbox"
+        role="menuitemcheckbox" tabindex="-1"
         aria-checked={office.copyOnSelect}
         onclick={() => {
-          close()
+          close(true)
           office.setCopyOnSelect(!office.copyOnSelect)
         }}
       >
@@ -98,10 +125,10 @@
       </button>
       <button
         type="button"
-        role="menuitemcheckbox"
+        role="menuitemcheckbox" tabindex="-1"
         aria-checked={office.closeQuits}
         onclick={() => {
-          close()
+          close(true)
           office.setCloseQuits(!office.closeQuits)
         }}
       >
@@ -110,9 +137,9 @@
       </button>
       <button
         type="button"
-        role="menuitem"
+        role="menuitem" tabindex="-1"
         onclick={() => {
-          close()
+          close(true)
           office.openKeys()
         }}
       >
@@ -121,9 +148,9 @@
       </button>
       <button
         type="button"
-        role="menuitem"
+        role="menuitem" tabindex="-1"
         onclick={() => {
-          close()
+          close(true)
           bridge.quit()
         }}
       >

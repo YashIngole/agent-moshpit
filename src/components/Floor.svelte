@@ -30,7 +30,7 @@
   // The floor is one stop for the Tab key, like a grid of icons: Tab lands on one desk and
   // the arrow keys walk to the rest. That desk is the last one visited, else the first.
   const home = $derived.by(() => {
-    const keys = [...waiting.map(a => a.id), ...rooms.flatMap(room => [...room.agents.map(a => a.id), ...(spares ? [spareKey(room.repo)] : [])])]
+    const keys = [...waiting.map(a => a.id), ...rooms.flatMap(room => [...room.agents.map(a => a.id), ...(spares ? [spareKey(room.key)] : [])])]
     return keys.includes(office.homeDesk) ? office.homeDesk : (keys[0] ?? spareKey(''))
   })
 
@@ -117,17 +117,17 @@
         </div>
       </section>
     {/if}
-    {#each rooms as room (room.repo)}
+    {#each rooms as room (room.key)}
       <section
         class="room"
-        aria-label="{room.repo}, {count(room.agents.length)}"
+        aria-label="{room.label}, {count(room.agents.length)}"
         style:--desks={Math.min(room.agents.length + (spares ? 1 : 0), 5)}
       >
         <header class="sign">
-          <h2>{room.repo}<span class="slash">/</span></h2>
+          <h2 title={room.key}>{room.label}<span class="slash">/</span></h2>
           <span>{count(room.agents.length)}</span>
           {#if !spares}
-            <button type="button" class="add" aria-label="Add an agent in {room.repo}" title="Add an agent in {room.repo}" onclick={() => office.openNew(room.agents[0]?.cwd ?? '')}>+</button>
+            <button type="button" class="add" aria-label="Add an agent in {room.label}" title="Add an agent in {room.label}" onclick={() => office.openNew(room.agents[0]?.cwd ?? '')}>+</button>
           {/if}
         </header>
         <div class="desks">
@@ -137,8 +137,8 @@
           {#if spares}
             <SpareDesk
               label="Add an agent"
-              key={spareKey(room.repo)}
-              home={home === spareKey(room.repo)}
+              key={spareKey(room.key)}
+              home={home === spareKey(room.key)}
               onchoose={() => office.openNew(room.agents[0]?.cwd ?? '')}
             />
           {/if}

@@ -41,8 +41,8 @@ writeFileSync(
   JSON.stringify([
     { id: 'fake', name: 'Fake Agent', tag: 'Fake', ...fake },
     { id: 'late', name: 'Late Agent', tag: 'Late', program: path.join(later, 'late.cmd'), task: 'last', install: [process.execPath, path.join(here, 'install-late.mjs'), later] },
-    // Asks about its folder first, the way Claude Code does: trust is read from a pretend ~/.claude.json.
-    { id: 'asker', name: 'Asker Agent', tag: 'Asker', ...fake, trust: 'claude' },
+    // Asks about its folder first, the way Claude Code does: the actual dialog must be visible before its desk raises a hand.
+    { id: 'asker', name: 'Asker Agent', tag: 'Asker', ...fake, args: [...fake.args, `--trust-except=${work}`], trust: 'claude' },
     { id: 'probe', name: 'Key Probe', tag: 'Probe', program: process.execPath, args: [path.join(here, 'key-probe.mjs')] }
   ])
 )
@@ -211,6 +211,9 @@ try {
   const told = () => notices('e2e').filter(xml => xml.includes('First is done'))
   check('and a notification that opens their desk when it is clicked', await until(() => told().some(xml => xml.includes(`launch="agent-moshpit-e2e://desk/${firstId}" activationType="protocol"`)), 10000), notices('e2e').join(' | '))
   check('one for the desk, not one for every time', told().length === 1, String(told().length))
+  // CDP can send keys to a background webview; reading requires native window focus.
+  openAddress('agent-moshpit-e2e://open')
+  await until(() => page.evaluate(() => document.hasFocus()), 5000)
   await page.keyboard.press('Control+Backquote')
   check('and again brings the terminals back', await until(async () => (await page.locator('.pane').count()) === 2))
   check('with what was on them, though the panes were gone', await shows('First', 'YOU SAID: ping'))

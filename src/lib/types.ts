@@ -12,6 +12,7 @@ export interface Agent {
   harness: string
   harness_name: string
   harness_tag: string
+  project: string
   repo: string
   branch: string
   cwd: string
@@ -21,6 +22,7 @@ export interface Agent {
   running: boolean
   /** Whether a stopped one carries on where it left off, or starts afresh. */
   resumable: boolean
+  resume_note: string
   /** Its terminal printed something since you last had it in front of you. */
   unread: boolean
 }

@@ -26,13 +26,27 @@ pub struct SavedDesk {
     /// What the program calls the conversation, once known. Used to carry on.
     #[serde(default)]
     pub session: Option<String>,
+    /// A session observed directly from its process, rather than an old folder/time guess.
+    #[serde(default)]
+    pub session_verified: bool,
     #[serde(default)]
     pub created_ms: Millis,
+}
+
+impl SavedDesk {
+    pub fn resume_session(&self, kind: &Harness) -> Option<&str> {
+        if kind.session == harness::SessionFrom::CodexRollouts && !self.session_verified {
+            None
+        } else {
+            self.session.as_deref()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Desk {
     pub saved: SavedDesk,
+    pub project: String,
     pub repo: String,
     pub branch: String,
     pub phase: Phase,
@@ -51,8 +65,7 @@ pub struct Desk {
     typed: bool,
     /// Went quiet before it began its task, waiting on a question of its own.
     asked_at_start: bool,
-    /// Started in a folder its program has not been told to trust: it asks about
-    /// that first, whatever else it was given, and waits for an answer.
+    /// A trust question has actually been observed on the startup screen.
     asks_trust: bool,
     /// Has gone quiet once since its program started.
     rested: bool,
@@ -197,12 +210,30 @@ impl Office {
         }
         desk.running = false;
         desk.worked = false;
-        if !ok && !desk.leaving && now.saturating_sub(desk.started_ms) < FALSE_START_MS {
-            desk.activity = "It stopped with an error as soon as it started. Open the desk to see what it said.".into();
+        if !ok && !desk.leaving {
+            desk.activity = if now.saturating_sub(desk.started_ms) < FALSE_START_MS {
+                "It stopped with an error as soon as it started. Open the desk to see what it said."
+            } else {
+                "Its program stopped with an error. Open the desk to see what it said."
+            }
+            .into();
             desk.turn(Phase::Failed, now)
         } else {
             desk.activity.clear();
             desk.turn(Phase::Asleep, now)
+        }
+    }
+
+    /// Startup predictions are not evidence. Refresh this from the actual terminal.
+    pub fn observed_trust(&mut self, id: &str, asked: bool) {
+        if let Some(desk) = self.get_mut(id) {
+            if !desk.typed {
+                if desk.asks_trust && !asked {
+                    desk.activity.clear();
+                    desk.settled = desk.tasked;
+                }
+                desk.asks_trust = asked;
+            }
         }
     }
 
@@ -287,7 +318,9 @@ impl Office {
 
     /// The user looked at this desk's terminal: a finished flag comes down, and it is read.
     pub fn mark_seen(&mut self, id: &str, now: Millis) -> bool {
-        let Some(desk) = self.get_mut(id) else { return false };
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
         let read = std::mem::take(&mut desk.unread);
         desk.seen_ms = now;
         if desk.phase != Phase::Done {
@@ -298,17 +331,28 @@ impl Office {
         true
     }
 
-    pub fn set_place(&mut self, id: &str, repo: String, branch: String) -> bool {
-        let Some(desk) = self.get_mut(id) else { return false };
-        let changed = desk.repo != repo || desk.branch != branch;
+    pub fn set_place(&mut self, id: &str, project: String, repo: String, branch: String) -> bool {
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
+        let changed = desk.project != project || desk.repo != repo || desk.branch != branch;
+        desk.project = project;
         desk.repo = repo;
         desk.branch = branch;
         changed
     }
 
+    pub fn unverify_session(&mut self, id: &str) {
+        if let Some(desk) = self.get_mut(id) {
+            desk.saved.session_verified = false;
+        }
+    }
+
     /// A name the program gave the conversation. The user's own name wins.
     pub fn suggest_title(&mut self, id: &str, title: &str) -> bool {
-        let Some(desk) = self.get_mut(id) else { return false };
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
         let title = harness::shorten(title, 60);
         if desk.saved.title_locked || title.is_empty() || desk.saved.title == title {
             return false;
@@ -321,7 +365,9 @@ impl Office {
     /// seated (`fallback` for a desk from before that was kept), and the program may
     /// name it again.
     pub fn rename(&mut self, id: &str, title: &str, fallback: &str) -> bool {
-        let Some(desk) = self.get_mut(id) else { return false };
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
         let title = harness::shorten(title, 60);
         if title.is_empty() {
             let auto = if desk.saved.auto_title.is_empty() { harness::shorten(fallback, 60) } else { desk.saved.auto_title.clone() };
@@ -338,11 +384,14 @@ impl Office {
     }
 
     pub fn set_session(&mut self, id: &str, session: &str) -> bool {
-        let Some(desk) = self.get_mut(id) else { return false };
-        if session.is_empty() || desk.saved.session.as_deref() == Some(session) {
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
+        if session.is_empty() || (desk.saved.session.as_deref() == Some(session) && desk.saved.session_verified) {
             return false;
         }
         desk.saved.session = Some(session.to_string());
+        desk.saved.session_verified = true;
         true
     }
 
@@ -360,12 +409,18 @@ impl Office {
                     harness_name: kind.map_or_else(|| d.saved.harness.clone(), |h| h.name.clone()),
                     harness_tag: kind.map_or_else(|| d.saved.harness.clone(), |h| h.tag.clone()),
                     repo: d.repo.clone(),
+                    project: d.project.clone(),
                     branch: d.branch.clone(),
                     cwd: d.saved.cwd.clone(),
                     since_ms: d.since_ms,
                     look: d.look,
                     running: d.running,
-                    resumable: kind.is_some_and(|h| harness::can_resume(h, d.saved.session.as_deref())),
+                    resumable: kind.is_some_and(|h| harness::can_resume(h, d.saved.resume_session(h))),
+                    resume_note: if kind.is_some_and(|h| h.session == harness::SessionFrom::CodexRollouts) && d.saved.session.is_some() && !d.saved.session_verified {
+                        "This desk's saved Codex conversation could not be verified. Start Codex, then use /resume to choose it; its saved conversations are unchanged.".into()
+                    } else {
+                        String::new()
+                    },
                     unread: d.unread,
                 }
             })
@@ -378,6 +433,7 @@ impl Desk {
         let look = fnv1a(saved.id.as_bytes());
         let repo = crate::status::base_name(&saved.cwd);
         Desk {
+            project: saved.cwd.clone(),
             saved,
             repo,
             branch: String::new(),
@@ -454,7 +510,7 @@ mod tests {
     use super::*;
 
     fn desk(id: &str) -> SavedDesk {
-        SavedDesk { id: id.into(), harness: "claude".into(), title: "Fix the total".into(), title_locked: false, auto_title: "Fix the total".into(), cwd: "C:/work/shop".into(), session: None, created_ms: 1 }
+        SavedDesk { id: id.into(), harness: "claude".into(), title: "Fix the total".into(), title_locked: false, auto_title: "Fix the total".into(), cwd: "C:/work/shop".into(), session: None, session_verified: false, created_ms: 1 }
     }
 
     fn office() -> Office {
@@ -466,6 +522,36 @@ mod tests {
 
     fn phase(office: &Office) -> Phase {
         office.get("a").unwrap().phase
+    }
+
+    #[test]
+    fn legacy_codex_ids_are_kept_but_never_resumed_without_verification() {
+        let mut saved = desk("a");
+        saved.harness = "codex".into();
+        saved.session = Some("legacy-session".into());
+        let table = harness::built_in();
+        let kind = table.iter().find(|h| h.id == "codex").unwrap();
+        assert_eq!(saved.resume_session(kind), None);
+        let mut office = Office::default();
+        office.add(saved, 100);
+        assert!(!office.views(&table)[0].resumable);
+        assert!(!office.views(&table)[0].resume_note.is_empty());
+        office.set_session("a", "terminal-verified-session");
+        assert!(office.views(&table)[0].resumable);
+        assert_eq!(office.saved()[0].session.as_deref(), Some("terminal-verified-session"));
+    }
+
+    #[test]
+    fn a_trust_dialog_that_disappears_does_not_leave_a_false_badge() {
+        let mut office = Office::default();
+        office.add(desk("a"), 100);
+        office.started("a", false, false, 100);
+        office.observed_trust("a", true);
+        office.observe("a", &Signal::Quiet, false, 1000);
+        assert_eq!(phase(&office), Phase::NeedsYou);
+        office.observed_trust("a", false);
+        office.observe("a", &Signal::Quiet, false, 2000);
+        assert_eq!(phase(&office), Phase::Idle);
     }
 
     #[test]
@@ -634,7 +720,7 @@ mod tests {
     }
 
     #[test]
-    fn a_program_that_ends_goes_home_unless_it_never_got_going() {
+    fn unexpected_errors_are_failures_even_after_startup() {
         let mut office = office();
         office.observe("a", &Signal::Working, false, 300);
         let left = office.exited("a", true, 60_000).unwrap();
@@ -651,9 +737,9 @@ mod tests {
         office.started("a", true, false, 75_000);
         office.will_stop("a");
         assert_eq!(office.exited("a", false, 75_500).unwrap().to, Phase::Asleep);
-        // An error after a long day is just the end of the day.
+        // A late crash still needs attention.
         office.started("a", true, false, 80_000);
-        assert_eq!(office.exited("a", false, 80_000 + FALSE_START_MS).unwrap().to, Phase::Asleep);
+        assert_eq!(office.exited("a", false, 80_000 + FALSE_START_MS).unwrap().to, Phase::Failed);
     }
 
     #[test]

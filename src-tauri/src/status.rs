@@ -8,8 +8,8 @@
 //!   working keeps printing (a spinner, a stream of words), one that is waiting
 //!   goes quiet, and one that wants the user rings the bell or sends a notice.
 //!
-//! Nothing here looks at what the words on the screen say, so a program is free
-//! to change them.
+//! Startup trust dialogs are the one narrow screen-text exception: configuration
+//! alone cannot tell whether a CLI actually stopped to ask a question.
 
 use crate::harness::TrustFrom;
 use crate::model::Millis;
@@ -318,7 +318,15 @@ pub struct ClaudeSession {
 }
 
 pub fn claude_session_file(home: &Path, pid: u32) -> PathBuf {
-    home.join(".claude").join("sessions").join(format!("{pid}.json"))
+    config_dir(home, "CLAUDE_CONFIG_DIR", ".claude").join("sessions").join(format!("{pid}.json"))
+}
+
+fn config_dir(home: &Path, variable: &str, fallback: &str) -> PathBuf {
+    configured_dir(home, std::env::var_os(variable).as_deref(), fallback)
+}
+
+fn configured_dir(home: &Path, chosen: Option<&std::ffi::OsStr>, fallback: &str) -> PathBuf {
+    chosen.filter(|p| !p.is_empty()).map_or_else(|| home.join(fallback), PathBuf::from)
 }
 
 pub fn read_claude_session(home: &Path, pid: u32) -> Option<ClaudeSession> {
@@ -345,157 +353,103 @@ pub fn claude_signal(session: &ClaudeSession) -> Option<Signal> {
 
 // ── which conversation Codex began ─────────────────────────────────────────
 
-/// The id of the conversation Codex started in `cwd` at or after `since`, read
-/// from the first line of the files it writes under `~/.codex/sessions`.
-pub fn codex_session(home: &Path, cwd: &str, since: Millis) -> Option<String> {
-    let day = newest_dir(&newest_dir(&newest_dir(&home.join(".codex").join("sessions"))?)?)?;
-    let mut newest: Option<(Millis, String)> = None;
-    for entry in std::fs::read_dir(day).ok()?.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
-            continue;
-        }
-        let Some(created) = entry.metadata().ok().and_then(|m| m.created().or_else(|_| m.modified()).ok()) else { continue };
-        let created = created.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as Millis).unwrap_or(0);
-        // A few seconds of slack: the file may be stamped just before the desk was.
-        if created + 5_000 < since {
-            continue;
-        }
-        let Some(id) = first_line(&path).and_then(|line| codex_meta(&line, cwd)) else { continue };
-        if newest.as_ref().is_none_or(|(at, _)| created > *at) {
-            newest = Some((created, id));
-        }
-    }
-    newest.map(|(_, id)| id)
+/// Codex is asked to put its own session id in its terminal title. Recent CLIs
+/// shorten it; resolve that prefix against rollout metadata, never against the
+/// newest session in a folder. Ambiguous or unsupported titles remain unknown.
+pub fn codex_session(home: &Path, title: &str) -> Option<String> {
+    session_in(&config_dir(home, "CODEX_HOME", ".codex").join("sessions"), title)
 }
 
-/// The folder with the greatest name: Codex files them by year, month and day.
-fn newest_dir(dir: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().map(|e| e.path()).filter(|p| p.is_dir()).max()
+pub fn session_prefix(title: &str) -> Option<&str> {
+    let title = title.trim();
+    let prefix = title.strip_suffix("...").or_else(|| title.strip_suffix('…')).unwrap_or(title);
+    (prefix.len() >= 24 && prefix.len() <= 36 && prefix.bytes().enumerate().all(|(i, b)| if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() })).then_some(prefix)
+}
+
+pub fn session_title_matches(title: &str, id: &str) -> bool {
+    session_prefix(title).is_some_and(|prefix| id.starts_with(prefix))
+}
+
+fn session_in(root: &Path, title: &str) -> Option<String> {
+    let prefix = session_prefix(title)?;
+    let mut dirs = vec![root.to_path_buf()];
+    let mut matches = std::collections::HashSet::new();
+    // The root and YYYY/MM/DD; do not follow directory symlinks or scan unrelated files.
+    for depth in 0..=3 {
+        let mut next = Vec::new();
+        for dir in dirs {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let Ok(kind) = entry.file_type() else {
+                    continue;
+                };
+                if kind.is_dir() && depth < 3 {
+                    next.push(entry.path());
+                } else if kind.is_file() && entry.file_name().to_string_lossy().contains(prefix) && entry.path().extension().is_some_and(|e| e == "jsonl") {
+                    if let Some(id) = first_line(&entry.path()).and_then(|line| codex_meta(&line)) {
+                        if id.len() == 36 && session_prefix(&id).is_some() && id.starts_with(prefix) {
+                            matches.insert(id);
+                        }
+                    }
+                }
+            }
+        }
+        dirs = next;
+    }
+    (matches.len() == 1).then(|| matches.into_iter().next()).flatten()
 }
 
 fn first_line(path: &Path) -> Option<String> {
-    use std::io::{BufRead, BufReader};
+    use std::io::{BufRead, BufReader, Read};
     let mut line = String::new();
-    BufReader::new(std::fs::File::open(path).ok()?).read_line(&mut line).ok()?;
+    BufReader::new(std::fs::File::open(path).ok()?.take(256 * 1024)).read_line(&mut line).ok()?;
     Some(line)
 }
 
-/// The session id on a `session_meta` line, if it is about this folder.
-fn codex_meta(line: &str, cwd: &str) -> Option<String> {
+/// The session id on a `session_meta` line.
+fn codex_meta(line: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
-    let payload = value.get("payload")?;
-    let theirs = payload.get("cwd")?.as_str()?;
-    if !same_folder(theirs, cwd) {
+    if value.get("type")?.as_str()? != "session_meta" {
         return None;
     }
+    let payload = value.get("payload")?;
     let id = payload.get("session_id").or_else(|| payload.get("id"))?.as_str()?;
     (!id.is_empty()).then(|| id.to_string())
 }
 
 // ── whether it will first ask to trust the folder ──────────────────────────
 
-/// Whether this program will stop, before anything else, to ask whether to trust
-/// `cwd`. Claude Code and Codex both do in a folder nobody has told them about,
-/// and the question sits there until it is answered, task or no task.
-pub fn asks_trust(from: TrustFrom, home: &Path, cwd: &Path) -> bool {
+/// A trust question actually visible in the startup screen. Unknown wording is
+/// left to the CLI's signals, never guessed from a configuration file.
+pub fn trust_prompt(from: TrustFrom, screen: &str) -> bool {
+    let words = screen.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
     match from {
-        TrustFrom::Claude => {
-            let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map_or_else(|| home.to_path_buf(), PathBuf::from);
-            claude_asks(&dir.join(".claude.json"), cwd)
-        }
-        TrustFrom::Codex => {
-            let dir = std::env::var_os("CODEX_HOME").map_or_else(|| home.join(".codex"), PathBuf::from);
-            codex_asks(&dir.join("config.toml"), cwd)
-        }
+        TrustFrom::Claude => words.contains("yes, i trust this folder") && words.contains("no, exit"),
+        TrustFrom::Codex => words.contains("do you trust") && (words.contains("yes, continue") || words.contains("yes, i trust")) && (words.contains("no, quit") || words.contains("no, exit")),
         TrustFrom::None => false,
     }
 }
 
-/// Claude Code (2.1.290) trusts a folder when it, or a folder above it up to the top of
-/// its git repository (or of the disk, outside one), has `hasTrustDialogAccepted` in
-/// the `projects` of `~/.claude.json`. No file at all is a first run, which asks.
-fn claude_asks(file: &Path, cwd: &Path) -> bool {
-    let Ok(text) = std::fs::read_to_string(file) else { return true };
-    // A file this version cannot read says nothing either way: no hand is raised on a guess.
-    let Ok(config) = serde_json::from_str::<serde_json::Value>(&text) else { return false };
-    let trusted: Vec<&str> = config
-        .get("projects")
-        .and_then(serde_json::Value::as_object)
-        .map(|projects| projects.iter().filter(|(_, p)| p.get("hasTrustDialogAccepted").and_then(serde_json::Value::as_bool) == Some(true)).map(|(folder, _)| folder.as_str()).collect())
-        .unwrap_or_default();
-    !up_to_repository(cwd).iter().any(|dir| trusted.iter().any(|t| same_folder(t, &dir.to_string_lossy())))
-}
-
-/// Codex (0.161) asks unless the folder, or the top of its git repository, is one of the
-/// `[projects.'…']` in `~/.codex/config.toml` with a `trust_level`. No file is a first run.
-fn codex_asks(file: &Path, cwd: &Path) -> bool {
-    let Ok(text) = std::fs::read_to_string(file) else { return true };
-    let known = codex_projects(&text);
-    let told = |dir: &Path| known.iter().any(|k| same_folder(k, &dir.to_string_lossy()));
-    let root = cwd.ancestors().find(|dir| dir.join(".git").exists());
-    !(told(cwd) || root.is_some_and(told))
-}
-
-/// The folder and the ones above it, up to the top of its git repository (or of the disk).
-fn up_to_repository(cwd: &Path) -> Vec<PathBuf> {
-    let all: Vec<PathBuf> = cwd.ancestors().map(Path::to_path_buf).collect();
-    match all.iter().position(|dir| dir.join(".git").exists()) {
-        Some(root) => all[..=root].to_vec(),
-        None => all,
-    }
-}
-
-/// The folders of Codex's `[projects.'…']` tables that say how far they are trusted.
-fn codex_projects(text: &str) -> Vec<String> {
-    let mut found = Vec::new();
-    let mut table: Option<String> = None;
-    for line in text.lines().map(str::trim) {
-        if line.starts_with('[') {
-            table = line.strip_prefix("[projects.").and_then(|rest| rest.strip_suffix(']')).and_then(toml_key);
-        } else if let (Some(folder), Some((key, _))) = (&table, line.split_once('=')) {
-            if key.trim() == "trust_level" {
-                found.push(folder.clone());
-            }
-        }
-    }
-    found
-}
-
-/// A TOML key in quotes: 'literal', or "basic" with its escapes.
-fn toml_key(quoted: &str) -> Option<String> {
-    if let Some(literal) = quoted.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
-        return Some(literal.to_string());
-    }
-    let basic = quoted.strip_prefix('"')?.strip_suffix('"')?;
-    let mut key = String::new();
-    let mut chars = basic.chars();
-    while let Some(c) = chars.next() {
-        match (c, c == '\\') {
-            (_, true) => match chars.next()? {
-                'n' => key.push('\n'),
-                't' => key.push('\t'),
-                other => key.push(other),
-            },
-            (c, false) => key.push(c),
-        }
-    }
-    Some(key)
-}
-
 /// Folders are compared the way Windows does: no matter the case, the slashes
 /// or a `\\?\` in front.
-pub fn same_folder(a: &str, b: &str) -> bool {
-    let tidy = |s: &str| s.trim_start_matches("\\\\?\\").replace('\\', "/").trim_end_matches('/').to_lowercase();
-    tidy(a) == tidy(b)
+fn project_key(path: &Path) -> String {
+    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let key = path.to_string_lossy().trim_start_matches("\\\\?\\").replace('\\', "/");
+    if cfg!(windows) {
+        key.to_lowercase()
+    } else {
+        key
+    }
 }
 
 // ── which project and branch a folder is ───────────────────────────────────
 
 /// The name of the project a folder belongs to, and the branch checked out there.
 /// A git worktree answers with the name of the project it is a copy of.
-pub fn project(cwd: &Path) -> (String, String) {
-    let fallback = || (base_name(&cwd.to_string_lossy()), String::new());
+pub fn project(cwd: &Path) -> (String, String, String) {
+    let fallback = || (project_key(cwd), base_name(&cwd.to_string_lossy()), String::new());
     let Some((root, git)) = cwd.ancestors().find_map(|dir| {
         let git = dir.join(".git");
         git.exists().then(|| (dir.to_path_buf(), git))
@@ -503,19 +457,23 @@ pub fn project(cwd: &Path) -> (String, String) {
         return fallback();
     };
     if git.is_dir() {
-        return (base_name(&root.to_string_lossy()), branch_in(&git.join("HEAD")));
+        return (project_key(&root), base_name(&root.to_string_lossy()), branch_in(&git.join("HEAD")));
     }
     // A worktree: `.git` is a file that says "gitdir: <main>/.git/worktrees/<name>".
     let Some(pointer) = std::fs::read_to_string(&git).ok().and_then(|t| t.trim().strip_prefix("gitdir:").map(|p| PathBuf::from(p.trim()))) else {
         return fallback();
     };
-    let main = pointer.ancestors().find(|p| p.file_name().is_some_and(|n| n == ".git")).and_then(Path::parent);
+    let pointer = if pointer.is_absolute() { pointer } else { root.join(pointer) };
+    let common = std::fs::read_to_string(pointer.join("commondir")).ok().map(|p| pointer.join(p.trim())).and_then(|p| p.canonicalize().ok());
+    let main = common.as_deref().and_then(Path::parent).or_else(|| pointer.ancestors().find(|p| p.file_name().is_some_and(|n| n == ".git")).and_then(Path::parent));
     let name = main.map(|m| base_name(&m.to_string_lossy())).unwrap_or_else(|| base_name(&root.to_string_lossy()));
-    (name, branch_in(&pointer.join("HEAD")))
+    (project_key(main.unwrap_or(&root)), name, branch_in(&pointer.join("HEAD")))
 }
 
 fn branch_in(head: &Path) -> String {
-    let Ok(text) = std::fs::read_to_string(head) else { return String::new() };
+    let Ok(text) = std::fs::read_to_string(head) else {
+        return String::new();
+    };
     let text = text.trim();
     match text.strip_prefix("ref: refs/heads/") {
         Some(branch) => branch.to_string(),
@@ -572,7 +530,21 @@ mod tests {
     #[test]
     fn the_terminal_speaking_for_itself_is_not_the_user() {
         // Focus coming and going, the cursor's place, the kind of terminal, a colour, a mode.
-        for report in [&b"\x1b[O"[..], b"\x1b[I", b"\x1b[O\x1b[I", b"\x1b[12;40R", b"\x1b[?1;2c", b"\x1b[>0;276;0c", b"\x1b[0n", b"\x1b[?2004;1$y", b"\x1b[8;24;80t", b"\x1b]11;rgb:0b0b/0d0d/1010\x07", b"\x1b]10;rgb:d5d5/dada/e2e2\x1b\\", b"\x1bP1$r0m\x1b\\", b""] {
+        for report in [
+            &b"\x1b[O"[..],
+            b"\x1b[I",
+            b"\x1b[O\x1b[I",
+            b"\x1b[12;40R",
+            b"\x1b[?1;2c",
+            b"\x1b[>0;276;0c",
+            b"\x1b[0n",
+            b"\x1b[?2004;1$y",
+            b"\x1b[8;24;80t",
+            b"\x1b]11;rgb:0b0b/0d0d/1010\x07",
+            b"\x1b]10;rgb:d5d5/dada/e2e2\x1b\\",
+            b"\x1bP1$r0m\x1b\\",
+            b"",
+        ] {
             assert!(is_report(report), "{:?}", String::from_utf8_lossy(report));
         }
         // Keys, a paste, a click in a program that follows the mouse.
@@ -714,69 +686,41 @@ mod tests {
     }
 
     #[test]
-    fn codex_names_the_conversation_for_this_folder_only() {
-        let line = r#"{"timestamp":"2026-10-08T15:49:36.279Z","type":"session_meta","payload":{"session_id":"01a1","id":"01a1","cwd":"C:\\Users\\Yash\\Documents\\api"}}"#;
-        assert_eq!(codex_meta(line, "c:/users/yash/documents/API/"), Some("01a1".into()));
-        assert_eq!(codex_meta(line, "C:\\Users\\Yash\\Documents\\shop"), None);
-        assert_eq!(codex_meta("not json", "x"), None);
-    }
-
-    #[test]
-    fn a_folder_nobody_trusted_is_asked_about_first() {
-        let dir = std::env::temp_dir().join(format!("moshpit-trust-{}", std::process::id()));
-        let docs = dir.join("Documents");
-        let (repo, notes, elsewhere) = (docs.join("shop"), docs.join("notes"), dir.join("elsewhere"));
-        for folder in [repo.join(".git"), repo.join("src"), notes.clone(), elsewhere.clone()] {
-            std::fs::create_dir_all(folder).unwrap();
+    fn session_identity_comes_from_each_terminal_not_shared_cwd() {
+        let dir = std::env::temp_dir().join(format!("moshpit-identity-{}", std::process::id()));
+        let day = dir.join("2026/10/09");
+        std::fs::create_dir_all(&day).unwrap();
+        let ids = ["01a1208b-04bd-7501-b17d-5d25a0000001", "01a1208b-04be-7501-b17d-5d25a0000002"];
+        for id in ids {
+            std::fs::write(day.join(format!("rollout-{id}.jsonl")), serde_json::json!({"type":"session_meta","payload":{"id":id,"cwd":"same-folder"}}).to_string()).unwrap();
         }
-        // Written the way Claude Code writes it on Windows: forward slashes.
-        let slashed = |p: &Path| p.to_string_lossy().replace('\\', "/");
-        let claude = dir.join(".claude.json");
-        let write_claude = |trusted: &[(&Path, bool)]| {
-            let projects: serde_json::Map<String, serde_json::Value> = trusted.iter().map(|(p, t)| (slashed(p), serde_json::json!({ "hasTrustDialogAccepted": t, "allowedTools": [] }))).collect();
-            std::fs::write(&claude, serde_json::json!({ "numStartups": 3, "projects": projects }).to_string()).unwrap();
-        };
-        write_claude(&[(&docs, true), (&elsewhere, false)]);
-        // Outside a repository, a trusted folder above counts...
-        assert!(!claude_asks(&claude, &notes));
-        assert!(!claude_asks(&claude, &docs));
-        // ...inside one, only folders up to its top do.
-        assert!(claude_asks(&claude, &repo.join("src")));
-        assert!(claude_asks(&claude, &elsewhere), "an entry that says false is not trust");
-        write_claude(&[(&docs, true), (&repo, true)]);
-        assert!(!claude_asks(&claude, &repo.join("src")));
-        // A first run asks; a file this version cannot read says nothing.
-        assert!(claude_asks(&dir.join("missing.json"), &repo));
-        std::fs::write(&claude, "{ not json").unwrap();
-        assert!(!claude_asks(&claude, &repo));
-
-        // Written the way Codex writes it on Windows: lower case, sometimes with \\?\ in front.
-        let codex = dir.join("config.toml");
-        let lower = |p: &Path| p.to_string_lossy().to_lowercase();
-        std::fs::write(
-            &codex,
-            format!(
-                "model = \"gpt-5\"\n\n[projects.'\\\\?\\{}']\ntrust_level = \"trusted\"\n\n[projects.\"{}\"]\ntrust_level = \"untrusted\"\n\n[tui]\nnotifications = true\n",
-                lower(&repo),
-                lower(&docs).replace('\\', "\\\\")
-            ),
-        )
-        .unwrap();
-        // The top of the repository counts for the folders in it; a decision either way is no question.
-        assert!(!codex_asks(&codex, &repo.join("src")));
-        assert!(!codex_asks(&codex, &docs));
-        // A folder above does not count for Codex.
-        assert!(codex_asks(&codex, &notes));
-        assert!(codex_asks(&dir.join("missing.toml"), &notes));
-        let _ = std::fs::remove_dir_all(&dir);
+        for id in ids {
+            assert_eq!(session_in(&dir, &format!("{}...", &id[..27])), Some(id.into()));
+        }
+        assert_eq!(session_in(&dir, "codex: same-folder"), None);
+        assert_eq!(session_in(&dir, "01a1208b..."), None);
+        let collision = "01a1208b-04bd-7501-b17d-5d25a0000003";
+        std::fs::write(day.join(format!("rollout-{collision}.jsonl")), serde_json::json!({"type":"session_meta","payload":{"id":collision}}).to_string()).unwrap();
+        assert_eq!(session_in(&dir, &format!("{}...", &ids[0][..27])), None);
+        assert_eq!(session_in(&dir, ids[0]), Some(ids[0].into()));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
-    fn toml_keys_are_read_in_either_kind_of_quotes() {
-        assert_eq!(toml_key(r"'c:\users\yash\shop'").as_deref(), Some(r"c:\users\yash\shop"));
-        assert_eq!(toml_key(r#""C:\\Users\\Yash\\shop""#).as_deref(), Some(r"C:\Users\Yash\shop"));
-        assert_eq!(toml_key("tui"), None);
-        assert_eq!(codex_projects("[projects.'a']\ntrust_level = \"trusted\"\n[projects.'b']\nother = 1\n"), vec!["a".to_string()]);
+    fn cli_config_roots_honor_custom_homes() {
+        let home = Path::new("home");
+        assert_eq!(configured_dir(home, None, ".codex"), home.join(".codex"));
+        assert_eq!(configured_dir(home, Some(std::ffi::OsStr::new("custom")), ".codex"), Path::new("custom"));
+        assert_eq!(configured_dir(home, Some(std::ffi::OsStr::new("")), ".claude"), home.join(".claude"));
+    }
+
+    #[test]
+    fn only_a_visible_trust_dialog_raises_a_hand() {
+        assert!(trust_prompt(TrustFrom::Claude, "Accessing workspace: ... Yes, I trust this folder\nNo, exit"));
+        assert!(trust_prompt(TrustFrom::Codex, "Do you trust the contents of this directory?\n1. Yes, continue\n2. No, quit"));
+        assert!(!trust_prompt(TrustFrom::Codex, "OpenAI Codex /permissions choose what Codex is allowed to do Ask Codex to do anything"));
+        assert!(!trust_prompt(TrustFrom::Claude, "Yes, I trust this folder"));
+        assert!(!trust_prompt(TrustFrom::None, "Do you trust this directory? Yes, continue No, quit"));
     }
 
     #[test]
@@ -791,9 +735,9 @@ mod tests {
         std::fs::write(main.join(".git").join("worktrees").join("fix-total").join("HEAD"), "ref: refs/heads/fix/checkout-total\n").unwrap();
         std::fs::write(copy.join(".git"), format!("gitdir: {}\n", main.join(".git").join("worktrees").join("fix-total").display())).unwrap();
 
-        assert_eq!(project(&main.join("src").join("cart")), ("shop".to_string(), "main".to_string()));
-        assert_eq!(project(&copy), ("shop".to_string(), "fix/checkout-total".to_string()));
-        assert_eq!(project(&dir.join("copies")), ("copies".to_string(), String::new()));
+        assert_eq!(project(&main.join("src").join("cart")), (project_key(&main), "shop".to_string(), "main".to_string()));
+        assert_eq!(project(&copy), (project_key(&main), "shop".to_string(), "fix/checkout-total".to_string()));
+        assert_eq!(project(&dir.join("copies")), (project_key(&dir.join("copies")), "copies".to_string(), String::new()));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

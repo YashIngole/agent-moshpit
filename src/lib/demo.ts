@@ -47,6 +47,7 @@ function agent(n: number, title: string, harness: string, repo: string, branch: 
     harness,
     harness_name: kind.name,
     harness_tag: kind.tag,
+    project: `C:/code/${repo}`,
     repo,
     branch,
     cwd: `C:/code/${repo}`,
@@ -54,6 +55,7 @@ function agent(n: number, title: string, harness: string, repo: string, branch: 
     look: n * 7919 + 13,
     running: phase !== 'asleep' && phase !== 'failed',
     resumable: harness !== 'gemini',
+    resume_note: '',
     // Busy and out of sight: something new in their terminal.
     unread: phase === 'working' && n % 2 === 1
   }
@@ -113,13 +115,14 @@ function screen(who: Agent): string {
 interface Seen {
   /** How many times the newer version was asked for. */
   updates: number
+  watched: string[]
   typed: { agent: string; data: string }[]
   opened: { agent: string | null; path: string; line: number | null; editor: string }[]
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, typed: [], opened: [] }
+  const seen: Seen = { updates: 0, watched: [], typed: [], opened: [] }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -175,7 +178,9 @@ export function demoBridge(): Bridge {
       listeners.add(fn)
       return () => listeners.delete(fn)
     },
-    onNewAgent: () => () => {},
+    onNewAgent: fn => { queueMicrotask(fn); return () => {} },
+    takeNewAgent: async () => { const pending = params.has('new-agent'); params.delete('new-agent'); return pending },
+    onStorageProblem: () => () => {},
     onOpenDesk: () => () => {},
     // `&open=demo-4` stands for a click on a notification about that desk.
     takeOpening: async () => params.get('open'),
@@ -194,7 +199,7 @@ export function demoBridge(): Bridge {
       // Named the way the core names a desk: from the task, else program and folder, numbered when taken.
       const auto = uniqueTitle(spec.prompt.trim() ? titleFrom(spec.prompt) : `${kind.tag} in ${repo}`, agents.map(a => a.title))
       const title = spec.title?.trim() ? shorten(spec.title, 60) : auto
-      const fresh = { ...agent(100 + made, title, kind.id, repo, 'main', 'starting', 0), id: `demo-new-${made}`, cwd: spec.cwd }
+      const fresh = { ...agent(100 + made, title, kind.id, repo, 'main', 'starting', 0), id: `demo-new-${made}`, project: spec.cwd, cwd: spec.cwd }
       given.set(fresh.id, auto)
       agents = [...agents, fresh]
       publish()
@@ -272,12 +277,13 @@ export function demoBridge(): Bridge {
       publish()
     },
     watch: ids => {
+      seen.watched = [...ids]
       if (agents.some(a => ids.includes(a.id) && a.unread)) {
         agents = agents.map(a => (ids.includes(a.id) ? { ...a, unread: false } : a))
         publish()
       }
-      const seen = agents.filter(a => ids.includes(a.id) && a.phase === 'done')
-      for (const a of seen) turn(a.id, 'idle')
+      const finished = agents.filter(a => ids.includes(a.id) && a.phase === 'done')
+      for (const a of finished) turn(a.id, 'idle')
     },
     openPage: url => void window.open(url, '_blank', 'noopener'),
     pickFolder: async () => 'C:/code/shop',

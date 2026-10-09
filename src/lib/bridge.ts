@@ -28,6 +28,8 @@ export interface Bridge {
   onSnapshot(fn: (snapshot: Snapshot) => void): () => void
   /** The tray's "New agent" item was chosen. */
   onNewAgent(fn: () => void): () => void
+  takeNewAgent(): Promise<boolean>
+  onStorageProblem(fn: (problem: StartupProblem) => void): () => void
   /** A notification was clicked: there is a desk to open (see `takeOpening`). */
   onOpenDesk(fn: () => void): () => void
   /** The desk a clicked notification asked for, once; null when there is none. */
@@ -93,12 +95,12 @@ export interface Bridge {
   updateNow(): Promise<boolean>
 }
 
-function subscribe<T>(name: string, fn: (payload: T) => void): () => void {
+function subscribe<T>(name: string, fn: (payload: T) => void, ready?: () => void): () => void {
   let stop: (() => void) | undefined
   let stopped = false
   void listen<T>(name, event => fn(event.payload)).then(unlisten => {
     if (stopped) unlisten()
-    else stop = unlisten
+    else { stop = unlisten; ready?.() }
   })
   return () => {
     stopped = true
@@ -111,8 +113,15 @@ function tauriBridge(): Bridge {
     demo: false,
     snapshot: () => invoke<Snapshot>('snapshot'),
     onSnapshot: fn => subscribe<Snapshot>('office:snapshot', fn),
-    onNewAgent: fn => subscribe<null>('office:new-agent', () => fn()),
-    onOpenDesk: fn => subscribe<null>('office:open-desk', () => fn()),
+    onNewAgent: fn => subscribe<null>('office:new-agent', () => fn(), fn),
+    takeNewAgent: () => invoke<boolean>('take_new_agent'),
+    onStorageProblem: fn => subscribe<StartupProblem>('office:storage-problem', fn, () => {
+      void invoke<StartupProblem[]>('startup_problems').then(problems => {
+        const problem = problems.find(p => /desks\.json$/.test(p.file))
+        if (problem) fn(problem)
+      }, () => {})
+    }),
+    onOpenDesk: fn => subscribe<null>('office:open-desk', () => fn(), fn),
     takeOpening: () => invoke<string | null>('take_opening'),
     newAgent: (spec, cols, rows) => invoke<string>('new_agent', { spec, cols, rows }),
     install: (harness, cols, rows) => invoke<string>('install', { harness, cols, rows }),

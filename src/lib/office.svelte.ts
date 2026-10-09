@@ -3,6 +3,7 @@
 import { tick } from 'svelte'
 import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
+import { groupProjects } from './projects'
 import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
 import type { Agent, Editor, Harness, Job, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 
@@ -11,11 +12,6 @@ export type Panel = { kind: 'new'; cwd: string; harness: string } | { kind: 'pro
 
 /** Whether a terminal is an install or an update rather than a desk's. */
 export const isJob = (id: string) => id.startsWith('job-')
-
-export interface RoomGroup {
-  repo: string
-  agents: Agent[]
-}
 
 /** What has been typed into the New agent form and not yet started. */
 export interface NewAgentDraft {
@@ -227,16 +223,7 @@ class Office {
   /** Agents with a hand up, longest wait first. */
   waiting = $derived(this.agents.filter(a => a.phase === 'needs_you').sort((a, b) => a.since_ms - b.since_ms))
   /** One room per project, in the order the core sends them. */
-  rooms = $derived.by((): RoomGroup[] => {
-    const groups: RoomGroup[] = []
-    for (const agent of this.agents) {
-      const repo = agent.repo || 'No folder'
-      const group = groups.find(g => g.repo === repo)
-      if (group) group.agents.push(agent)
-      else groups.push({ repo, agents: [agent] })
-    }
-    return groups
-  })
+  rooms = $derived(groupProjects(this.agents))
   /** Whether any terminal is on screen. */
   terminals = $derived(this.layout.rows.length > 0)
   /** The desks whose terminal is on screen. */
@@ -287,7 +274,15 @@ class Office {
         () => {}
       )
     takeOpening()
-    const stops = [bridge.onSnapshot(s => this.#take(s)), bridge.onNewAgent(() => this.openNew()), bridge.onOpenDesk(takeOpening), bridge.onNewer(newer => (this.newer = newer))]
+    const takeNewAgent = () => void bridge.takeNewAgent().then(pending => { if (pending) this.openNew() }, () => {})
+    const stops = [
+      bridge.onSnapshot(s => this.#take(s)), bridge.onNewAgent(takeNewAgent),
+      bridge.onOpenDesk(takeOpening), bridge.onNewer(newer => (this.newer = newer)),
+      bridge.onStorageProblem(problem => {
+        this.problem = problem.text
+        this.problemFile = { path: problem.file, line: problem.line }
+      })
+    ]
     const onVisibility = () => {
       this.#syncClock()
       this.#report()
@@ -509,7 +504,7 @@ class Office {
     if (list.length < 2) return
     const at = Math.max(0, list.indexOf(this.focused))
     this.focused = list[(at + by + list.length) % list.length]!
-    if (this.zoomed) this.zoomed = this.focused
+    if (this.zoomed) { this.zoomed = this.focused; this.#report() }
   }
 
   /** Move the keyboard to the pane at this place in reading order, counting from one. */
@@ -517,7 +512,7 @@ class Office {
     const id = ids(this.layout)[n - 1]
     if (!id) return
     this.focused = id
-    if (this.zoomed) this.zoomed = id
+    if (this.zoomed) { this.zoomed = id; this.#report() }
   }
 
   /** Two panes change places, a pane dragged by its header onto another. */

@@ -13,7 +13,10 @@
 //   else   is said back
 import { createInterface } from 'node:readline'
 
-const task = process.argv.slice(2).join(' ')
+const args = process.argv.slice(2)
+const trustExcept = args.find(arg => arg.startsWith('--trust-except='))?.slice('--trust-except='.length)
+let trustPending = trustExcept !== undefined && process.cwd().toLowerCase() !== trustExcept.toLowerCase()
+const task = args.filter(arg => !arg.startsWith('--trust-except=')).join(' ')
 const say = text => process.stdout.write(`${text}\r\n`)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -27,14 +30,21 @@ async function work(label) {
   say('FINISHED')
 }
 
-say(`FAKE AGENT READY in ${process.cwd()} at ${process.stdout.columns}x${process.stdout.rows}`)
-if (task) {
-  say(`TASK: ${task}`)
-  await work('working')
+async function ready() {
+  say(`FAKE AGENT READY in ${process.cwd()} at ${process.stdout.columns}x${process.stdout.rows}`)
+  if (task) { say(`TASK: ${task}`); await work('working') }
 }
+if (trustPending) say('Do you trust this folder?\r\n1. Yes, I trust this folder\r\n2. No, exit')
+else await ready()
 
 const lines = createInterface({ input: process.stdin })
 for await (const line of lines) {
+  if (trustPending) {
+    trustPending = false
+    process.stdout.write('\x1b[2J\x1b[H')
+    await ready()
+    continue
+  }
   const said = line.trim()
   if (said === 'exit') break
   if (said === 'ask') {

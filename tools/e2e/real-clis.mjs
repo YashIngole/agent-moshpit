@@ -14,7 +14,7 @@
 //
 // Prints what each terminal shows and saves a picture of the window. A program
 // that is not on this computer is skipped. The app runs as the named office `real`.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -90,8 +90,13 @@ try {
     const title = `${name}, new folder`
     if (!(await seat(name, work, title))) continue
     shown += 1
-    check(`${name}, started with no task in a folder it was not told to trust, needs you`, await until(async () => (await state(title)) === 'needs_you', 20000), await state(title))
-    check('and its desk says what for', ((await desk(title).locator('.doing').textContent()) ?? '') === 'Asks whether to trust this folder', (await desk(title).locator('.doing').textContent()) ?? '')
+    const terminal = () => page.locator('.pane', { hasText: title }).locator('.xterm-accessibility-tree').innerText().catch(() => '')
+    await until(async () => /trust|context left|shortcuts/i.test(await terminal()), 25000)
+    await sleep(3500)
+    const visible = (await terminal()).toLowerCase().replace(/\s+/g, ' ')
+    const asks = name === 'Claude Code' ? visible.includes('yes, i trust this folder') && visible.includes('no, exit') : visible.includes('do you trust') && /yes, (continue|i trust)/.test(visible) && /no, (quit|exit)/.test(visible)
+    check(`${name}: the trust badge agrees with the actual terminal dialog`, ((await desk(title).locator('.doing').textContent()) ?? '') === 'Asks whether to trust this folder' ? asks : !asks, visible.slice(0, 300))
+    check(`${name}: ${asks ? 'the visible dialog needs you' : 'the ready prompt settles idle'}`, await until(async () => (await state(title)) === (asks ? 'needs_you' : 'idle'), 12000), await state(title))
   }
   // Let both draw their opening screens.
   await sleep(4000)
@@ -115,6 +120,18 @@ try {
     // Its opening screen takes some seconds, with pauses: watched for longer than the office allows one.
     const opening = await watch('Codex, at rest', 36000)
     check('Codex, with nothing to do in a folder it trusts, draws its opening screen and settles as idle', opening.at(-1) === 'idle' && opening.every(seen => seen === 'starting' || seen === 'idle'), opening.join(' > '))
+    if (await seat('Codex', root, 'Codex, same folder')) {
+      const savedPair = () => {
+        try { return JSON.parse(readFileSync(path.join(data, 'desks.json'), 'utf8')).filter(d => ['Codex, at rest', 'Codex, same folder'].includes(d.title)) }
+        catch { return [] }
+      }
+      await sleep(12000)
+      const pair = savedPair()
+      // A brand-new Codex with no user task has no rollout file yet. It must not
+      // borrow either an existing same-folder conversation or the other new desk's.
+      check('two task-free Codex desks do not borrow any existing same-folder session', pair.length === 2 && pair.every(d => !d.session && !d.session_verified), JSON.stringify(pair.map(d => ({ title: d.title, session: d.session, verified: d.session_verified }))))
+      await page.locator('.pane', { hasText: 'Codex, same folder' }).getByRole('button', { name: 'Put this terminal away' }).click()
+    }
     const during = { beside: [], zoomed: [], back: [] }
     const beside = watch('Codex, at rest', 6000)
     await seat('Fake Agent', work, 'Beside')

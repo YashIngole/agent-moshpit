@@ -5,10 +5,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
 
 # A newer push to the same branch makes the older run pointless.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +25,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Linux packages Tauri needs
         if: runner.os == 'Linux'
@@ -48,6 +55,9 @@ jobs:
       - name: Interface unit tests
         run: npm test
 
+      - name: Release tooling tests
+        run: npm run test:tools
+
       - name: Interface build
         run: npm run build
 
@@ -57,11 +67,25 @@ jobs:
 
       - name: Core lint
         working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
       - name: Core tests
         working-directory: src-tauri
-        run: cargo test --lib
+        run: cargo test --locked --lib
 
       - name: Desktop build
-        run: npx tauri build --no-bundle
+        run: npx tauri build --debug --no-bundle
+
+      - name: Windows desktop terminals and persistence
+        if: runner.os == 'Windows'
+        env:
+          MOSHPIT_APP: ${{ github.workspace }}\src-tauri\target\debug\agent-moshpit.exe
+        run: npm run test:app
+
+      - name: Dependency advisories
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+          npm audit --omit=dev

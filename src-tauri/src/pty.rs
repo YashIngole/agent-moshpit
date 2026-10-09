@@ -32,26 +32,46 @@ pub struct Launch {
 }
 
 /// What a terminal has shown, and who is watching it.
-#[derive(Default)]
 struct Screen {
     kept: VecDeque<u8>,
     /// Each watcher, with the number it was given so it can be taken away again.
     sinks: Vec<(u64, Sink)>,
     pulse: Pulse,
+    /// A bounded live screen for startup-dialog observation; scrollback is unnecessary here.
+    visible: vt100::Parser,
+    /// Terminal state immediately before the retained bytes, so trimming keeps modes and colors.
+    prior: vt100::Parser,
+    trimmed: bool,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Self { kept: VecDeque::new(), sinks: Vec::new(), pulse: Pulse::default(), visible: vt100::Parser::new(24, 80, 0), prior: vt100::Parser::new(24, 80, 0), trimmed: false }
+    }
 }
 
 impl Screen {
+    fn replay(&self) -> Vec<u8> {
+        let mut bytes = if self.trimmed { self.prior.screen().state_formatted() } else { Vec::new() };
+        bytes.extend(self.kept.iter());
+        bytes
+    }
+
     /// Take in what the program printed. Returns what has to be said back to it
     /// on the terminal's behalf, which is nothing while a window is showing it.
     fn take(&mut self, bytes: &[u8], now: Millis) -> Vec<u8> {
         self.pulse.output(bytes, now);
+        self.visible.process(bytes);
         self.kept.extend(bytes);
         if self.kept.len() > KEPT_BYTES {
+            self.trimmed = true;
             let extra = self.kept.len() - KEPT_BYTES;
-            self.kept.drain(..extra);
+            let removed: Vec<u8> = self.kept.drain(..extra).collect();
+            self.prior.process(&removed);
             // Start what is kept at the start of a line where one is near, not mid-word.
             if let Some(at) = self.kept.iter().take(4096).position(|&b| b == b'\n') {
-                self.kept.drain(..=at);
+                let removed: Vec<u8> = self.kept.drain(..=at).collect();
+                self.prior.process(&removed);
             }
         }
         self.sinks.retain(|(_, send)| send(bytes));
@@ -107,6 +127,9 @@ impl Terminals {
 
         let mut command = CommandBuilder::new(&launch.program);
         command.args(&launch.args);
+        if let Some(path) = crate::harness::child_path() {
+            command.env("PATH", path);
+        }
         if !launch.cwd.is_empty() {
             command.cwd(&launch.cwd);
         }
@@ -132,6 +155,11 @@ impl Terminals {
             *runs
         };
         let screen = Arc::new(Mutex::new(Screen::default()));
+        {
+            let mut screen = screen.lock().unwrap();
+            screen.visible.screen_mut().set_size(size.rows, size.cols);
+            screen.prior.screen_mut().set_size(size.rows, size.cols);
+        }
         {
             let mut terms = self.terms.lock().unwrap();
             if let Some(mut old) = terms.remove(id) {
@@ -205,7 +233,14 @@ impl Terminals {
         let all: Vec<_> = self.terms.lock().unwrap().iter().map(|(id, t)| (id.clone(), t.screen.clone(), t.size)).collect();
         all.into_iter()
             .map(|(id, screen, size)| {
-                let printed: Vec<u8> = screen.lock().unwrap().kept.iter().copied().collect();
+                let printed = {
+                    let screen = screen.lock().unwrap();
+                    if size.is_some() {
+                        screen.replay()
+                    } else {
+                        screen.kept.iter().copied().collect()
+                    }
+                };
                 let shown = match size {
                     Some((cols, rows)) => drawn(&printed, cols, rows, history),
                     // A screen kept from before is already drawn.
@@ -230,7 +265,7 @@ impl Terminals {
             *runs
         };
         let mut screen = screen.lock().unwrap();
-        let kept: Vec<u8> = screen.kept.iter().copied().collect();
+        let kept = screen.replay();
         if sink(&kept) {
             screen.sinks.push((token, sink));
         }
@@ -268,8 +303,12 @@ impl Terminals {
     pub fn resize(&self, id: &str, cols: u16, rows: u16) {
         let screen = {
             let mut terms = self.terms.lock().unwrap();
-            let Some(term) = terms.get_mut(id) else { return };
-            let Some(live) = term.live.as_ref() else { return };
+            let Some(term) = terms.get_mut(id) else {
+                return;
+            };
+            let Some(live) = term.live.as_ref() else {
+                return;
+            };
             let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
             // The same size again changes nothing, and the program draws nothing.
             if live.master.get_size().is_ok_and(|now| now.rows == size.rows && now.cols == size.cols) {
@@ -280,7 +319,10 @@ impl Terminals {
             term.screen.clone()
         };
         // What it prints next is its screen drawn again at the new size.
-        screen.lock().unwrap().pulse.resized(now_ms());
+        let mut screen = screen.lock().unwrap();
+        screen.pulse.resized(now_ms());
+        screen.visible.screen_mut().set_size(rows.max(2), cols.max(8));
+        screen.prior.screen_mut().set_size(rows.max(2), cols.max(8));
     }
 
     /// End the program. Its last screen stays to be read.
@@ -322,6 +364,14 @@ impl Terminals {
         let screen = self.terms.lock().unwrap().get(id).map(|t| t.screen.clone())?;
         let screen = screen.lock().unwrap();
         Some((screen.pulse.signal(now), screen.pulse.title.clone(), screen.pulse.printed_ms()))
+    }
+
+    pub fn trust_prompt(&self, id: &str, kind: crate::harness::TrustFrom) -> bool {
+        if kind == crate::harness::TrustFrom::None {
+            return false;
+        }
+        let screen = self.terms.lock().unwrap().get(id).map(|t| t.screen.clone());
+        screen.is_some_and(|s| crate::status::trust_prompt(kind, &s.lock().unwrap().visible.screen().contents()))
     }
 }
 
@@ -406,10 +456,13 @@ mod tests {
     fn watcher() -> (Sink, Arc<Mutex<Vec<u8>>>) {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let into = seen.clone();
-        (Box::new(move |bytes: &[u8]| {
-            into.lock().unwrap().extend_from_slice(bytes);
-            true
-        }), seen)
+        (
+            Box::new(move |bytes: &[u8]| {
+                into.lock().unwrap().extend_from_slice(bytes);
+                true
+            }),
+            seen,
+        )
     }
 
     fn wait_for(seen: &Arc<Mutex<Vec<u8>>>, word: &str) -> bool {
@@ -420,6 +473,23 @@ mod tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         false
+    }
+
+    #[test]
+    fn sustained_output_stays_bounded_and_replays_terminal_state() {
+        let mut screen = Screen::default();
+        screen.take(b"\x1b[31m", 1);
+        for i in 0..30_000 {
+            screen.take(format!("line {i:05} with enough text to fill the replay buffer\r\n").as_bytes(), i + 2);
+        }
+        assert!(screen.kept.len() <= KEPT_BYTES);
+        let replay = screen.replay();
+        assert!(replay.len() < KEPT_BYTES + 32 * 1024);
+        let mut reopened = vt100::Parser::new(24, 80, 0);
+        reopened.process(&replay);
+        assert_eq!(reopened.screen().contents(), screen.visible.screen().contents());
+        assert_eq!(reopened.screen().cell(22, 0).unwrap().fgcolor(), screen.visible.screen().cell(22, 0).unwrap().fgcolor());
+        assert!(reopened.screen().contents().contains("line 29999"));
     }
 
     #[test]

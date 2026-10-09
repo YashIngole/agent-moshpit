@@ -44,20 +44,20 @@ pub enum StatusFrom {
 pub enum SessionFrom {
     /// The office picks the id and passes it after `session_arg`.
     Given,
-    /// Read from the newest file Codex wrote for this folder.
+    /// Resolve the session id reported by this process's terminal title.
     CodexRollouts,
     /// It is not known. Resuming uses whatever `resume` says without an id.
     #[default]
     Unknown,
 }
 
-/// Where the office reads whether a program will first ask to trust its folder.
+/// Which startup trust dialog the office recognizes on the actual terminal screen.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrustFrom {
-    /// The folders Claude Code was told to trust, in `~/.claude.json`.
+    /// Claude Code's visible folder-trust choices.
     Claude,
-    /// The projects Codex was told about, in `~/.codex/config.toml`.
+    /// Codex's visible folder-trust choices.
     Codex,
     /// It does not ask, or the office cannot tell.
     #[default]
@@ -96,7 +96,7 @@ pub struct Harness {
     pub worktree: Vec<String>,
     #[serde(default)]
     pub status: StatusFrom,
-    /// Whether it asks to trust a folder before it starts, and where that is kept.
+    /// Which visible startup trust dialog can be recognized.
     #[serde(default)]
     pub trust: TrustFrom,
     /// Its package on npm, which installs it, updates it when it has no way of
@@ -168,7 +168,7 @@ pub fn built_in() -> Vec<Harness> {
         },
         Harness {
             // Codex rings its terminal when it wants an answer or has finished, if asked to.
-            args: words(&["-c", "tui.notifications=true"]),
+            args: words(&["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]"]),
             task: TaskArg::Last,
             resume: words(&["resume", "{session}"]),
             session: SessionFrom::CodexRollouts,
@@ -226,7 +226,9 @@ pub struct Problem {
 pub fn table_checked(user_file: &Path) -> (Vec<Harness>, Vec<Problem>) {
     let mut all = built_in();
     let mut problems = Vec::new();
-    let Ok(text) = std::fs::read_to_string(user_file) else { return (all, problems) };
+    let Ok(text) = std::fs::read_to_string(user_file) else {
+        return (all, problems);
+    };
     let name = user_file.file_name().map_or_else(|| "harnesses.json".to_string(), |n| n.to_string_lossy().into_owned());
     let file = user_file.to_string_lossy().into_owned();
     let rows = match serde_json::from_str::<Vec<Harness>>(&text) {
@@ -296,7 +298,13 @@ impl Runner {
             Runner::Npm(words) => ("npm", words),
             Runner::Command(words) => (words.first().map_or("", String::as_str), words.get(1..).unwrap_or(&[])),
         };
-        let quote = |w: &str| if w.is_empty() || w.contains(' ') { format!("\"{w}\"") } else { w.to_string() };
+        let quote = |w: &str| {
+            if w.is_empty() || w.contains(' ') {
+                format!("\"{w}\"")
+            } else {
+                w.to_string()
+            }
+        };
         std::iter::once(first.to_string()).chain(rest.iter().map(|w| quote(w))).collect::<Vec<_>>().join(" ")
     }
 }
@@ -458,6 +466,11 @@ fn folders() -> &'static [PathBuf] {
     })
 }
 
+/// Child programs need the same PATH used to find them (including interpreters).
+pub fn child_path() -> Option<std::ffi::OsString> {
+    std::env::join_paths(folders()).ok()
+}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from).filter(|p| !p.as_os_str().is_empty())
 }
@@ -600,8 +613,13 @@ pub fn version(found: &Found) -> String {
 /// Empty when it does not answer within `secs`.
 fn ask(found: &Found, words: &[String], secs: u64) -> String {
     use std::process::{Command, Stdio};
-    let Ok((program, args)) = command_line(found, words) else { return String::new() };
+    let Ok((program, args)) = command_line(found, words) else {
+        return String::new();
+    };
     let mut command = Command::new(program);
+    if let Some(path) = child_path() {
+        command.env("PATH", path);
+    }
     command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
     #[cfg(windows)]
     {
@@ -609,7 +627,9 @@ fn ask(found: &Found, words: &[String], secs: u64) -> String {
         // No console window may flash up for a question nobody asked to see answered.
         command.creation_flags(0x0800_0000);
     }
-    let Ok(mut child) = command.spawn() else { return String::new() };
+    let Ok(mut child) = command.spawn() else {
+        return String::new();
+    };
     let started = std::time::Instant::now();
     loop {
         match child.try_wait() {
@@ -667,7 +687,7 @@ mod tests {
 
     #[test]
     fn each_program_takes_its_task_its_own_way() {
-        assert_eq!(start_args(&known("codex"), None, "Ignored", "Type the API", false), ["-c", "tui.notifications=true", "Type the API"]);
+        assert_eq!(start_args(&known("codex"), None, "Ignored", "Type the API", false), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]", "Type the API"]);
         assert_eq!(start_args(&known("antigravity"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         assert_eq!(start_args(&known("gemini"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         // A program known only by name is never handed words it may not understand.
@@ -678,7 +698,7 @@ mod tests {
     fn carrying_on_needs_whatever_the_program_needs() {
         assert_eq!(resume_args(&known("claude"), Some("abc")).unwrap(), ["--resume", "abc"]);
         assert_eq!(resume_args(&known("claude"), None), None);
-        assert_eq!(resume_args(&known("codex"), Some("abc")).unwrap(), ["-c", "tui.notifications=true", "resume", "abc"]);
+        assert_eq!(resume_args(&known("codex"), Some("abc")).unwrap(), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]", "resume", "abc"]);
         // Hermes carries on its latest conversation without being told which.
         assert_eq!(resume_args(&known("hermes"), None).unwrap(), ["--continue"]);
         // So does Antigravity CLI, which keeps its conversations by folder.
@@ -702,7 +722,9 @@ mod tests {
         let shim = dir.join(if cfg!(windows) { "tool.cmd" } else { "tool" });
         std::fs::write(&shim, r#"@ECHO off
 "%_prog%"  "%dp0%\tool.mjs" %*
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let found = find(&shim.to_string_lossy());
         let _ = std::fs::remove_dir_all(&dir);
         if cfg!(windows) {

@@ -11,7 +11,7 @@
   import type { Agent, Job } from '../lib/types'
   import { STATUS_WORD, place } from '../lib/words'
   import Person from './Person.svelte'
-  import TerminalView from './TerminalView.svelte'
+  const terminalView = import('./TerminalView.svelte')
 
   interface Placed {
     id: string
@@ -320,7 +320,9 @@
       </header>
 
       <div class="screen">
+        {#await terminalView then { default: TerminalView }}
         <TerminalView id={pane.id} focused={typing} {hidden} live={agent ? agent.running : true} onfocus={() => office.focusPane(pane.id)} />
+        {/await}
         {#if office.finding === pane.id}
           <form
             class="find"
@@ -364,6 +366,7 @@
         {#if agent && !agent.running}
           <p class="ended" role="status">
             <span>{agent.phase === 'failed' ? agent.activity || 'Their program stopped with an error.' : 'Their program is not running.'}</span>
+            {#if agent.resume_note}<span class="resume-note">{agent.resume_note}</span>{/if}
             <button type="button" class="button" onclick={() => void office.wake(pane.id)}>{agent.resumable ? 'Carry on' : 'Start again'}</button>
           </p>
         {/if}
@@ -400,6 +403,7 @@
 </section>
 
 <style>
+  .resume-note { max-width: 60ch; overflow-wrap: anywhere; color: var(--ink-2); }
   .panes {
     position: relative;
     min-width: 0;

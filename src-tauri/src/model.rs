@@ -44,6 +44,8 @@ pub struct AgentView {
     pub harness_name: String,
     pub harness_tag: String,
     pub repo: String,
+    /// Canonical repository root, shared by worktrees; a folder path outside git.
+    pub project: String,
     pub branch: String,
     pub cwd: String,
     /// When the current phase began.
@@ -54,6 +56,7 @@ pub struct AgentView {
     pub running: bool,
     /// Whether a stopped one carries on where it left off, or starts afresh.
     pub resumable: bool,
+    pub resume_note: String,
     /// Its terminal printed something since the user last had it in front of them.
     pub unread: bool,
 }

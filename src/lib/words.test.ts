@@ -11,6 +11,7 @@ function agent(over: Partial<Agent> = {}): Agent {
     harness: 'claude',
     harness_name: 'Claude Code',
     harness_tag: 'Claude',
+    project: 'C:/code/shop',
     repo: 'shop',
     branch: 'fix/checkout-total',
     cwd: 'C:/code/shop',
@@ -18,6 +19,7 @@ function agent(over: Partial<Agent> = {}): Agent {
     look: 1,
     running: true,
     resumable: true,
+    resume_note: '',
     unread: false,
     ...over
   }

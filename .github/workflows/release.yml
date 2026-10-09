@@ -35,15 +35,33 @@ env:
   TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  quality:
+    needs: resolve
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+
   # One draft, made first, so that the four builds below do not each make their own.
   draft:
+    needs: [resolve, quality]
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Find or make the draft release
         id: draft
@@ -60,7 +78,7 @@ jobs:
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: draft
+    needs: [resolve, draft, quality]
     strategy:
       fail-fast: false
       matrix:
@@ -78,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Linux packages Tauri needs
         if: runner.os == 'Linux'
@@ -117,12 +135,12 @@ jobs:
 
   # latest.json, from the signatures the builds attached.
   manifest:
-    needs: [draft, build]
+    needs: [resolve, draft, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Write latest.json and attach it
         env:

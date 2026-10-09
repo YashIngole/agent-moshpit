@@ -66,6 +66,7 @@ The look is dark, the office after hours: graphite rooms, matte desks, and the o
 ```sh
 cd src-tauri && cargo test     # the core: desks, status, the program table, terminals
 npm test                       # the window's layout of panes, file paths, links, words, looks and times
+npm run test:tools             # repeatable release manifests
 npm run check                  # the window's types
 npm run test:ui                # builds the window and drives it in a headless Edge or Chrome, with demo data
 ```
@@ -77,9 +78,9 @@ npm run tauri build -- --debug --no-bundle
 node tools/e2e/terminals.mjs
 ```
 
-`npm run test:app` runs the same test. It looks for `agent-moshpit.exe` in `src-tauri/target/debug`, or under `CARGO_TARGET_DIR` when that is set. If yours was built somewhere else, set `MOSHPIT_APP` to its full path. The agents in this test are stand-in programs added through `harnesses.json`, so no Claude Code, no Codex and no model is used and nothing is spent. It opens the app's window on your desktop while it runs, as the office named `e2e`, and reads the clipboard once without changing it.
+`npm run test:app` runs that test followed by the persistence and project-identity regressions in `tools/e2e/reliability.mjs`. It looks for `agent-moshpit.exe` in `src-tauri/target/debug`, or under `CARGO_TARGET_DIR` when that is set. If yours was built somewhere else, set `MOSHPIT_APP` to its full path. The agents in this test are stand-in programs added through `harnesses.json`, so no Claude Code, no Codex and no model is used and nothing is spent. It opens the app's window on your desktop while it runs, as the office named `e2e`, and reads the clipboard once without changing it.
 
-`node tools/e2e/real-clis.mjs` starts the real Claude Code and Codex with no task and types nothing into them, to check what only the real programs can show: the question about trusting a folder, and Codex staying idle while its pane is resized. A program that is not installed is skipped.
+`node tools/e2e/real-clis.mjs` starts the real Claude Code and Codex with no task and types nothing into them, to check what only the real programs can show: the badge agreeing with the visible trust dialog or ready prompt, two empty Codex desks in the same folder refusing to borrow existing session IDs, and Codex staying idle while its pane is resized. A program that is not installed is skipped.
 
 Every test of the real app runs it as its own named office with its own data folder (`MOSHPIT_INSTANCE`, `MOSHPIT_DATA_DIR`), so an office you have open is left alone, and none of them asks npm for versions.
 
@@ -100,3 +101,30 @@ npm run build:site
 npx wrangler deploy --config tools/cloudflare/site.jsonc     # agentmoshpit.com
 npx wrangler deploy --config tools/cloudflare/www.jsonc      # www.agentmoshpit.com, which only redirects
 ```
+
+
+## Reliability checks added on 9 October 2026
+
+| Reviewed problem | Fix and regression coverage |
+| --- | --- |
+| Missing saved folder launched in a different directory | Wake returns a recovery error and preserves the saved cwd; core and Windows desktop checks. |
+| Two Codex desks could adopt the same conversation | Own terminal ID plus unambiguous metadata resolution; same-folder collision tests, a real CLI negative check, and a desktop fixture covering own-session restart, session switching and custom CODEX_HOME. Legacy guessed IDs cannot auto-resume. |
+| False folder-trust badges | Visible dialog detection, including a ready-prompt negative case; core, stand-in and real CLI checks. |
+| Corrupt saved desks were overwritten on quit | Protected recovery state, visible file error, backup of the prior readable version, revision ordering and preserved screens; storage and Windows desktop checks. |
+| Late process errors looked asleep | Unexpected nonzero exits become Failed regardless of age; state-machine check. |
+| Custom CLI configuration homes ignored | CODEX_HOME and CLAUDE_CONFIG_DIR respected; root-resolution tests. |
+| Zoom keyboard navigation did not update watched desks | Both navigation paths report the visible desk; browser assertions on the bridge calls. |
+| Checked-out branches remained stale | Periodic refresh for every running adapter, with Claude session cwd when available; live shell/HEAD regression. |
+| Quit/update omitted unfinished package jobs | Shared quit guard includes running jobs; engine regression. |
+| Equal folder names merged different projects | Canonical project identity, common repository identity for worktrees and disambiguated labels; unit and desktop regressions. |
+| Tray New agent could arrive before listeners | Durable pending request, consumed after subscription; bridge race and new-window browser checks. |
+| More menu lacked keyboard navigation | Focus entry/return, arrows, Home/End and Escape; browser checks. |
+
+A 30,000-line terminal test checks bounded replay and retained rendering state. The terminal component loads separately from the initial UI bundle. Children inherit the same expanded PATH used to discover programs, including login-shell paths on Unix.
+
+CI runs the browser and core checks on Windows, macOS and Linux, and the real stand-in desktop/persistence flow on Windows after building the packaged debug executable. A release resolves its tag to one commit, runs that CI workflow on the commit, and only then creates a draft and builds installers from the same commit. Signature assets stay on the release so manifest generation can be repeated. Workflow changes require a pushed CI run for remote validation.
+
+`cargo audit --file src-tauri/Cargo.lock` on 9 October found zero vulnerability entries and two informational warnings in Tauri's Linux GTK dependency tree: [GLib 0.18.5 iterator unsoundness](https://rustsec.org/advisories/RUSTSEC-2024-0429.html) and [unmaintained proc-macro-error 1.0.4](https://rustsec.org/advisories/RUSTSEC-2024-0370.html). GLib's published fix is in 0.20+, incompatible with GTK 0.18's dependency requirements; adding another version would leave the affected copy present. These warnings remain visible in CI. Replacing or forking the GTK stack needs Linux validation; it is not claimed fixed by these application changes.
+
+
+Final local validation: 71 Rust tests, 49 frontend unit tests, 2 release-tool tests, 156 browser checks, Svelte types, Clippy with warnings denied, and actionlint all passed. The packaged Windows app passed the full stand-in terminal flow and the persistence/session regressions. Real Claude Code and Codex startup checks passed without sending a model task. The published v0.3.0 update passed signature verification; a one-byte modification was rejected, with installation disabled. npm audit reported zero vulnerabilities. The packaged debug build is ready; the installed office was not replaced.

@@ -146,6 +146,21 @@ jobs:
           # Four builds writing one latest.json at once can lose each other's part: it is written once, below.
           uploadUpdaterJson: false
 
+      - name: Windows release runtime linkage
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $dumpbin) { throw 'Visual Studio dumpbin was not found.' }
+          $dependencies = & $dumpbin.FullName /DEPENDENTS 'src-tauri/target/${{ matrix.target }}/release/agent-moshpit.exe'
+          $dependencies
+          if ($LASTEXITCODE -ne 0) { throw 'The release executable could not be inspected.' }
+          if ($dependencies -match '(?i)\b(?:msvcp|msvcr|vcruntime)\d+[^\s]*\.dll') {
+            throw 'The release requires an unbundled Microsoft C++ runtime DLL.'
+          }
+
   # latest.json, from the signatures the builds attached.
   manifest:
     needs: [resolve, draft, build]

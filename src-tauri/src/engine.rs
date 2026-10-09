@@ -229,9 +229,9 @@ impl Handle {
         Ok(())
     }
 
-    fn mcp_launch(&self, harness: &Harness, id: &str, args: Vec<String>) -> Result<crate::mcp::PreparedLaunch, String> {
+    fn mcp_launch(&self, harness: &Harness, id: &str, args: Vec<String>, options: &crate::launch::Options) -> Result<crate::mcp::PreparedLaunch, String> {
         match self.inner.mcp.lock().unwrap().as_ref() {
-            Some(hub) => hub.prepare(&harness.id, id, args, harness.args.len()),
+            Some(hub) => hub.prepare(&harness.id, id, args, crate::launch::prefix_len(harness, options)?),
             None => Ok((args, vec![])),
         }
     }
@@ -317,7 +317,7 @@ impl Handle {
         if generated_title.is_some() && found.through_shell {
             return Err("This wrapper cannot receive MCP configuration safely. Use the native Claude Code or Codex executable for delegation.".into());
         }
-        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, &id, args)? };
+        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, &id, args, &spec.launch)? };
         let (program, args) = match harness::command_line(&found, &args) {
             Ok(command) => command,
             Err(error) => { self.mcp_revoke(&id); return Err(error); }
@@ -369,7 +369,7 @@ impl Handle {
                 (crate::launch::start_args(&kind, fresh.as_deref(), "", "", false, &launch)?, fresh)
             }
         };
-        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, id, args)? };
+        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, id, args, &launch)? };
         let (program, args) = match harness::command_line(&found, &args) {
             Ok(command) => command,
             Err(error) => { self.mcp_revoke(id); return Err(error); }

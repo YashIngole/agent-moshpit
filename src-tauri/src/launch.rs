@@ -163,6 +163,12 @@ fn configured(h: &Harness, options: &Options) -> Result<Harness, String> {
     Ok(kind)
 }
 
+/// MCP flags belong after the configured harness prefix, before resume/task
+/// arguments. Overrides can change that prefix's length.
+pub(crate) fn prefix_len(h: &Harness, options: &Options) -> Result<usize, String> {
+    Ok(configured(h, options)?.args.len())
+}
+
 pub fn start_args(h: &Harness, session: Option<&str>, title: &str, task: &str, worktree: bool, options: &Options) -> Result<Vec<String>, String> {
     let mut args = harness::start_args(&configured(h, options)?, session, title, task, worktree);
     // Stop variadic Claude flags, and keep a task beginning with '-' positional.

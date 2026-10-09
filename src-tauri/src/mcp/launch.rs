@@ -43,4 +43,22 @@ mod tests {
         assert_eq!(wrapped[0], "custom-cli.mjs");
         assert_eq!(&wrapped[9..], ["resume", "conversation"]);
     }
+
+    #[test]
+    fn launch_overrides_keep_flag_values_together_before_mcp_and_resume() {
+        use crate::launch::{self, Options, Provider};
+        let mut h = crate::harness::built_in().into_iter().find(|h| h.launch == Provider::Codex).unwrap();
+        h.args = vec!["custom-cli.mjs".into(), "--full-auto".into()];
+        let options = Options { permission: "custom".into(), sandbox: "workspace-write".into(), approval: "on-request".into(), ..Default::default() };
+        let prefix = launch::prefix_len(&h, &options).unwrap();
+        let start = launch::start_args(&h, None, "", "task", false, &options).unwrap();
+        let resume = launch::resume_args(&h, Some("conversation"), &options).unwrap().unwrap();
+        for raw in [start, resume] {
+            let expected_tail = raw[prefix..].to_vec();
+            let configured = arguments("codex", "moshpit", raw, prefix);
+            assert_eq!(&configured[..prefix], ["custom-cli.mjs", "--sandbox", "workspace-write", "--ask-for-approval", "on-request"]);
+            assert!(configured[prefix + 1].starts_with("mcp_servers.agent_moshpit.command="));
+            assert_eq!(&configured[prefix + 8..], expected_tail);
+        }
+    }
 }

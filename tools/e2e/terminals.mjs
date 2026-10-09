@@ -36,7 +36,7 @@ mkdirSync(path.join(work, 'src'))
 writeFileSync(path.join(work, 'src', 'app.ts'), 'export {}\n')
 // A second stand-in is not installed yet: its own install command puts it in place.
 const later = path.join(data, 'later')
-const fake = { program: process.execPath, args: [path.join(here, 'fake-agent.mjs')], task: 'last' }
+const fake = { program: process.execPath, args: [path.join(here, 'fake-agent.mjs'), '--hold-initial-work'], task: 'last' }
 writeFileSync(
   path.join(data, 'harnesses.json'),
   JSON.stringify([
@@ -141,6 +141,9 @@ try {
   check('the task reached it whole, as one word', await shows('First', 'TASK: say hello & goodbye'))
   check('they have a desk on the floor, tagged with their program', (await desk('First').locator('.tag').textContent()) === 'Fake')
   check('while it prints, they are working', await until(async () => (await state('First')).includes('working'), 4000))
+  // Release the fixture only after observing its working state, so a busy
+  // machine cannot finish the short turn before the assertion gets to read it.
+  await type('First', 'finish')
   check('it says it has finished', await shows('First', 'FINISHED'))
   // Idle when the window is in front, which a window driven by a test may not be; a flag otherwise.
   check('and then they are no longer working', await until(async () => /idle|done/.test(await state('First')), 8000), await state('First'))

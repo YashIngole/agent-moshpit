@@ -1,12 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- The tray icon while someone needs you: same figure, plus a marigold dot. -->
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#15302E"/>
-  <rect x="19" y="27" width="26" height="18" rx="9" fill="#4C9BE8"/>
-  <circle cx="32" cy="23" r="10.5" fill="#F2C9A1"/>
-  <path d="M21.5 23a10.5 10.5 0 0 1 21 0c-2.6-4.2-6.1-6.4-10.5-6.4S24.1 18.8 21.5 23z" fill="#2B2B3A"/>
-  <rect x="10" y="38" width="44" height="15" rx="5" fill="#D0A06E"/>
-  <circle cx="48" cy="16" r="15" fill="#15302E"/>
-  <circle cx="48" cy="16" r="12" fill="#FFC83D"/>
-  <rect x="46" y="8.5" width="4" height="9.5" rx="2" fill="#1A1405"/>
-  <circle cx="48" cy="21.8" r="2.3" fill="#1A1405"/>
+  <!-- The tray icon while someone needs you: the same figure, plus a dot of the amber
+       that means "needs you" in the office. -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#13161a" stroke="#2c323a" stroke-width="4"/>
+  <rect x="12" y="28" width="28" height="24" rx="10" fill="#3a4049"/>
+  <path d="M17 30c2.5 5.5 15.5 5.5 18 0" fill="none" stroke="#272b33" stroke-width="3"/>
+  <circle cx="26" cy="22" r="10" fill="#d09a6c"/>
+  <path d="M16 22a10 10 0 0 1 20 0c-3-4.2-6.2-6-10-6s-7 1.8-10 6z" fill="#17171c"/>
+  <rect x="37" y="25" width="21" height="18" rx="3" fill="#0b0d10"/>
+  <rect x="40" y="28" width="8" height="4" rx="1.5" fill="#82aaff"/>
+  <rect x="40" y="36" width="12" height="4" rx="1.5" fill="#82aaff"/>
+  <rect x="8" y="44" width="48" height="8" rx="3" fill="#2a2f36"/>
+  <circle cx="50" cy="14" r="14" fill="#13161a"/>
+  <circle cx="50" cy="14" r="11" fill="#ffb224"/>
 </svg>

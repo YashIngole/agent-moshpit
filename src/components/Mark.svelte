@@ -1,6 +1,7 @@
 <script lang="ts">
   // The app's mark: someone in a hoodie at a lit screen. The same drawing as
-  // assets/brand/icon.svg, at the size of a line of text.
+  // assets/brand/icon.svg, at the size of a line of text: every number there is
+  // sixteen times the one here, so change the two together.
 </script>
 
 <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">

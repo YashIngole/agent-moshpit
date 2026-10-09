@@ -304,7 +304,7 @@ Everything the office does draw is flat vector, made in code: a desk is a few ro
 Graphite, and four colours that each mean one thing.
 
 ### Primary
-- **Amber** (`needs`, with `needs-ink` for anything written on it): "needs you". The band across the top, the "?" tag over a desk, the waiting agent's screen and the light it throws on the desk, the words "needs you" and their dot, and the dot beside the count in the top bar. Nowhere else in what the office draws.
+- **Amber** (`needs`, with `needs-ink` for anything written on it): "needs you". The band across the top, the "?" tag over a desk, the waiting agent's screen and the light it throws on the desk, the words "needs you" and their dot, the dot beside the count in the top bar, and the dot on the tray icon. Nowhere else in what the office draws.
 
 ### Secondary
 - **Done green** (`done`): the tick on a finished agent's screen, its light on the desk, and the dot beside "done".
@@ -463,12 +463,12 @@ The face carries the mood in its brows. Eyes have whites so they read on every s
 Loops are poses switched on a shared beat every 320ms, and a blink of 130ms every 4.3 seconds; no loop is a running CSS animation. A new agent walks to their chair once, over 720ms. For the band, a pane's header and the list, the same drawing is cropped to head and shoulders.
 
 ### The mark
-Someone in a hoodie at a lit screen, on a dark tile, 24px in the top bar. The app icon, the tray icons and the favicon in `assets/brand/` and `public/` have not been redrawn for this look: they are still the first version's teal tile and oak desk, and the dot the tray icon gains when someone needs you is that version's yellow, not this amber.
+Someone in a hoodie at a lit screen, on a dark tile, 24px in the top bar. The app icon (`assets/brand/icon.svg`) is the same drawing, sixteen times the size. The tray icon and the favicon (`assets/brand/tray.svg`, `public/favicon.svg`) are that figure fitted to a 16-pixel grid, so the tile's edge, the desk and the two blue lines on the screen each fall on whole pixels. While someone needs you the tray icon gains a plain amber dot at its top right, ringed in the tile's colour so it holds on a light taskbar; its words are in the tray's tooltip.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep amber for "needs you" alone: the band, the "?" tag, the waiting screen and its light, the words and their dot, the dot beside the count in the bar.
+- **Do** keep amber for "needs you" alone: the band, the "?" tag, the waiting screen and its light, the words and their dot, the dot beside the count in the bar, the dot on the tray icon.
 - **Do** give every status its word, its dot, its pose and its screen.
 - **Do** use `trouble-ink` for red words and `trouble` for red shapes, and check new text at 4.5:1 on `inset`, the lightest surface it can sit on.
 - **Do** set the office's own fixtures (signs, counts, status, tags, buttons, keys, commands) in Geist Mono, and names and sentences in Geist.

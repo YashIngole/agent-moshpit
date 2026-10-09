@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-09T08:44:56.203Z",
+  "generatedAt": "2026-10-09T09:04:44.735Z",
   "title": "Design System: Agent Moshpit",
   "extensions": {
     "colorMeta": {
@@ -1146,7 +1146,7 @@
       }
     ],
     "dos": [
-      "**Do** keep amber for \"needs you\" alone: the band, the \"?\" tag, the waiting screen and its light, the words and their dot, the dot beside the count in the bar.",
+      "**Do** keep amber for \"needs you\" alone: the band, the \"?\" tag, the waiting screen and its light, the words and their dot, the dot beside the count in the bar, the dot on the tray icon.",
       "**Do** give every status its word, its dot, its pose and its screen.",
       "**Do** use `trouble-ink` for red words and `trouble` for red shapes, and check new text at 4.5:1 on `inset`, the lightest surface it can sit on.",
       "**Do** set the office's own fixtures (signs, counts, status, tags, buttons, keys, commands) in Geist Mono, and names and sentences in Geist.",

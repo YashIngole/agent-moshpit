@@ -37,6 +37,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 No finish review in this skill's sense has been run on the CLI office, and no reviewer subagent. What it has had is two walks through the built app, flow by flow, with the fixes that followed each: `docs/reviews/ux-sweep-2026-10-08.md` and `docs/reviews/ux-sweep-2026-10-09.md`, with their screenshots. The four pictures in `docs/` (`office.png`, `terminals.png`, `strip.png`, `new-agent.png`) are the built window showing its demo data.
 
+The app icon, the tray icons and the favicon were redrawn for this look on 2026-10-09, from the mark in the top bar; until then they were the first version's teal tile and oak desk. They were shown first as a mockup, `docs/mockups/night-4-icons.png`, and built after a yes to it. The PNG, ICO and ICNS files in `src-tauri/icons/` are rendered from the SVGs in `assets/brand/` by `tools/make-icons.mjs` and `tauri icon`.
+
 Where the build differs from the mockups it was drawn from:
 
 - The band names who is waiting and which program, not the command or the question. The office does not read a program's screen, so the question stays in the terminal and the band has one button.
@@ -45,7 +47,6 @@ Where the build differs from the mockups it was drawn from:
 
 Known and left as they are:
 
-- The app icon, the tray icons and the favicon (`assets/brand/`, `public/favicon.svg`, `src-tauri/icons/`) are still the first version's drawing: a teal tile, an oak desk, and a yellow dot for "needs you". Only the mark in the top bar was redrawn for this look.
 - Button labels are lowercase in the bar, on the band and in Agent programs, and in sentence case in the New agent form, in menus and in notices.
 - The title of the New agent panel is weight 750; the other two panels' titles are 650.
 - The band's first line ("needs you · 48 sec") is a small uppercase line above the name. `DESIGN.md` describes it on the band and does not make it a pattern for other headings.

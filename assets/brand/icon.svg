@@ -1,23 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Someone at a desk, seen the way the office draws them. -->
-  <rect x="32" y="32" width="960" height="960" rx="224" fill="#15302E"/>
-  <!-- rug -->
-  <rect x="150" y="560" width="724" height="300" rx="150" fill="#1F4744"/>
-  <!-- chair back -->
-  <rect x="352" y="250" width="320" height="250" rx="110" fill="#2F5551"/>
-  <!-- shirt -->
-  <rect x="330" y="470" width="364" height="240" rx="120" fill="#4C9BE8"/>
+  <!-- Someone in a hoodie at a lit screen, in the office after hours. The same drawing
+       as src/components/Mark.svelte, sixteen times the size. -->
+  <rect x="32" y="32" width="960" height="960" rx="240" fill="#13161a" stroke="#2c323a" stroke-width="40"/>
+  <!-- hoodie, and the fold of its hood -->
+  <rect x="224" y="480" width="416" height="352" rx="144" fill="#3a4049"/>
+  <path d="M304 480c32 80 224 80 256 0" fill="none" stroke="#272b33" stroke-width="48"/>
   <!-- head -->
-  <circle cx="512" cy="410" r="150" fill="#F2C9A1"/>
+  <circle cx="432" cy="352" r="144" fill="#d09a6c"/>
   <!-- hair -->
-  <path d="M362 410a150 150 0 0 1 300 0c-34-58-86-90-150-90s-116 32-150 90z" fill="#2B2B3A"/>
-  <!-- eyes -->
-  <circle cx="458" cy="436" r="17" fill="#2B2B3A"/>
-  <circle cx="566" cy="436" r="17" fill="#2B2B3A"/>
+  <path d="M288 352a144 144 0 0 1 288 0c-48-64-96-88-144-88s-96 24-144 88z" fill="#17171c"/>
+  <!-- the screen, at work -->
+  <rect x="592" y="368" width="320" height="240" rx="40" fill="#0b0d10"/>
+  <path d="M656 448h96M656 512h160" stroke="#82aaff" stroke-width="35.2" stroke-linecap="round"/>
   <!-- desk -->
-  <rect x="190" y="610" width="644" height="210" rx="52" fill="#D0A06E"/>
-  <rect x="190" y="748" width="644" height="72" rx="36" fill="#A97B4F"/>
-  <rect x="190" y="748" width="644" height="36" fill="#A97B4F"/>
-  <!-- the glow of a screen on the desk -->
-  <rect x="402" y="650" width="220" height="44" rx="22" fill="#9BE7F0"/>
+  <rect x="128" y="736" width="768" height="128" rx="48" fill="#2a2f36"/>
 </svg>

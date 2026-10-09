@@ -38,6 +38,6 @@ Visual evidence is in this folder. Final captures cover minimum-size attention, 
 
 The installed user office was left running. Review preview servers and browser tabs were closed. The earlier policy-blocked temporary baseline snapshot remains as recorded in [the cleanup note](../cleanup-note.md).
 
-Release integration for v0.5.1 preserves v0.5.0's voice input, internal MCP and launch settings. Terminals being read are tracked separately from visible panes: selecting another pane clears only that pane's unread flag, while an existing recording stays with its original visible terminal. Covering or closing the original pane still cancels it. Browser checks cover both cases; the core regression verifies that focus changes preserve delivery to the original run and hidden panes reject delivery.
+Release integration for v0.5.2 preserves v0.5.1's voice input, internal MCP and launch settings. Terminals being read are tracked separately from visible panes: selecting another pane clears only that pane's unread flag, while an existing recording stays with its original visible terminal. Covering or closing the original pane still cancels it. Browser checks cover both cases; the core regression verifies that focus changes preserve delivery to the original run and hidden panes reject delivery.
 
 The combined build passed 215 browser checks, all six launch-settings groups, 53 frontend unit tests, 103 Rust tests (one live catalog test intentionally ignored), and Clippy with warnings denied. The site demo and screenshots were regenerated from the combined UI.

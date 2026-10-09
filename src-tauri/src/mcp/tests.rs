@@ -25,7 +25,7 @@ impl Fixture {
         kind.package.clear(); kind.update.clear(); kind.task = TaskArg::None;
         kind.trust = TrustFrom::None; kind.session = SessionFrom::Unknown; kind.resume.clear();
         let handle = engine::start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
-        let make = |cwd: &Path| NewAgent { harness: "shell".into(), cwd: cwd.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false };
+        let make = |cwd: &Path| NewAgent { harness: "shell".into(), cwd: cwd.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false, launch: Default::default() };
         let a = handle.new_agent(make(&dir), 80, 24).unwrap();
         let b = handle.new_agent(make(&dir.join("sub")), 80, 24).unwrap();
         let hub = Hub::start(handle.clone(), dir.join("coordination.json")).unwrap();
@@ -104,7 +104,7 @@ fn other_projects_and_unrelated_tasks_are_private() {
     let f = Fixture::new();
     let other = std::env::temp_dir().join(format!("moshpit-other-{}", random_id().unwrap()));
     std::fs::create_dir_all(&other).unwrap();
-    let id = f.handle.new_agent(NewAgent { harness: "shell".into(), cwd: other.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false }, 80, 24).unwrap();
+    let id = f.handle.new_agent(NewAgent { harness: "shell".into(), cwd: other.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false, launch: Default::default() }, 80, 24).unwrap();
     f.hub.issue(&id).unwrap();
     assert!(f.call(&f.a, "send_task", json!({"session_id":id,"prompt":"Cross-project task","request_key":"cross"})).unwrap_err().contains("different project"));
     let task = f.queued();

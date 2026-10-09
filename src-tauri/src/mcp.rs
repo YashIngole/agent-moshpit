@@ -314,7 +314,7 @@ impl Hub {
                 let (task, fresh) = self.reserve(caller, &child, args, true)?;
                 if !fresh { return Ok(json!({"session_id":task.to,"task_id":task.id,"task":task_view(&task),"reused":true})); }
                 let prompt = format!("{}\n\nThis task was delegated through Agent Moshpit (task_id: {}). Use get_context, update your activity, and report_result with your findings, changed files and validation when finished. Do not edit files outside your assigned task.", task.prompt, task.id);
-                let spec = NewAgent { harness, cwd: own.cwd, prompt, title: String::new(), worktree };
+                let spec = NewAgent { harness, cwd: own.cwd, prompt, title: String::new(), worktree, launch: Default::default() };
                 match handle.new_agent_id(spec, 100, 30, task.to.clone(), Some(&title)) {
                     Ok(_) => {
                         // A fast child may already have reported a result: do not overwrite it.

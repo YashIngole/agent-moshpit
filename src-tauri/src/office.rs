@@ -31,6 +31,8 @@ pub struct SavedDesk {
     pub session_verified: bool,
     #[serde(default)]
     pub created_ms: Millis,
+    #[serde(default)]
+    pub launch: crate::launch::Options,
 }
 
 impl SavedDesk {
@@ -447,6 +449,7 @@ impl Office {
                         String::new()
                     },
                     unread: d.unread,
+                    launch: d.saved.launch.clone(),
                 }
             })
             .collect()
@@ -537,7 +540,7 @@ mod tests {
     use super::*;
 
     fn desk(id: &str) -> SavedDesk {
-        SavedDesk { id: id.into(), harness: "claude".into(), title: "Fix the total".into(), title_locked: false, auto_title: "Fix the total".into(), cwd: "C:/work/shop".into(), session: None, session_verified: false, created_ms: 1 }
+        SavedDesk { id: id.into(), harness: "claude".into(), title: "Fix the total".into(), title_locked: false, auto_title: "Fix the total".into(), cwd: "C:/work/shop".into(), session: None, session_verified: false, created_ms: 1, launch: Default::default() }
     }
 
     fn office() -> Office {

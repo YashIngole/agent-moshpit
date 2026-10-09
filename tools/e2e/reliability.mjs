@@ -16,6 +16,7 @@ writeFileSync(file, broken)
 const env = { MOSHPIT_DATA_DIR: data, MOSHPIT_INSTANCE: 'reliability', CODEX_HOME: path.join(data, 'custom-codex-home') }
 writeFileSync(path.join(data, 'harnesses.json'), JSON.stringify([{
   id: 'sessions', name: 'Session Agent', tag: 'Session', program: process.execPath,
+  launch: 'codex',
   args: [fileURLToPath(new URL('./session-agent.mjs', import.meta.url))],
   session: 'codex_rollouts', resume: ['--resume', '{session}']
 }]))
@@ -68,15 +69,18 @@ try {
   assert.equal(after.cwd, missing)
   assert.equal(after.running, false)
   console.log('ok   missing folders cannot launch elsewhere; old IDs stay unverified; same-name projects stay separate')
-  const create = title => call(page, 'new_agent', { spec: { harness: 'sessions', cwd: projects[0], prompt: '', title, worktree: false }, cols: 100, rows: 30 })
+  const launchSettings = { model: 'future-model', effort: 'future-effort', permission: 'yolo' }
+  const create = title => call(page, 'new_agent', { spec: { harness: 'sessions', cwd: projects[0], prompt: '', title, worktree: false, launch: launchSettings }, cols: 100, rows: 30 })
   const ids = [await create('Session A'), await create('Session B')]
   const savedPair = () => JSON.parse(readFileSync(file, 'utf8')).filter(d => ids.includes(d.id))
   assert.ok(await until(() => savedPair().length === 2 && savedPair().every(d => d.session_verified && d.session)), 'custom CODEX_HOME sessions should resolve')
   const pair = savedPair()
+  assert.ok(pair.every(d => d.launch.model === launchSettings.model && d.launch.effort === launchSettings.effort && d.launch.permission === launchSettings.permission), 'explicit launch settings are saved with each desk')
   assert.notEqual(pair[0].session, pair[1].session, 'same-folder desks must have different sessions')
   await call(page, 'restart', { agent: ids[0], cols: 100, rows: 30 })
   assert.ok(await until(() => savedPair().find(d => d.id === ids[0])?.session_verified))
   assert.equal(savedPair().find(d => d.id === ids[0]).session, pair.find(d => d.id === ids[0]).session, 'restart must resume its own ID')
+  assert.equal((await call(page, 'snapshot')).agents.find(d => d.id === ids[0]).launch.model, launchSettings.model, 'restart retains launch overrides')
   await call(page, 'term_write', { agent: ids[0], data: '/new\r\n' })
   assert.ok(await until(() => { const d = savedPair().find(d => d.id === ids[0]); return d.session_verified && d.session !== pair.find(p => p.id === ids[0]).session }), 'session switch is verified from the new terminal title')
   for (const id of ids) await call(page, 'stop', { agent: id })
@@ -84,6 +88,12 @@ try {
   console.log('ok   same-folder sessions, custom CODEX_HOME, own-session restart and session switching')
   await quit(page)
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).find(a => a.id === 'missing').cwd, missing)
+  page = await open()
+  const restored = (await call(page, 'snapshot')).agents.filter(d => ids.includes(d.id))
+  assert.equal(restored.length, 2)
+  assert.ok(restored.every(d => d.launch.model === launchSettings.model && d.launch.permission === launchSettings.permission && !d.running), 'launch settings survive a full app restart')
+  await quit(page)
+  console.log('ok   per-desk model, effort and permissions survive restart and application reload')
   console.log('all reliability checks passed')
 } finally {
   if (browser) await browser.close().catch(() => {})

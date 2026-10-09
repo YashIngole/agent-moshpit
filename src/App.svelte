@@ -202,7 +202,7 @@
       <Panes />
     {/if}
     {#if office.panel?.kind === 'new'}
-      <NewAgent cwd={office.panel.cwd} harness={office.panel.harness} />
+      <NewAgent cwd={office.panel.cwd} harness={office.panel.harness} launch={office.panel.launch} />
     {:else if office.panel?.kind === 'programs'}
       <Programs />
     {:else if office.panel?.kind === 'keys'}

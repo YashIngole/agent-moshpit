@@ -20,7 +20,15 @@ The rest are known by name only: they start in their folder and you type the tas
 
 Codex is started with `tui.terminal_title=["session-id"]` as well as terminal notifications. The office resolves the reported ID (or its unique shortened prefix) against `$CODEX_HOME/sessions`, falling back to `~/.codex/sessions`. It never chooses the newest conversation in a folder. This was checked with Codex 0.162.0 on 9 October 2026. An empty conversation has no rollout yet and stays unverified until Codex saves one. A CLI that does not report a usable ID cannot be resumed automatically. IDs saved by older office versions are preserved, but must be chosen explicitly with Codex's `/resume` before relying on that conversation. The setting is documented in the [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
 
-Claude session discovery respects `CLAUDE_CONFIG_DIR`, falling back to `~/.claude`. Folder-trust badges come from the visible terminal dialog; configuration files alone do not prove that a CLI is asking a question. The office does not change CLI permission or approval settings.
+Claude session discovery respects `CLAUDE_CONFIG_DIR`, falling back to `~/.claude`. Folder-trust badges come from the visible terminal dialog; configuration files alone do not prove that a CLI is asking a question. New agent can pass explicit permission and model overrides for a desk, without editing the CLI's configuration files.
+
+## Live models and launch settings
+
+Model names are not maintained in an app release. Codex discovery reads `codex debug models`; Claude discovery reads the SDK control protocol's initialization response, without sending a user message. The app normalizes model IDs, names, descriptions and supported effort levels, while leaving authentication to the CLI. Discovery disables Claude customizations and does not start an agent task or request model inference.
+
+Catalogs are cached for 15 minutes, scoped by program, executable/script version, folder and Codex profile. Refresh bypasses the cache. Concurrent requests are coalesced, the cache holds at most 32 contexts, output is bounded, and probe processes have a timeout and descendant cleanup. A failed refresh retains the last usable catalog; custom IDs and inherited settings remain usable. An older CLI without the discovery command can be updated or used with a custom ID.
+
+Explicit launch overrides are stored in `desks.json` and are passed again when the desk carries on. Old desks without overrides continue to inherit the CLI's settings. The app keeps its session-identification and notification arguments, and passes overrides as individual arguments rather than constructing a shell command.
 
 ## Adding a program of your own
 
@@ -46,6 +54,7 @@ Put a file called `harnesses.json` in the data folder (see [Where things are kep
 | `tag` | yes | The short word on a desk: "Claude". |
 | `program` | yes | What is typed to start it: a plain name found on the `PATH`, or a full path. Never a line for a shell. |
 | `args` | | Words passed every time, before anything else. |
+| `launch` | | Optional adapter: `"claude"` or `"codex"` enables that CLI's launch controls and live catalog for this row. Default `"none"` keeps configuration in the terminal. Built-in Claude and Codex rows opt in. |
 | `task` | | How the first task is handed over: `"last"` (as the last word), `{ "flag": "--ask" }` (after that flag), or `"none"` (typed in the terminal; the default). |
 | `resume` | | Words that make it carry on an earlier conversation. `{session}` stands for the conversation's id. Empty: it starts afresh. |
 | `session` | | How the office learns that id: `"given"` (the office picks one and passes it after `session_arg`), `"codex_rollouts"` (resolve the session ID in that terminal's title against Codex rollout metadata), or `"unknown"` (the default). |

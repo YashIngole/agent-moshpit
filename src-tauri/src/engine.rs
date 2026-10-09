@@ -120,6 +120,7 @@ struct Inner {
     home: PathBuf,
     stopping: AtomicBool,
     mcp: Mutex<Option<Arc<crate::mcp::Hub>>>,
+    catalogs: crate::catalog::Cache,
 }
 
 /// The engine, as the rest of the app holds it. Cheap to clone.
@@ -185,7 +186,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             }
         }
     });
-    let handle = Handle { inner: Arc::new(Inner { shell, out: Mutex::new(out), table, aside, terms, state: Mutex::new(state), home, stopping: AtomicBool::new(false), mcp: Mutex::new(None) }) };
+    let handle = Handle { inner: Arc::new(Inner { shell, out: Mutex::new(out), table, aside, terms, state: Mutex::new(state), home, stopping: AtomicBool::new(false), mcp: Mutex::new(None), catalogs: crate::catalog::Cache::default() }) };
     *slot.lock().unwrap() = Some(handle.clone());
     handle.refresh_places();
 
@@ -284,6 +285,13 @@ impl Handle {
         self.picture(&state)
     }
 
+    pub fn model_catalog(&self, id: &str, cwd: &str, profile: &str, refresh: bool) -> Result<crate::catalog::Catalog, String> {
+        let kind = self.kind(id)?.clone();
+        crate::launch::Options { profile: profile.into(), ..Default::default() }.validate(kind.launch)?;
+        let found = self.locate(&kind)?;
+        Ok(self.inner.catalogs.get(&kind, &found, cwd, profile, refresh))
+    }
+
     /// Seat a new agent and start its program. Returns the desk's id.
     pub fn new_agent(&self, spec: NewAgent, cols: u16, rows: u16) -> Result<String, String> {
         self.new_agent_id(spec, cols, rows, new_id(), None)
@@ -304,7 +312,7 @@ impl Handle {
         let auto = self.inner.state.lock().unwrap().office.unique_title(&auto);
         let title = if named { harness::shorten(&spec.title, 60) } else { auto.clone() };
         let session = (kind.session == SessionFrom::Given).then(new_uuid);
-        let args = harness::start_args(&kind, session.as_deref(), if named { &title } else { "" }, task, spec.worktree);
+        let args = crate::launch::start_args(&kind, session.as_deref(), if named { &title } else { "" }, task, spec.worktree, &spec.launch)?;
         if spec.worktree && kind.worktree.is_empty() { return Err("This program does not support worktrees.".into()); }
         if generated_title.is_some() && found.through_shell {
             return Err("This wrapper cannot receive MCP configuration safely. Use the native Claude Code or Codex executable for delegation.".into());
@@ -314,7 +322,7 @@ impl Handle {
             Ok(command) => command,
             Err(error) => { self.mcp_revoke(&id); return Err(error); }
         };
-        let desk = SavedDesk { id: id.clone(), harness: kind.id.clone(), title, title_locked: named, auto_title: auto, cwd: cwd.clone(), session_verified: session.is_some(), session, created_ms: now_ms() };
+        let desk = SavedDesk { id: id.clone(), harness: kind.id.clone(), title, title_locked: named, auto_title: auto, cwd: cwd.clone(), session_verified: session.is_some(), session, created_ms: now_ms(), launch: spec.launch };
         // Register the desk before spawning: a fast MCP startup or process exit
         // must already be able to identify it. Never hold the state lock to spawn.
         {
@@ -343,22 +351,22 @@ impl Handle {
         if self.inner.terms.running(id) {
             return Ok(());
         }
-        let (kind, cwd, session) = {
+        let (kind, cwd, session, launch) = {
             let state = self.inner.state.lock().unwrap();
             let desk = state.office.get(id).ok_or("That desk is gone.")?;
             let kind = self.kind(&desk.saved.harness)?;
-            (kind.clone(), desk.saved.cwd.clone(), desk.saved.resume_session(kind).map(str::to_string))
+            (kind.clone(), desk.saved.cwd.clone(), desk.saved.resume_session(kind).map(str::to_string), desk.saved.launch.clone())
         };
         if cwd.is_empty() || !Path::new(&cwd).is_dir() {
             return Err(format!("The saved folder no longer exists: {cwd}. Restore it, or start a new desk in the project's new folder."));
         }
         let found = self.locate(&kind)?;
         // Carry on when it can; otherwise a fresh start in the same folder.
-        let (args, fresh) = match harness::resume_args(&kind, session.as_deref()) {
+        let (args, fresh) = match crate::launch::resume_args(&kind, session.as_deref(), &launch)? {
             Some(args) => (args, None),
             None => {
                 let fresh = (kind.session == SessionFrom::Given).then(new_uuid);
-                (harness::start_args(&kind, fresh.as_deref(), "", "", false), fresh)
+                (crate::launch::start_args(&kind, fresh.as_deref(), "", "", false, &launch)?, fresh)
             }
         };
         let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, id, args)? };
@@ -801,6 +809,7 @@ impl Handle {
                     name: h.name.clone(),
                     tag: h.tag.clone(),
                     installed,
+                    launch: h.launch,
                     outdated: installed && harness::newer(&version, &latest),
                     version,
                     latest,
@@ -964,6 +973,7 @@ mod tests {
         let (program, args) = if cfg!(windows) { ("cmd.exe", vec!["/d".to_string(), "/q".to_string()]) } else { ("/bin/sh", vec![]) };
         Harness {
             id: "shell".into(),
+            launch: crate::launch::Provider::None,
             name: "A Shell".into(),
             tag: "Shell".into(),
             program: program.into(),
@@ -997,7 +1007,7 @@ mod tests {
         let shell = Arc::new(Quiet::default());
         let engine = start(shell.clone(), vec![shell_kind()], vec![], vec![]);
         let cwd = std::env::temp_dir().to_string_lossy().into_owned();
-        let spec = NewAgent { harness: "shell".into(), cwd: cwd.clone(), prompt: String::new(), title: "Probe".into(), worktree: false };
+        let spec = NewAgent { harness: "shell".into(), cwd: cwd.clone(), prompt: String::new(), title: "Probe".into(), worktree: false, launch: Default::default() };
         let id = engine.new_agent(spec, 80, 24).unwrap();
 
         let agent = |engine: &Handle| engine.snapshot().agents.into_iter().find(|a| a.id == id).unwrap();
@@ -1039,7 +1049,7 @@ mod tests {
     fn voice_pins_a_live_run_rejects_stale_or_hidden_panes_and_does_not_save_echo() {
         let shell = Arc::new(Quiet::default());
         let engine = start(shell.clone(), vec![shell_kind()], vec![], vec![]);
-        let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false };
+        let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false, launch: Default::default() };
         let id = engine.new_agent(spec, 80, 24).unwrap();
         assert!(engine.voice_target(&id).is_none());
         engine.watch(vec![id.clone()]);
@@ -1069,7 +1079,7 @@ mod tests {
         missing.program = "no-such-program-moshpit".into();
         let engine = start(shell, vec![shell_kind(), missing], vec![], vec![]);
         let here = std::env::temp_dir().to_string_lossy().into_owned();
-        let spec = |harness: &str, cwd: &str| NewAgent { harness: harness.into(), cwd: cwd.into(), prompt: String::new(), title: String::new(), worktree: false };
+        let spec = |harness: &str, cwd: &str| NewAgent { harness: harness.into(), cwd: cwd.into(), prompt: String::new(), title: String::new(), worktree: false, launch: Default::default() };
 
         assert!(engine.new_agent(spec("shell", "Z:/no/such/folder/anywhere"), 80, 24).unwrap_err().contains("folder"));
         assert!(engine.new_agent(spec("ghost", &here), 80, 24).unwrap_err().contains("Ghost was not found"));
@@ -1128,9 +1138,10 @@ mod tests {
                 session: None,
                 session_verified: false,
                 created_ms: 1,
+                launch: Default::default(),
             },
             // A desk whose kind of program is no longer in the table cannot be shown as anything.
-            SavedDesk { id: "b".into(), harness: "gone".into(), title: "Stranger".into(), title_locked: false, auto_title: String::new(), cwd: String::new(), session: None, session_verified: false, created_ms: 2 },
+            SavedDesk { id: "b".into(), harness: "gone".into(), title: "Stranger".into(), title_locked: false, auto_title: String::new(), cwd: String::new(), session: None, session_verified: false, created_ms: 2, launch: Default::default() },
         ];
         let engine = start(shell, vec![shell_kind()], saved, vec![("a".to_string(), b"said before the restart\r\n".to_vec())]);
         let agents = engine.snapshot().agents;
@@ -1166,6 +1177,7 @@ mod tests {
             session: Some(format!("session-{id}")),
             session_verified: true,
             created_ms: 1,
+            launch: Default::default(),
         };
         // "mine" is a program the user added in harnesses.json, which this time could not be read.
         let before = vec![desk("a", "shell", "Old friend"), desk("b", "mine", "Stranger"), desk("c", "shell", "Another")];
@@ -1257,7 +1269,7 @@ mod tests {
         // Claude must also refresh its saved cwd when no session file exists yet.
         kind.status = StatusFrom::ClaudeSessions;
         let engine = start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
-        let id = engine.new_agent(NewAgent { harness: "shell".into(), cwd: dir.to_string_lossy().into_owned(), prompt: String::new(), title: "Branch".into(), worktree: false }, 80, 24).unwrap();
+        let id = engine.new_agent(NewAgent { harness: "shell".into(), cwd: dir.to_string_lossy().into_owned(), prompt: String::new(), title: "Branch".into(), worktree: false, launch: Default::default() }, 80, 24).unwrap();
         assert_eq!(engine.snapshot().agents[0].branch, "before");
         std::fs::write(dir.join(".git/HEAD"), "ref: refs/heads/after\n").unwrap();
         for _ in 0..SLOW_EVERY {

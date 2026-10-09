@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:tools": "node --test tools/*.test.mjs",
     "test:ui": "vite build && node tools/e2e/ui-demo.mjs",
+    "test:launch": "vite build && node tools/e2e/launch-settings.mjs",
     "test:app": "node tools/e2e/terminals.mjs && node tools/e2e/reliability.mjs",
     "test:mcp": "node tools/e2e/mcp.mjs",
     "build:site": "vite build --base ./ --outDir site/demo --emptyOutDir",

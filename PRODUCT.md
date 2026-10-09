@@ -38,8 +38,8 @@ Neighbours, as looked at in the two reviews of 2026-10-08 and 2026-10-09 (source
 ## Operating Context
 
 - The user's own installed CLIs, with their own sign-ins, settings and models. The office knows fourteen by name and five in detail: Claude Code, Codex, Antigravity CLI, Hermes and Gemini CLI. Four were read from each program's `--help` on 2026-10-08 (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2); Antigravity CLI, which replaced Gemini CLI for personal Google accounts, was read from Google's documentation on 2026-10-09 and has not been run. A user can add a program, or replace a row, in `harnesses.json`.
-- What the office shows but does not own: the conversation, approvals, slash commands, models, accounts, worktrees and history. All of that is the program's and is seen through its terminal.
-- What the office does own: the desks (which program, its name, its folder, the id of its conversation when known), how the panes are laid out, the reading of each agent's status, and getting the user's attention (the band, the tray, notifications, the window's title).
+- What the office shows but does not own: the conversation, approvals, slash commands, models, accounts, worktrees and history. All of that is the program's and is seen through its terminal. New agent also offers optional model, effort and permission launch overrides for Claude and Codex, requested by the owner on 2026-10-09. Models and effort levels come from the installed CLI's catalog, so new releases need no app update.
+- What the office does own: the desks (which program, its name, its folder, the id of its conversation when known, and explicit launch overrides), how the panes are laid out, the reading of each agent's status, and getting the user's attention (the band, the tray, notifications, the window's title).
 - The desktop: a tray icon, system notifications, and a window that may be small and kept at the side of the screen, or closed entirely.
 - Windows first.
 - Typical load: 2 to 8 agents at once. The design must stay usable to about 20; the demo's `crowd` scene has 20 for checking this.

@@ -4,8 +4,10 @@
   import { onMount, untrack } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { office } from '../lib/office.svelte'
+  import LaunchSettings from './LaunchSettings.svelte'
+  import type { LaunchOptions } from '../lib/types'
 
-  let { cwd: initialCwd, harness: initialHarness = '' }: { cwd: string; harness?: string } = $props()
+  let { cwd: initialCwd, harness: initialHarness = '', launch: initialLaunch }: { cwd: string; harness?: string; launch?: LaunchOptions } = $props()
 
   // The form opens with whatever was in it when it was last closed, so a stray
   // Escape costs nothing. It is emptied when the agent starts.
@@ -15,6 +17,7 @@
   let task = $state(kept.task)
   let title = $state(kept.title)
   let worktree = $state(kept.worktree)
+  let launches = $state<Record<string, LaunchOptions>>(structuredClone(kept.launches))
   let starting = $state(false)
   let problem = $state('')
   let taskField = $state<HTMLTextAreaElement>()
@@ -41,9 +44,12 @@
   $effect(() => {
     if (initialHarness) harness = initialHarness
   })
+  $effect(() => {
+    if (initialHarness && initialLaunch) launches[initialHarness] = structuredClone($state.snapshot(initialLaunch))
+  })
 
   $effect(() => {
-    office.newDraft = { harness, task, cwd, title, worktree }
+    office.newDraft = { harness, task, cwd, title, worktree, launches: $state.snapshot(launches) }
   })
 
   onMount(() => taskField?.focus())
@@ -69,7 +75,8 @@
       cwd: cwd.trim(),
       prompt: kind.takes_task ? task.trim() : '',
       title: title.trim(),
-      worktree: kind.worktree && worktree
+      worktree: kind.worktree && worktree,
+      launch: kind.launch && kind.launch !== 'none' ? $state.snapshot(launches[kind.id] ?? {}) : {}
     }
     try {
       // Not here yet: installed first, in a terminal of its own, and then started.
@@ -104,6 +111,9 @@
     onkeydown={event => {
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !starting) {
         event.preventDefault()
+        // Commit native change fields, just as clicking the Start button does.
+        // Multiline folder/tool rules stay unnormalized while being edited.
+        if (event.target instanceof HTMLElement) event.target.blur()
         void start()
       }
     }}
@@ -125,7 +135,8 @@
         </div>
         {#if kind && kind.installed}
           <p class="hint">
-            Your own {kind.name}{kind.version ? ` ${kind.version}` : ''}: its sign-in, settings, model and tools. Nothing is set up again here.
+            Your own {kind.name}{kind.version ? ` ${kind.version}` : ''}, with its sign-in and tools.
+            {#if kind.launch && kind.launch !== 'none'}Choose launch settings below, or keep its defaults.{:else}It uses its own settings and model.{/if}
             {#if kind.outdated}
               <span class="newer">{kind.latest} is out.</span>
               <button type="button" class="link" onclick={() => office.update(kind.id)}>Update it</button>
@@ -145,6 +156,10 @@
         </p>
       {/if}
     </div>
+
+    {#if kind?.launch && kind.launch !== 'none'}
+      {#key kind.id}<LaunchSettings {kind} {cwd} bind:options={() => launches[kind.id] ?? {}, value => { launches[kind.id] = value }} />{/key}
+    {/if}
 
     {#if kind?.takes_task}
       <div>

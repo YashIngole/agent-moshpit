@@ -59,6 +59,8 @@ pub struct AgentView {
     pub resume_note: String,
     /// Its terminal printed something since the user last had it in front of them.
     pub unread: bool,
+    /// Explicit settings used to launch this desk; the CLI may change them later.
+    pub launch: crate::launch::Options,
 }
 
 /// One program an agent can be, and whether it is on this computer.
@@ -68,6 +70,7 @@ pub struct HarnessView {
     pub name: String,
     pub tag: String,
     pub installed: bool,
+    pub launch: crate::launch::Provider,
     /// What `--version` printed. Empty until it has answered, or when it did not.
     pub version: String,
     /// Whether the first thing to do can be handed over when it starts.
@@ -120,4 +123,6 @@ pub struct NewAgent {
     /// Ask the program to work on a git worktree of its own.
     #[serde(default)]
     pub worktree: bool,
+    #[serde(default)]
+    pub launch: crate::launch::Options,
 }

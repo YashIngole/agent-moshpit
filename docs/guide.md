@@ -14,7 +14,7 @@ The pictures show the built-in demo data, not a real session. The people and the
 
 Agent Moshpit starts the agent programs you already have, each in a pseudo-terminal of its own, as child processes of the app. Everything under a pane's header is that program's own screen: its prompt, its slash commands, its approvals, its settings. The office draws none of it. What the office adds is the floor, where one look tells you the state of every agent and whoever needs you is brought to the top.
 
-- **It runs your own programs with their own sign-ins.** It keeps no account, API key or agent model setting. Optional local voice has its own recognition model. Whatever `claude` or `codex` does when you type it in a terminal, it does here.
+- **It runs your own programs with their own sign-ins.** It keeps no account or API key. You can inherit each CLI's settings or save explicit model, effort and permission overrides with an individual desk. Optional local voice has its own recognition model.
 - **It is not a harness.** There is no conversation view, no diff view and no Approve button of the office's own. A question is answered where the program asks it.
 - **It sends nothing about you or your work.** It asks two questions about versions, when it starts and every 12 hours, unless `MOSHPIT_NO_UPDATE_CHECK` is set: npm (`npm view <package> version`), for the newest version of each installed program that is published there, and its own releases on GitHub, for a newer version of the office. There is no telemetry and no remote font or script. The programs it starts talk to their own services as they always do. An install or an update runs only when you press its button, in a terminal where you see every line.
 - **Nothing is a separate window.** There is one Agent Moshpit button in the taskbar. Each program is a process of its own under the app, and is ended when the app quits.
@@ -27,12 +27,15 @@ Agent Moshpit starts the agent programs you already have, each in a pseudo-termi
 Press **+ new agent** (`n` on the floor, `Ctrl+Shift+N` anywhere, or **New agent…** in the tray menu). An empty desk in a room, or the **+** on a room's sign, opens the same form on that room's folder.
 
 - **Who should take it?** The programs found on this computer. Ones the office can install sit behind **+N to install**. Choosing one shows the exact command, and the button becomes **Install … and start**: the install runs in a pane where you can watch it, and the agent then starts in that pane.
+- **Model and Effort**, for Claude Code and Codex. The model picker reads your installed CLI's catalog, including each model's supported effort levels. It checks again when the form opens after the 15-minute cache expires, and every 15 minutes while the form stays visible. **Refresh** checks immediately. Newly available models and effort levels need no app update; availability follows your CLI and account. **Custom model…** accepts a model ID or alias, even when discovery fails. **Use CLI settings** passes no override.
+- **Permissions.** Claude offers Manual, Auto, Accept edits, Plan, Don't ask and Bypass permissions when the installed version supports them. Codex offers workspace and read-only sandboxes, automatic approval review, YOLO and custom sandbox/approval settings. Each choice explains its behavior; the choices are not interchangeable between programs.
+- **Advanced launch settings.** Additional folders; Codex profiles and live search; or Claude tool allow/deny rules, Chrome integration and extra instructions. Options appear when the installed CLI exposes them. **Reset to CLI settings** clears this program's overrides.
 - **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Antigravity CLI, Gemini CLI). Leave it empty and say it in their terminal. Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
 - **Folder.** Type it, browse for it, or pick one used before.
 - **Work on a separate copy**, where the program can (Claude Code, Codex, Hermes). The program is asked to make a git worktree of its own (`--worktree`), so several agents can change one project without colliding.
 - **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2".
 
-`Ctrl+Enter` starts the agent from anywhere in the form. Closing the form keeps what you typed in it. The program and the separate-copy box are remembered for the next agent, because people start several alike.
+`Ctrl+Enter` starts the agent from anywhere in the form. Closing the form keeps what you typed in it. Each program keeps its own launch draft when you switch between them. Explicit launch settings are saved with the desk and reused on restart, Carry on and **Start another like this**. They describe how the desk starts; the CLI can change settings later in its terminal.
 
 The new agent walks to a desk in the room of their project, and their terminal opens in a pane of its own.
 

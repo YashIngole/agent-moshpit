@@ -87,6 +87,9 @@ jobs:
       - name: Interface in a browser, with demo data
         run: node tools/e2e/ui-demo.mjs
 
+      - name: Agent launch settings and catalog refresh
+        run: node tools/e2e/launch-settings.mjs
+
       - name: Core lint
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets -- -D warnings

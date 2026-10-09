@@ -14,15 +14,18 @@
 import { createInterface } from 'node:readline'
 
 const args = process.argv.slice(2)
+const holdInitialWork = args.includes('--hold-initial-work')
 const trustExcept = args.find(arg => arg.startsWith('--trust-except='))?.slice('--trust-except='.length)
 let trustPending = trustExcept !== undefined && process.cwd().toLowerCase() !== trustExcept.toLowerCase()
-const task = args.filter(arg => !arg.startsWith('--trust-except=')).join(' ')
+const task = args.filter(arg => !arg.startsWith('--trust-except=') && arg !== '--hold-initial-work').join(' ')
 const say = text => process.stdout.write(`${text}\r\n`)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-async function work(label) {
-  for (let i = 1; i <= 8; i++) {
-    say(`${label} ${i}/8`)
+async function work(label, hold = false) {
+  let finished = !hold
+  if (hold) lines.once('line', () => { finished = true })
+  for (let i = 1; i <= 8 || !finished; i++) {
+    say(`${label} ${i}${hold ? '' : '/8'}`)
     await sleep(250)
   }
   // A desktop notice, as a terminal program sends one.
@@ -32,12 +35,12 @@ async function work(label) {
 
 async function ready() {
   say(`FAKE AGENT READY in ${process.cwd()} at ${process.stdout.columns}x${process.stdout.rows}`)
-  if (task) { say(`TASK: ${task}`); await work('working') }
+  if (task) { say(`TASK: ${task}`); await work('working', holdInitialWork) }
 }
+const lines = createInterface({ input: process.stdin })
 if (trustPending) say('Do you trust this folder?\r\n1. Yes, I trust this folder\r\n2. No, exit')
 else await ready()
 
-const lines = createInterface({ input: process.stdin })
 for await (const line of lines) {
   if (trustPending) {
     trustPending = false

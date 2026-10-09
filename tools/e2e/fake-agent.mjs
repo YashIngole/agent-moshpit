@@ -25,9 +25,13 @@ async function work(label, hold = false) {
   let finished = !hold
   if (hold) lines.once('line', () => { finished = true })
   for (let i = 1; i <= 8 || !finished; i++) {
-    say(`${label} ${i}${hold ? '' : '/8'}`)
+    // Keep the held startup turn on one progress row, so a slow test machine
+    // does not scroll the task out of the later visible-screen replay check.
+    if (hold) process.stdout.write(`\r${label} ${i}`)
+    else say(`${label} ${i}/8`)
     await sleep(250)
   }
+  if (hold) say('')
   // A desktop notice, as a terminal program sends one.
   process.stdout.write('\x1b]9;Agent turn complete\x07')
   say('FINISHED')

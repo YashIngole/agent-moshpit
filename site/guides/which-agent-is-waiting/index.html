@@ -281,12 +281,12 @@ notification_method = "bel"</code></pre>
             <h3>How it knows, without reading the screen</h3>
             <ul>
               <li><b>Claude Code says so itself.</b> It keeps a small file about each running session, and the app reads from it whether Claude is busy, idle or waiting.</li>
-              <li><b>Every other program is read from how its terminal behaves.</b> One that keeps printing is working. One that goes quiet is idle, or done if it had been working. One that rings the bell or sends a terminal notice wants you. Codex is started with its notices turned on for this.</li>
-              <li><b>A folder nobody has trusted yet.</b> Claude Code and Codex first ask whether to trust a folder that is new to them. The app reads their own settings before starting one, and shows “needs you” until you answer.</li>
+              <li><b>Every other program is read from how its terminal behaves.</b> One that keeps printing is working. A pause in that output shows Quiet until completion is confirmed. A bell or a notice asking for input raises a hand; a completion notice confirms Done. Codex is started with its notices turned on for this.</li>
+              <li><b>A folder nobody has trusted yet.</b> Claude Code and Codex first ask whether to trust a folder that is new to them. The app shows “needs you” when that question is visible in the terminal, until you answer.</li>
             </ul>
             <h3>What is not certain</h3>
             <ul>
-              <li>For every program but Claude Code, the status is a reading of the terminal and not a report. A program that asks a question without ringing its terminal looks idle or done.</li>
+              <li>For every program but Claude Code, the status is a reading of the terminal and not a report. A program that asks a question without ringing its terminal can look idle or Quiet.</li>
               <li>Two things have not been tried by hand yet: a real click on a Windows notification, and the flash of the taskbar button. A test checks that the notification carries the desk's address and that the address opens the desk.</li>
               <li>On macOS and Linux, a click on a notification does not open that agent's desk yet, and neither build has been used by hand.</li>
               <li>The app makes no sound of its own.</li>

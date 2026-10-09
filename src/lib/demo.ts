@@ -8,6 +8,7 @@
 //
 // The terminals here are typed by hand: they show what a program might print and
 // echo what is typed into them. Nothing is started and nothing is sent anywhere.
+import { version as appVersion } from '../../package.json'
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
@@ -356,8 +357,8 @@ export function demoBridge(): Bridge {
     quit: () => {},
     settings: async () => ({ close_quits: closeQuits, voice: { ...voiceSettings } }),
     setCloseQuits: on => void (closeQuits = on),
-    version: async () => '0.3.0',
-    newer: async () => (params.has('update') ? { version: '0.3.1' } : null),
+    version: async () => appVersion,
+    newer: async () => (params.has('update') ? { version: '99.0.0' } : null),
     onNewer: () => () => {},
     // Nothing is fetched in a pretend office: it says so the way a failure would, or is asked for and noted.
     voiceView: async () => structuredClone(voice),

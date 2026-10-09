@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
+import packageMetadata from '../../package.json' with { type: 'json' }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const PORT = Number(process.env.MOSHPIT_UI_PORT || 4174)
@@ -658,18 +659,18 @@ try {
 
   page = await open('demo=office&still&update')
   await page.getByRole('button', { name: 'More', exact: true }).click()
-  const offer = page.getByRole('menuitem', { name: /Update to 0\.3\.1/ })
-  check('a newer version of the office is offered first in the menu, beside the one you have', (await page.getByRole('menuitem').first().textContent())?.includes('Update to 0.3.1') && ((await offer.textContent()) ?? '').includes('You have 0.3.0'))
+  const offer = page.getByRole('menuitem', { name: /Update to 99\.0\.0/ })
+  check('a newer version of the office is offered first in the menu, beside the one you have', (await page.getByRole('menuitem').first().textContent())?.includes('Update to 99.0.0') && ((await offer.textContent()) ?? '').includes(`You have ${packageMetadata.version}`))
   await offer.click()
   check('choosing it asks the core for the update, once', await until(async () => (await page.evaluate(() => window.__demo.updates)) === 1))
   check('and a "not now" is said, with the offer left in the menu', await until(async () => ((await page.locator('.toast').textContent()) ?? '').includes('Not updated')))
   await page.getByRole('button', { name: 'More', exact: true }).click()
-  check('where it still is', (await page.getByRole('menuitem', { name: /Update to 0\.3\.1/ }).count()) === 1)
+  check('where it still is', (await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).count()) === 1)
   await page.context().close()
 
   page = await open('demo=office&still&update=fails')
   await page.getByRole('button', { name: 'More', exact: true }).click()
-  await page.getByRole('menuitem', { name: /Update to 0\.3\.1/ }).click()
+  await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).click()
   check(
     'an update that cannot be had says why, and where else to get it',
     await until(async () => {

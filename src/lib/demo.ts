@@ -57,6 +57,7 @@ function agent(n: number, title: string, harness: string, repo: string, branch: 
     look: n * 7919 + 13,
     running: phase !== 'asleep' && phase !== 'failed',
     resumable: harness !== 'gemini',
+    resume_scope: harness === 'gemini' ? 'none' : harness === 'antigravity' ? 'folder' : harness === 'hermes' ? 'latest' : 'desk',
     resume_note: '',
     // Busy and out of sight: something new in their terminal.
     unread: phase === 'working' && n % 2 === 1

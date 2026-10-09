@@ -1,0 +1,38 @@
+{
+  "media": true,
+  "stillClass": true,
+  "beatBefore": {
+    "b2": "1",
+    "b3": "0",
+    "b4": "3"
+  },
+  "beatAfter": {
+    "b2": "1",
+    "b3": "0",
+    "b4": "3"
+  },
+  "panel": {
+    "opacity": "1",
+    "animationName": "svelte-tv5cb4-arrive",
+    "animationPlayState": "paused",
+    "animationDuration": "1e-06s",
+    "transform": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  "band": {
+    "opacity": "1",
+    "animationPlayState": "paused"
+  },
+  "active": {
+    "tag": "TEXTAREA",
+    "rect": {
+      "x": 16,
+      "y": 392.953125,
+      "width": 298,
+      "height": 97.1875,
+      "top": 392.953125,
+      "right": 314,
+      "bottom": 490.140625,
+      "left": 16
+    }
+  }
+}

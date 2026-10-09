@@ -50,7 +50,7 @@
     height: 34px;
     place-items: center;
     border: 1px solid var(--wall);
-    border-radius: 9px;
+    border-radius: var(--r-2);
   }
   .plus svg {
     width: 14px;

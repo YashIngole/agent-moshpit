@@ -423,6 +423,28 @@ pub fn can_resume(h: &Harness, session: Option<&str>) -> bool {
     resume_args(h, session).is_some()
 }
 
+/// What a resume action can actually promise about the conversation it selects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResumeScope {
+    None,
+    Desk,
+    Folder,
+    Latest,
+}
+
+pub fn resume_scope(h: &Harness, session: Option<&str>) -> ResumeScope {
+    if !can_resume(h, session) {
+        ResumeScope::None
+    } else if h.resume.iter().any(|word| word.contains("{session}")) {
+        ResumeScope::Desk
+    } else if h.id == "antigravity" {
+        ResumeScope::Folder
+    } else {
+        ResumeScope::Latest
+    }
+}
+
 // ── where it is ────────────────────────────────────────────────────────────
 
 /// A program found on this computer, as it has to be started.
@@ -712,6 +734,11 @@ mod tests {
         assert_eq!(resume_args(&known("antigravity"), None).unwrap(), ["--continue"]);
         assert_eq!(resume_args(&known("gemini"), Some("abc")), None);
         assert!(can_resume(&known("hermes"), None) && !can_resume(&known("opencode"), Some("abc")));
+        assert_eq!(resume_scope(&known("claude"), Some("abc")), ResumeScope::Desk);
+        assert_eq!(resume_scope(&known("codex"), None), ResumeScope::None);
+        assert_eq!(resume_scope(&known("antigravity"), None), ResumeScope::Folder);
+        assert_eq!(resume_scope(&known("hermes"), None), ResumeScope::Latest);
+        assert_eq!(resume_scope(&known("gemini"), Some("abc")), ResumeScope::None);
     }
 
     #[test]

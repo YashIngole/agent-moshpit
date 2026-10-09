@@ -158,23 +158,21 @@
     font-weight: 600;
     text-align: left;
   }
-  button[role='menuitem']:hover,
+  button[role='menuitem']:hover {
+    background: var(--inset);
+  }
   button[role='menuitem']:focus-visible {
     background: var(--inset);
-    outline: none;
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
-  /* What an item does, on a line or two under it: read whole, not cut off. A path breaks anywhere. */
+  /* Read hints whole; long paths wrap and the sheet scrolls within the window. */
   button[role='menuitem'] span {
-    display: -webkit-box;
-    overflow: hidden;
     font-size: var(--t-xs);
     font-weight: 400;
     line-height: 1.35;
     color: var(--ink-3);
     overflow-wrap: anywhere;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
   }
   button.danger {
     color: var(--trouble-ink);

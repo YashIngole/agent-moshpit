@@ -1,0 +1,84 @@
+{
+  "viewport": [
+    340,
+    420
+  ],
+  "rootScrollWidth": 461,
+  "bodyScrollWidth": 355,
+  "bandClientWidth": 340,
+  "bandScrollWidth": 355,
+  "bandChildren": [
+    {
+      "class": "face svelte-l10xhm",
+      "text": "",
+      "rect": {
+        "x": 12,
+        "y": 85.1875,
+        "width": 32,
+        "height": 32,
+        "top": 85.1875,
+        "right": 44,
+        "bottom": 117.1875,
+        "left": 12
+      }
+    },
+    {
+      "class": "who svelte-l10xhm",
+      "text": "needs you · 14 min Task 13 in infra",
+      "rect": {
+        "x": 56,
+        "y": 58,
+        "width": 0,
+        "height": 86.375,
+        "top": 58,
+        "right": 56,
+        "bottom": 144.375,
+        "left": 56
+      }
+    },
+    {
+      "class": "what svelte-l10xhm",
+      "text": "claude is waiting for your answer in infra · main",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    {
+      "class": "answer svelte-l10xhm",
+      "text": "Open their terminal",
+      "rect": {
+        "x": 68,
+        "y": 86.1875,
+        "width": 168.203125,
+        "height": 30,
+        "top": 86.1875,
+        "right": 236.203125,
+        "bottom": 116.1875,
+        "left": 68
+      }
+    },
+    {
+      "class": "queue svelte-l10xhm",
+      "text": "also waiting Task 5 in mobile",
+      "rect": {
+        "x": 248.203125,
+        "y": 89.09375,
+        "width": 106.546875,
+        "height": 24.1875,
+        "top": 89.09375,
+        "right": 354.75,
+        "bottom": 113.28125,
+        "left": 248.203125
+      }
+    }
+  ],
+  "floorClient": 330,
+  "floorScroll": 330
+}

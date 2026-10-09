@@ -552,15 +552,14 @@ impl Handle {
         if n == 0 {
             return (!jobs.is_empty()).then_some(job_warning);
         }
-        let busy: Vec<_> = state.office.desks().iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::NeedsYou | Phase::Starting)).collect();
+        let busy: Vec<_> = state.office.desks().iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::Quiet | Phase::NeedsYou | Phase::Starting)).collect();
         let afresh: Vec<String> = busy.iter().filter(|d| !self.kind(&d.saved.harness).is_ok_and(|h| harness::can_resume(h, d.saved.resume_session(h)))).map(|d| d.saved.title.clone()).collect();
         let head = if n == 1 { "1 agent is still busy. Quitting ends its program.".to_string() } else { format!("{n} agents are still busy. Quitting ends their programs.") };
         let tail = match (afresh.len(), n) {
-            (0, 1) => " Its conversation is kept: Carry on, on its desk, picks it up again.".to_string(),
-            (0, _) => " Their conversations are kept: Carry on, on each desk, picks them up again.".to_string(),
+            (0, _) => " Conversations stay in the programs' history. Each desk shows whether it resumes its own conversation or the program's latest one.".to_string(),
             (1, 1) => " Its program cannot carry on a conversation, so it starts afresh next time.".to_string(),
             (a, b) if a == b => " Their programs cannot carry on a conversation, so they start afresh next time.".to_string(),
-            _ => format!(" {} will start afresh next time; the others carry on where they left off.", afresh.join(", ")),
+            _ => format!(" {} will start afresh next time; the other desks show which conversation their programs resume.", afresh.join(", ")),
         };
         Some(format!("{head}{tail}{}", if job_warning.is_empty() { String::new() } else { format!(" {job_warning}") }))
     }

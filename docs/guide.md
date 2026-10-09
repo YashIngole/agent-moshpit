@@ -47,6 +47,7 @@ One room per project (the git repository's name, or the folder's), a desk per ag
 | --- | --- | --- |
 | Starting | sitting, three dots on the screen | The program has been started and has not settled yet. |
 | Working | typing, code on the screen | It is at work. |
+| Quiet | sitting at a prompt | No recent output. It may still be working; completion has not been confirmed. |
 | Needs you | a hand up, an amber tag, an amber screen | It has stopped on a question only you can answer, in its terminal. |
 | Done | leaning back, a green tick on the screen | It finished a stretch of work that you have not looked at yet. |
 | Idle | sitting at a prompt | Running, with nothing to do. |
@@ -56,7 +57,7 @@ One room per project (the git repository's name, or the folder's), a desk per ag
 A status is always a word and a pose as well as a colour. Four colours carry meaning and are used for nothing else: amber for needs you, green for done, red for trouble, and blue for the light of a screen at work.
 
 - A small dot before a name means their terminal has printed something since you last had it in front of you.
-- The counts in the top bar (`1 needs you`, `2 working`, `1 done`, `1 in trouble`) are buttons: a click shows the next desk in that state.
+- The counts in the top bar (`1 needs you`, `2 working`, `1 quiet`, `1 done`, `1 in trouble`) are buttons: a click shows the next desk in that state. In a narrow window, one status button opens the same actions in the menu.
 - With more than ten agents and no terminals open, desks are drawn smaller so a crowd fits.
 - The floor is one stop for `Tab`. The arrow keys walk from desk to desk and `Enter` opens one.
 
@@ -69,7 +70,7 @@ Click a desk and their terminal opens to the right of the floor, with the keyboa
 - **Give one pane the room** with `Ctrl+Shift+Enter`, the button in its header, or a double-click on the header. A **+N** chip lists the ones waiting behind it and puts them back.
 - **Put a pane away** with its × or `Ctrl+Shift+W`. The program keeps running at its desk.
 - **Back to the floor, and back again,** with `Ctrl` + `` ` ``. The same panes return. Pick a desk while you are on the floor and they return with that desk among them. `Esc` is not used for this, because the programs use it themselves.
-- **The floor beside the terminals** keeps the width you drag it to. Below 300 pixels it becomes a strip: a list of names, each with its status and program, with whoever needs you, is in trouble or is done gathered on top under **waiting**. Double-click that edge to switch between the strip and the usual width.
+- **The floor beside the terminals** keeps the width you drag it to. Two or more panes start with a compact floor on a laptop-sized window, until you choose a width yourself. Below 300 pixels it becomes a strip: a list of names, each with its status and program, with whoever needs you, is in trouble or is done gathered on top under **waiting**. Double-click that edge, or choose **Compact floor** in the menu, to switch between the strip and the usual width.
 - In a window narrower than 760 pixels the terminals take the whole window and the floor waits behind them.
 
 ## In a terminal
@@ -110,7 +111,7 @@ Audio and transcripts are kept only in memory and discarded after use or cancell
 Amber means one thing here: someone needs you.
 
 - Their hand goes up at their desk, with a line saying what for when the office knows.
-- A band across the top names whoever has waited longest and has one button, **Open their terminal**, which opens it beside whatever is already open. Anyone else waiting is listed on the band. The band is only there for people whose terminal is not already in front of you.
+- A band across the top names whoever has waited longest and has one button, **Open their terminal**, which opens it beside whatever is already open. Anyone else waiting is listed on the band. It stays until the question is answered, including when that terminal is open.
 - The top bar counts them, the window's title becomes `Agent Moshpit (2 need you)`, the taskbar button flashes if the window is behind, and the tray icon changes.
 - You get a notification, unless you are looking at that terminal.
 
@@ -119,7 +120,7 @@ The hand stays up until the question is answered in their terminal. Going back t
 How the office knows, without ever reading the words on a program's screen:
 
 - **Claude Code says so itself.** It keeps a small file about each running session (`~/.claude/sessions/<pid>.json`), and the office reads from it whether Claude is busy, idle or waiting.
-- **Every other program is read from how its terminal behaves.** One that keeps printing is working. One that goes quiet is idle, or done if it had been working. One that rings the terminal's bell or sends a terminal notice wants you, or has finished if the notice says so. Codex is started with its terminal notices turned on for this.
+- **Every other program is read from how its terminal behaves.** One that keeps printing is working. After it has worked, silence shows **Quiet**, because it may still be working. A completion notice confirms **Done**, or **Idle** if you are looking at that terminal. One that rings the terminal's bell or sends a terminal notice wants you, or has finished if the notice says so. Codex is started with its terminal notices turned on for this.
 - **A folder nobody has trusted yet.** Claude Code and Codex first ask whether to trust a folder they have not been told about. The office reads their own settings before starting one, and shows **needs you**, "Asks whether to trust this folder", until you press a key in that terminal.
 - **A task that stops at once.** A program handed a task that goes quiet almost immediately, before anyone has typed, shows **needs you**, "Asked something before starting".
 
@@ -127,7 +128,7 @@ A green tick means they finished something you have not seen. Bring their termin
 
 ## Notifications
 
-The office tells you when an agent needs you, is done, or hit a problem, unless that agent's terminal is already in front of you. On Windows a click on the notification opens the office with that desk's terminal beside the others, and starts the office first if it had quit; a newer notification about a desk takes the place of the older one.
+The office tells you when an agent needs you, is done, or hit a problem, unless you are looking at that agent's selected terminal. Panes behind a form, a menu or another zoomed pane are not treated as read. On Windows a click on the notification opens the office with that desk's terminal beside the others, and starts the office first if it had quit; a newer notification about a desk takes the place of the older one.
 
 ## A desk's menu: rename, restart, stop, remove
 
@@ -136,10 +137,10 @@ Right-click a desk on the floor, in the strip or on a pane's header, press `Shif
 - **Open their terminal**, or **Open beside the others**.
 - **Start another like this.** The New agent form, on the same program and folder.
 - **Rename** (`F2`). An emptied name goes back to the one the desk was given. Claude Code's own name for a session is used until you name the desk yourself.
-- **Restart their program** and **Stop their program.** Stop ends the program and keeps the desk, away. Both ask first if the agent is working, starting or waiting for you, and the menu says whether the conversation will be carried on or started afresh.
-- **Carry on** or **Start again**, for a desk whose program is not running.
+- **Restart their program** and **Stop their program.** Stop ends the program and keeps the desk, away. Both ask first if the agent is working, quiet, starting or waiting for you, and the menu says which conversation it can resume or whether it starts afresh.
+- **Carry on**, **Continue in folder**, **Continue latest** or **Start again**, for a desk whose program is not running. The hint explains what it resumes.
 - **Open the folder in** your editor, **Show their folder**, **Copy the folder path**.
-- **Remove this desk.** Also the × that appears on a desk under the pointer, a middle-click, or `Delete`. The desk leaves the floor at once and can be brought back with **Undo** for eight seconds; after that its program is ended and the desk is gone. If the agent is busy you are asked first. The program keeps the conversation in its own history, and nothing of yours is deleted: the folder, and a worktree a program made for a separate copy, are left as they are.
+- **Remove this desk.** Also the × that appears on a desk under the pointer, a middle-click, or `Delete`. The desk leaves the floor at once and can be brought back with **Undo** for eight seconds; after that its program is ended and the desk is gone. Consecutive removals share **Undo all**, and the timer pauses while the pointer or keyboard focus is on the notice. Closing the notice finishes the removals. If the agent is busy you are asked first. The program keeps the conversation in its own history, and nothing of yours is deleted: the folder, and a worktree a program made for a separate copy, are left as they are.
 
 ## Closing the window, and quitting
 
@@ -152,8 +153,8 @@ Closing the window does not quit. The window goes and the office stays in the tr
 ## What comes back after a restart
 
 - Every desk is back, away. Nothing is started until you ask.
-- Opening a desk shows its last screen as it was drawn when the office quit, with up to 500 lines above it, and a **Carry on** or **Start again** button.
-- **Carry on** resumes the conversation where the program can: Claude Code, Codex once the office has read which session it began, and Hermes. The others start afresh in the same folder.
+- Opening a desk shows its last screen as it was drawn when the office quit, with up to 500 lines above it, and a resume or **Start again** button.
+- **Carry on** resumes this desk's saved session for Claude Code or Codex once its session is known. **Continue in folder** asks Antigravity for the folder's latest conversation. **Continue latest** asks Hermes, or a program without a saved-session argument, for its latest conversation; that may belong to another desk. Unsupported programs start afresh in the same folder.
 - The window has the size and place it had, the same floor width and text size, and `Ctrl` + `` ` `` brings back the panes that were open.
 
 What does not come back is a terminal's scrollback beyond that last screen.
@@ -162,6 +163,8 @@ What does not come back is a terminal's scrollback beyond that last screen.
 
 - **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. This panel also chooses the editor that file paths open in.
 - **Voice input.** Enable local voice, download/remove models, choose language and the in-app toggle shortcut.
+- **Configuration warning**, while a startup warning is unresolved. Opens the warning again after it has been dismissed, with its file action. Moving between desks never clears it.
+- **Compact floor**, while terminals are open.
 - **Make the terminals even**, when more than one is open.
 - **Copy on select**, off by default.
 - **Closing the window quits**, off by default.

@@ -1,0 +1,39 @@
+{
+  "viewport": [
+    340,
+    420
+  ],
+  "active": "<textarea id=\"new-task\" class=\"field svelte-tv5cb4\" rows=\"4\" placeholder=\"Fix the checkout total when a coupon is applied twice, and add a test for it.\"></textarea>",
+  "rect": {
+    "x": 16,
+    "y": 296.140625,
+    "width": 298,
+    "height": 97.1875,
+    "top": 296.140625,
+    "right": 314,
+    "bottom": 393.328125,
+    "left": 16
+  },
+  "end": {
+    "x": 0,
+    "y": 363,
+    "width": 330,
+    "height": 57,
+    "top": 363,
+    "right": 330,
+    "bottom": 420,
+    "left": 0
+  },
+  "points": [
+    {
+      "y": 298.140625,
+      "top": "<textarea id=\"new-task\" class=\"field svelte-tv5cb4\" rows=\"4\" placeholder=\"Fix the checkout total when a coupon is applied twice, and add a t"
+    },
+    {
+      "y": 391.328125,
+      "top": "<button type=\"button\" class=\"button quiet svelte-tv5cb4\">Cancel</button>"
+    }
+  ],
+  "fullyObscured": false,
+  "scrollTop": 142
+}

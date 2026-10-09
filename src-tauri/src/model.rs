@@ -20,6 +20,8 @@ pub enum Phase {
     /// The program has been started and has not drawn anything yet.
     Starting,
     Working,
+    /// Output paused; the program has not confirmed that its work is finished.
+    Quiet,
     /// Stopped on a question only the user can answer, in its terminal.
     NeedsYou,
     /// Finished a stretch of work that nobody has looked at yet.
@@ -56,6 +58,7 @@ pub struct AgentView {
     pub running: bool,
     /// Whether a stopped one carries on where it left off, or starts afresh.
     pub resumable: bool,
+    pub resume_scope: crate::harness::ResumeScope,
     pub resume_note: String,
     /// Its terminal printed something since the user last had it in front of them.
     pub unread: bool,

@@ -8,7 +8,12 @@
   let { toast, beside }: { toast: Toast; beside: boolean } = $props()
 </script>
 
-<div class="toast" class:beside role="status">
+<div class="toast" class:beside role="status"
+  onpointerenter={() => { if (toast.undo) office.pauseUndo('pointer', true) }}
+  onpointerleave={() => { if (toast.undo) office.pauseUndo('pointer', false) }}
+  onfocusin={() => { if (toast.undo) office.pauseUndo('focus', true) }}
+  onfocusout={event => { if (toast.undo && !event.currentTarget.contains(event.relatedTarget as Node | null)) office.pauseUndo('focus', false) }}
+>
   <span>{toast.text}</span>
   {#if toast.action}
     <button
@@ -19,7 +24,7 @@
       }}>{toast.action.label}</button
     >
   {/if}
-  <button type="button" class="close" aria-label="Dismiss" onclick={() => (office.toast = null)}>
+  <button type="button" class="close" aria-label={toast.undo ? 'Finish removing desks' : 'Dismiss'} title={toast.undo ? 'End their programs and finish removing these desks' : 'Dismiss'} onclick={() => office.dismissToast(toast.undo)}>
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
   </button>
 </div>

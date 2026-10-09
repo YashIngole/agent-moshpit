@@ -238,7 +238,7 @@
     padding: var(--s-4);
   }
   .dense .room {
-    flex-basis: calc(var(--desks, 2) * 148px + 20px);
+    flex-basis: calc(var(--desks, 2) * 140px + (var(--desks, 2) - 1) * var(--s-2) + 22px);
     padding: var(--s-2) 10px 10px;
   }
   .dense .desks {
@@ -284,7 +284,8 @@
       flex-basis: 100%;
       padding: var(--s-2) var(--s-2) var(--s-3);
     }
-    .desks {
+    .desks,
+    .dense .desks {
       grid-template-columns: minmax(0, 1fr);
       gap: 0;
     }

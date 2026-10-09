@@ -1,0 +1,4 @@
+Total messages: 5 (Errors: 0, Warnings: 0)
+Returning 1 messages for level "info"
+
+[LOG] %ccodex-grid-background%c two-axis grid-line gradient background color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556

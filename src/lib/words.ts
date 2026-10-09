@@ -4,6 +4,7 @@ import type { Agent, Phase } from './types'
 export const STATUS_WORD: Record<Phase, string> = {
   needs_you: 'Needs you',
   working: 'Working',
+  quiet: 'Quiet',
   done: 'Done',
   idle: 'Idle',
   failed: 'Trouble',
@@ -18,6 +19,8 @@ export function doing(agent: Agent): string {
       return agent.activity || 'Waiting for you in their terminal'
     case 'working':
       return agent.activity || 'Working'
+    case 'quiet':
+      return 'No recent output. It may still be working.'
     case 'starting':
       return agent.activity || 'Getting set up'
     case 'done':
@@ -36,6 +39,20 @@ export function doing(agent: Agent): string {
 export function describe(agent: Agent): string {
   const where = agent.repo ? `, in ${agent.repo}` : ''
   return `${agent.title}, ${agent.harness_name}${where}. ${STATUS_WORD[agent.phase]}. ${doing(agent)}`
+}
+
+export function resumeAction(agent: Agent): string {
+  if (!agent.resumable) return 'Start again'
+  if (agent.resume_scope === 'folder') return 'Continue in folder'
+  if (agent.resume_scope === 'latest') return 'Continue latest'
+  return 'Carry on'
+}
+
+export function resumeHint(agent: Agent): string {
+  if (!agent.resumable) return 'Starts their program afresh.'
+  if (agent.resume_scope === 'folder') return 'Continues the latest conversation in this folder; it may belong to another desk.'
+  if (agent.resume_scope === 'latest') return 'Continues the latest conversation selected by the program; it may belong to another desk.'
+  return 'Resumes this desk’s saved conversation.'
 }
 
 /** Words a name does not end on: "Fix the total when a" reads as cut off. As in `office.rs`. */

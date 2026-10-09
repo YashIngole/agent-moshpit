@@ -52,6 +52,7 @@ export interface Menu {
 export interface Toast {
   text: string
   action?: { label: string; run: () => void }
+  undo?: boolean
 }
 
 const NO_DRAFT: NewAgentDraft = { harness: '', task: '', cwd: '', title: '', worktree: false, launches: {} }
@@ -81,6 +82,7 @@ function rememberedFolders(): string[] {
 
 interface View {
   floor: number
+  floorChosen: boolean
   layout: Layout
   harness: string
   /** Whether the terminals were open, rather than put away, when the window last was. */
@@ -95,12 +97,13 @@ interface View {
 
 /** How the room was last laid out. Kept by the window; nothing depends on it. */
 function rememberedView(): View {
-  const view: View = { floor: FLOOR_WIDTH.usual, layout: EMPTY, harness: '', open: false, font: FONT_SIZE.usual, worktree: false, editor: '', copySelect: false }
+  const view: View = { floor: FLOOR_WIDTH.usual, floorChosen: false, layout: EMPTY, harness: '', open: false, font: FONT_SIZE.usual, worktree: false, editor: '', copySelect: false }
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}')
     if (saved && typeof saved === 'object') {
-      const { floor, layout, harness, open, font, worktree, editor, copySelect } = saved as Record<string, unknown>
+      const { floor, floorChosen, layout, harness, open, font, worktree, editor, copySelect } = saved as Record<string, unknown>
       if (typeof floor === 'number' && Number.isFinite(floor)) view.floor = Math.max(FLOOR_WIDTH.least, Math.round(floor))
+      view.floorChosen = typeof floorChosen === 'boolean' ? floorChosen : view.floor !== FLOOR_WIDTH.usual
       if (typeof harness === 'string') view.harness = harness
       if (typeof editor === 'string') view.editor = editor
       if (typeof font === 'number' && Number.isFinite(font)) view.font = Math.min(FONT_SIZE.most, Math.max(FONT_SIZE.least, Math.round(font)))
@@ -145,6 +148,7 @@ class Office {
   zoomed = $state('')
   /** How wide the floor is while terminals are open. */
   floorWidth = $state(REMEMBERED.floor)
+  #floorChosen = REMEMBERED.floorChosen
   /** The terminals' text size. */
   fontSize = $state(REMEMBERED.font)
   /** Selecting text in a terminal copies it. */
@@ -155,16 +159,29 @@ class Office {
   newer = $state<Newer | null>(null)
   updating = $state(false)
   #problem = $state('')
+  healthProblem = $state<{ text: string; file: { path: string; line: number | null } | null } | null>(null)
+  healthDismissed = $state(false)
   /** Something that could not be done, said once. */
   get problem() {
-    return this.#problem
+    return this.#problem || (!this.healthDismissed ? this.healthProblem?.text : '') || ''
   }
   set problem(text: string) {
     this.#problem = text
-    this.problemFile = null
   }
   /** The file the problem is in, to open and put right, when there is one. */
-  problemFile = $state<{ path: string; line: number | null } | null>(null)
+  get problemFile() {
+    return this.#problem ? null : this.healthProblem?.file ?? null
+  }
+
+  dismissProblem() {
+    if (this.#problem) this.#problem = ''
+    else this.healthDismissed = true
+  }
+
+  showHealthProblem() {
+    this.#problem = ''
+    this.healthDismissed = false
+  }
   /** The program the last agent was started as: the form opens on it next time. */
   lastHarness = $state(REMEMBERED.harness)
   /** The small menu that is open, if one is. */
@@ -177,6 +194,15 @@ class Office {
   finding = $state('')
   /** Desks removed a moment ago, which can still be brought back. */
   leaving = new SvelteSet<string>()
+  get undoToast(): Toast | null {
+    if (this.leaving.size === 0) return null
+    const first = this.allAgents.find(a => this.leaving.has(a.id))
+    return {
+      text: this.leaving.size === 1 ? `${first?.title ?? 'A desk'} was taken off the floor.` : `${this.leaving.size} desks were taken off the floor.`,
+      action: { label: this.leaving.size === 1 ? 'Undo' : 'Undo all', run: () => this.#undoRemovals() },
+      undo: true
+    }
+  }
   /** The editors on this computer that file paths can be opened in. */
   editors = $state<Editor[]>([])
   /** The editor the user picked, if they did. */
@@ -242,7 +268,9 @@ class Office {
   #hints = givenHints()
   #toastTimer: ReturnType<typeof setTimeout> | undefined
   /** Removals waiting out their chance to be undone, by desk. */
-  #removals = new Map<string, ReturnType<typeof setTimeout>>()
+  #removals = new Map<string, ReturnType<typeof setTimeout> | undefined>()
+  #undoHover = false
+  #undoFocus = false
   /** Where the last look for someone in a given state got to, so the next look moves on. */
   #lastFound = ''
 
@@ -260,9 +288,9 @@ class Office {
     void bridge.startupProblems().then(
       problems => {
         if (problems.length === 0) return
-        this.problem = problems.map(p => p.text).join(' ')
         const file = problems.find(p => p.file)
-        if (file) this.problemFile = { path: file.file, line: file.line }
+        this.healthProblem = { text: problems.map(p => p.text).join(' '), file: file ? { path: file.file, line: file.line } : null }
+        this.healthDismissed = false
       },
       () => {}
     )
@@ -280,8 +308,8 @@ class Office {
       bridge.onSnapshot(s => this.#take(s)), bridge.onNewAgent(takeNewAgent),
       bridge.onOpenDesk(takeOpening), bridge.onNewer(newer => (this.newer = newer)),
       bridge.onStorageProblem(problem => {
-        this.problem = problem.text
-        this.problemFile = { path: problem.file, line: problem.line }
+        this.healthProblem = { text: problem.text, file: { path: problem.file, line: problem.line } }
+        this.healthDismissed = false
       })
     ]
     const onVisibility = () => {
@@ -291,11 +319,14 @@ class Office {
     // A removal still waiting to be undone happens now: the window is going.
     const onLeave = () => this.#removeNow()
     document.addEventListener('visibilitychange', onVisibility)
+    const onResize = () => this.#adaptFloor()
+    window.addEventListener('resize', onResize)
     window.addEventListener('pagehide', onLeave)
     this.#syncClock()
     return () => {
       for (const stop of stops) stop()
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('resize', onResize)
       window.removeEventListener('pagehide', onLeave)
       clearInterval(this.#clock)
       clearTimeout(this.#toastTimer)
@@ -538,7 +569,16 @@ class Office {
   setFloorWidth(width: number, keep = true) {
     const most = Math.max(FLOOR_WIDTH.least, window.innerWidth - 420)
     this.floorWidth = Math.min(most, Math.max(FLOOR_WIDTH.least, Math.round(width)))
-    if (keep) this.keepView()
+    if (keep) { this.#floorChosen = true; this.keepView() }
+  }
+
+  #adaptFloor() {
+    if (this.#floorChosen) return
+    this.floorWidth = ids(this.layout).length > 1 && window.innerWidth < 1180 ? FLOOR_WIDTH.strip : FLOOR_WIDTH.usual
+  }
+
+  toggleCompactFloor() {
+    this.setFloorWidth(this.floorWidth < LIST_BELOW ? FLOOR_WIDTH.usual : FLOOR_WIDTH.strip)
   }
 
   setCloseQuits(on: boolean) {
@@ -578,6 +618,7 @@ class Office {
 
   #lay(layout: Layout) {
     this.layout = layout
+    this.#adaptFloor()
     this.keepView()
     this.#report()
   }
@@ -585,7 +626,7 @@ class Office {
   keepView() {
     try {
       const layout = this.terminals ? this.layout : this.stowed
-      const view: View = { floor: this.floorWidth, layout, harness: this.lastHarness, open: this.terminals, font: this.fontSize, worktree: this.newDraft.worktree, editor: this.editorChoice, copySelect: this.copyOnSelect }
+      const view: View = { floor: this.floorWidth, floorChosen: this.#floorChosen, layout, harness: this.lastHarness, open: this.terminals, font: this.fontSize, worktree: this.newDraft.worktree, editor: this.editorChoice, copySelect: this.copyOnSelect }
       localStorage.setItem(VIEW_KEY, JSON.stringify(view))
     } catch {
       // No storage: the view lasts until the window closes.
@@ -594,8 +635,12 @@ class Office {
 
   /** Tell the core which terminals are in front of the user, so their flags come down. */
   #report() {
-    const visible = this.zoomed ? [this.zoomed] : ids(this.layout)
-    bridge.watch(document.hidden ? [] : visible)
+    const attended = !this.panel && !this.menu && has(this.layout, this.focused) && (!this.zoomed || this.zoomed === this.focused) ? [this.focused] : []
+    bridge.watch(document.hidden ? [] : attended)
+  }
+
+  reportWatched() {
+    this.#report()
   }
 
   // ── installing and updating ────────────────────────────────────────────
@@ -731,7 +776,7 @@ class Office {
   /** Whether taking this desk away would interrupt work, and so should be asked about first. */
   busy(id: string): boolean {
     const phase: Phase | undefined = this.agents.find(a => a.id === id)?.phase
-    return phase === 'working' || phase === 'needs_you' || phase === 'starting'
+    return phase === 'working' || phase === 'quiet' || phase === 'needs_you' || phase === 'starting'
   }
 
   /**
@@ -751,25 +796,44 @@ class Office {
     this.closePane(id, false)
     if (next) this.homeDesk = next
     if (hadKeyboard || !this.terminals) void tick().then(() => this.#focusDesk(next))
-    this.#removals.set(
-      id,
-      setTimeout(() => this.#removeFor(id), UNDO_MS)
-    )
-    this.say(`${agent.title} was taken off the floor.`, { label: 'Undo', run: () => this.#undoRemove(id) }, UNDO_MS)
+    this.#removals.set(id, undefined)
+    this.#restartRemovals()
   }
 
-  #undoRemove(id: string) {
-    clearTimeout(this.#removals.get(id))
-    this.#removals.delete(id)
-    this.leaving.delete(id)
-    this.toast = null
-    void tick().then(() => this.#focusDesk(id))
+  #undoRemovals() {
+    const first = [...this.#removals.keys()][0] ?? ''
+    for (const [id, timer] of this.#removals) {
+      clearTimeout(timer)
+      this.leaving.delete(id)
+    }
+    this.#removals.clear()
+    this.#undoHover = this.#undoFocus = false
+    void tick().then(() => this.#focusDesk(first))
+  }
+
+  #restartRemovals() {
+    for (const [id, timer] of this.#removals) {
+      clearTimeout(timer)
+      this.#removals.set(id, this.#undoHover || this.#undoFocus ? undefined : setTimeout(() => this.#removeFor(id), UNDO_MS))
+    }
+  }
+
+  pauseUndo(source: 'pointer' | 'focus', paused: boolean) {
+    if (source === 'pointer') this.#undoHover = paused
+    else this.#undoFocus = paused
+    this.#restartRemovals()
+  }
+
+  dismissToast(undo = false) {
+    if (undo) this.#removeNow()
+    else this.toast = null
   }
 
   #removeFor(id: string) {
     this.#removals.delete(id)
     bridge.dismiss(id)
     this.leaving.delete(id)
+    if (this.leaving.size === 0) this.#undoHover = this.#undoFocus = false
   }
 
   #removeNow() {
@@ -794,7 +858,11 @@ class Office {
     const after = desks.findIndex(desk => desk.dataset.desk === this.#lastFound)
     const desk = desks[(after + 1) % desks.length]!
     this.#lastFound = desk.dataset.desk ?? ''
-    desk.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    if (desk.getBoundingClientRect().width === 0) {
+      this.show(this.#lastFound, true)
+      return
+    }
+    desk.scrollIntoView({ block: 'center', inline: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
     desk.focus({ preventScroll: true })
     desk.classList.remove('found')
     void desk.offsetWidth

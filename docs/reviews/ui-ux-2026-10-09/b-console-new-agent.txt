@@ -1,0 +1,5 @@
+Total messages: 6 (Errors: 0, Warnings: 0)
+Returning 2 messages for level "info"
+
+[LOG] %cflat-type-hierarchy%c Role sizes: body 12px, h2 14px, h1 15px (largest adjacent step 1.17:1; target 1.25:1) color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %ccodex-grid-background%c two-axis grid-line gradient background color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556

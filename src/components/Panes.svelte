@@ -9,7 +9,7 @@
   import { terms } from '../lib/terms'
   import { elapsed } from '../lib/time'
   import type { Agent, Job } from '../lib/types'
-  import { STATUS_WORD, place } from '../lib/words'
+  import { STATUS_WORD, place, resumeAction, resumeHint } from '../lib/words'
   import Person from './Person.svelte'
   const terminalView = import('./TerminalView.svelte')
 
@@ -367,7 +367,8 @@
           <p class="ended" role="status">
             <span>{agent.phase === 'failed' ? agent.activity || 'Their program stopped with an error.' : 'Their program is not running.'}</span>
             {#if agent.resume_note}<span class="resume-note">{agent.resume_note}</span>{/if}
-            <button type="button" class="button" onclick={() => void office.wake(pane.id)}>{agent.resumable ? 'Carry on' : 'Start again'}</button>
+            {#if agent.resumable && (agent.resume_scope === 'folder' || agent.resume_scope === 'latest')}<span class="resume-note">{resumeHint(agent)}</span>{/if}
+            <button type="button" class="button" title={resumeHint(agent)} onclick={() => void office.wake(pane.id)}>{resumeAction(agent)}</button>
           </p>
         {/if}
       </div>

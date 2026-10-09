@@ -1,0 +1,16 @@
+{
+  "label": "Open their terminal Enter, or a click",
+  "outline": "rgb(231, 234, 240) none 3px",
+  "background": "rgb(27, 31, 37)",
+  "menuBackground": "rgb(19, 22, 26)",
+  "rect": {
+    "x": 301.67633056640625,
+    "y": 245.94522094726562,
+    "width": 255.4285888671875,
+    "height": 46.58282470703125,
+    "top": 245.94522094726562,
+    "right": 557.1049194335938,
+    "bottom": 292.5280456542969,
+    "left": 301.67633056640625
+  }
+}

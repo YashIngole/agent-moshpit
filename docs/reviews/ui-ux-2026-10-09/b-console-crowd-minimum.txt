@@ -1,0 +1,8 @@
+Total messages: 9 (Errors: 0, Warnings: 0)
+Returning 5 messages for level "info"
+
+[LOG] %ctext-overflow%c h2.svelte-l10xhm overflows its box by 80px color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %ctext-overflow%c button.svelte-l10xhm overflows its box by 19px color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %cclipped-overflow-container%c section.panes.svelte-1pbmt9i clips a positioned child color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %cclipped-overflow-container%c div.term-host.svelte-fa34fu clips a positioned child color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %ccodex-grid-background%c two-axis grid-line gradient background color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556

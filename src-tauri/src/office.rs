@@ -60,7 +60,7 @@ pub struct Desk {
     pub running: bool,
     /// When its program was last started.
     pub started_ms: Millis,
-    /// Has done something since anyone last looked: what turns quiet into "done".
+    /// Has worked since anyone last looked; explicit completion can raise a flag.
     worked: bool,
     /// Has drawn its first screen and gone quiet once. Until then, printing is not work.
     settled: bool,
@@ -132,7 +132,7 @@ impl Office {
 
     /// Whoever is busy enough that quitting should be asked about.
     pub fn busy(&self) -> usize {
-        self.desks.iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::NeedsYou | Phase::Starting)).count()
+        self.desks.iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::Quiet | Phase::NeedsYou | Phase::Starting)).count()
     }
 
     pub fn add(&mut self, saved: SavedDesk, now: Millis) {
@@ -291,8 +291,12 @@ impl Office {
                     return desk.turn(Phase::NeedsYou, now);
                 }
                 desk.rested = true;
+                if matches!(signal, Signal::Quiet) && desk.worked && desk.phase != Phase::Done {
+                    desk.activity = "No recent output. It may still be working.".into();
+                    return desk.turn(Phase::Quiet, now);
+                }
                 // Someone who has only just sat down, or was already resting, has finished nothing.
-                let finished = desk.worked && matches!(desk.phase, Phase::Working | Phase::NeedsYou);
+                let finished = desk.worked && matches!(desk.phase, Phase::Working | Phase::Quiet | Phase::NeedsYou);
                 if desk.phase == Phase::Done && !watched {
                     return None;
                 }
@@ -443,6 +447,7 @@ impl Office {
                     look: d.look,
                     running: d.running,
                     resumable: kind.is_some_and(|h| harness::can_resume(h, d.saved.resume_session(h))),
+                    resume_scope: kind.map_or(harness::ResumeScope::None, |h| harness::resume_scope(h, d.saved.resume_session(h))),
                     resume_note: if kind.is_some_and(|h| h.session == harness::SessionFrom::CodexRollouts) && d.saved.session.is_some() && !d.saved.session_verified {
                         "This desk's saved Codex conversation could not be verified. Start Codex, then use /resume to choose it; its saved conversations are unchanged.".into()
                     } else {
@@ -607,7 +612,7 @@ mod tests {
         assert_eq!((began.from, began.to), (Phase::Starting, Phase::Working));
         // Still working: nothing new to say.
         assert_eq!(office.observe("a", &Signal::Working, false, 900), None);
-        let ended = office.observe("a", &Signal::Quiet, false, 5_000).unwrap();
+        let ended = office.observe("a", &Signal::Finished, false, 5_000).unwrap();
         assert_eq!((ended.from, ended.to), (Phase::Working, Phase::Done));
         // The flag stays up until someone looks.
         assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000), None);
@@ -624,7 +629,7 @@ mod tests {
         assert_eq!(ended.to, Phase::Idle);
         // And a flag that is up comes down when its terminal is brought in front.
         office.observe("a", &Signal::Working, false, 6_000);
-        office.observe("a", &Signal::Quiet, false, 9_000);
+        office.observe("a", &Signal::Finished, false, 9_000);
         assert_eq!(phase(&office), Phase::Done);
         office.observe("a", &Signal::Quiet, true, 9_500);
         assert_eq!(phase(&office), Phase::Idle);
@@ -652,7 +657,9 @@ mod tests {
         // Answered: it gets on with the task, and the end of that is worth a flag.
         office.typed("a", 120_800);
         office.observe("a", &Signal::Working, false, 121_000);
-        assert_eq!(office.observe("a", &Signal::Quiet, false, 140_000).unwrap().to, Phase::Done);
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 140_000).unwrap().to, Phase::Quiet);
+        assert_eq!(office.busy(), 1);
+        assert_eq!(office.observe("a", &Signal::Finished, false, 141_000).unwrap().to, Phase::Done);
     }
 
     #[test]
@@ -673,7 +680,7 @@ mod tests {
             office.typed("a", 301_000);
             assert_eq!(phase(&office), Phase::Starting);
             office.observe("a", &Signal::Working, false, 301_500);
-            let settled = office.observe("a", &Signal::Quiet, false, 305_000).unwrap();
+            let settled = office.observe("a", if tasked { &Signal::Finished } else { &Signal::Quiet }, false, 305_000).unwrap();
             // Given a task, that was the work; without one, only its opening screen.
             assert_eq!(settled.to, if tasked { Phase::Done } else { Phase::Idle }, "tasked: {tasked}");
         }
@@ -707,14 +714,20 @@ mod tests {
     }
 
     #[test]
-    fn a_task_that_took_a_while_is_work_however_soon_it_ended() {
+    fn a_pause_in_output_is_not_completion() {
         let mut office = office();
         office.observe("a", &Signal::Working, false, 300);
-        assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000).unwrap().to, Phase::Done);
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000).unwrap().to, Phase::Quiet);
+        assert_eq!(office.busy(), 1);
+        assert!(!office.mark_seen("a", 9_050));
+        assert_eq!(office.observe("a", &Signal::Finished, false, 9_100).unwrap().to, Phase::Done);
         // Once it has rested, quick work later is still work.
         office.mark_seen("a", 9_500);
         office.observe("a", &Signal::Working, false, 10_000);
-        assert_eq!(office.observe("a", &Signal::Quiet, false, 12_600).unwrap().to, Phase::Done);
+        assert_eq!(office.observe("a", &Signal::Quiet, true, 12_600).unwrap().to, Phase::Quiet);
+        assert_eq!(office.busy(), 1);
+        assert_eq!(office.observe("a", &Signal::Finished, true, 13_000).unwrap().to, Phase::Idle);
+        assert_eq!(office.busy(), 0);
     }
 
     #[test]
@@ -740,7 +753,8 @@ mod tests {
         assert_eq!(phase(&office), Phase::Idle);
         // Once it has had time to open, printing is work, and its end is worth a flag.
         office.observe("a", &Signal::Working, false, 100 + OPENING_MS);
-        assert_eq!(office.observe("a", &Signal::Quiet, false, 60_000).unwrap().to, Phase::Done);
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 60_000).unwrap().to, Phase::Quiet);
+        assert_eq!(office.observe("a", &Signal::Finished, false, 60_100).unwrap().to, Phase::Done);
 
         // And as soon as someone has typed to it, however early.
         let mut typed = Office::default();

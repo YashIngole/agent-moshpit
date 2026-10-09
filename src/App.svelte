@@ -37,6 +37,8 @@
     voice.panel = office.panel?.kind === 'voice'
   })
 
+  $effect(() => office.reportWatched())
+
   /** The pane at a place in the window, if there is one there. */
   function paneAt(x: number, y: number): string {
     const pane = document.elementsFromPoint(x, y).find(el => el instanceof HTMLElement && el.matches('.pane'))
@@ -172,7 +174,7 @@
             Open {file.path.split(/[\\/]/).pop()}
           </button>
         {/if}
-        <button type="button" class="button quiet" onclick={() => (office.problem = '')}>Dismiss</button>
+        <button type="button" class="button quiet" onclick={() => office.dismissProblem()}>Dismiss</button>
       </span>
     </p>
   {/if}
@@ -211,8 +213,8 @@
       <VoicePanel />
     {/if}
     <!-- Said over the floor, never over the foot of a terminal, where a program's prompt and choices are. -->
-    {#if office.toast}
-      <Toast toast={office.toast} beside={office.terminals} />
+    {#if office.undoToast || office.toast}
+      <Toast toast={(office.undoToast ?? office.toast)!} beside={office.terminals} />
     {/if}
   </div>
 </div>

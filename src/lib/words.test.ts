@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest'
 import type { Agent } from './types'
-import { STATUS_WORD, describe, doing, place, shorten, titleFrom, uniqueTitle } from './words'
+import { STATUS_WORD, describe, doing, place, resumeAction, resumeHint, shorten, titleFrom, uniqueTitle } from './words'
 
 function agent(over: Partial<Agent> = {}): Agent {
   return {
@@ -55,6 +55,15 @@ group('what a desk says', () => {
     expect(place(agent())).toBe('shop · fix/checkout-total')
     expect(place(agent({ branch: '' }))).toBe('shop')
     expect(place(agent({ repo: '', branch: '' }))).toBe('')
+  })
+
+  it('does not promise completion or desk identity when they are unknown', () => {
+    expect(describe(agent({ phase: 'quiet' }))).toContain('Quiet. No recent output. It may still be working.')
+    expect(resumeAction(agent({ resume_scope: 'desk' }))).toBe('Carry on')
+    expect(resumeAction(agent({ resume_scope: 'folder' }))).toBe('Continue in folder')
+    expect(resumeAction(agent({ resume_scope: 'latest' }))).toBe('Continue latest')
+    expect(resumeHint(agent({ resume_scope: 'latest' }))).toContain('may belong to another desk')
+    expect(resumeAction(agent({ resumable: false, resume_scope: 'none' }))).toBe('Start again')
   })
 })
 

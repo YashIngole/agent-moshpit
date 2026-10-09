@@ -1,0 +1,479 @@
+﻿[
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Desk.svelte",
+    "line": 267,
+    "snippet": "border-radius: 5px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "5px",
+    "importedBy": [
+      "Floor.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Desk.svelte",
+    "line": 333,
+    "snippet": "font-size: 10.5px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "10.5px",
+    "importedBy": [
+      "Floor.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Desk.svelte",
+    "line": 374,
+    "snippet": "font-size: 10.5px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "10.5px",
+    "importedBy": [
+      "Floor.svelte"
+    ]
+  },
+  {
+    "antipattern": "codex-grid-background",
+    "name": "Decorative grid-line background",
+    "description": "A decorative grid or line-field background drawn with hairline linear-gradient layers tiled by a fixed pixel cell is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.",
+    "severity": "advisory",
+    "category": "slop",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Floor.svelte",
+    "line": 168,
+    "snippet": "two-axis grid-line gradient background",
+    "advisory": true,
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Keys.svelte",
+    "line": 187,
+    "snippet": "border-radius: 5px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "5px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\KnockBand.svelte",
+    "line": 103,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\KnockBand.svelte",
+    "line": 128,
+    "snippet": "Undocumented color #2a1f04 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#2a1f04",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\NewAgent.svelte",
+    "line": 296,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\NewAgent.svelte",
+    "line": 329,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\NewAgent.svelte",
+    "line": 331,
+    "snippet": "font-size: 10.5px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "10.5px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\NewAgent.svelte",
+    "line": 408,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Panes.svelte",
+    "line": 540,
+    "snippet": "border-radius: 5px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "5px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 437,
+    "snippet": "Undocumented color #c3e88d is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#c3e88d",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 462,
+    "snippet": "font-size: 10px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "10px",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 480,
+    "snippet": "Undocumented color #d4d6db is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#d4d6db",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 483,
+    "snippet": "Undocumented color #8b9099 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#8b9099",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 486,
+    "snippet": "Undocumented color #3f325f is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#3f325f",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 511,
+    "snippet": "Undocumented color #4a515c is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#4a515c",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 515,
+    "snippet": "Undocumented color #4a515c is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#4a515c",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 520,
+    "snippet": "Undocumented color #ffe7bf is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#ffe7bf",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 525,
+    "snippet": "Undocumented color #4c6b58 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#4c6b58",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 528,
+    "snippet": "Undocumented color #36503f is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#36503f",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 531,
+    "snippet": "Undocumented color #6f7277 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#6f7277",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 584,
+    "snippet": "font-size: 15px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "15px",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 612,
+    "snippet": "font-size: 9.5px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "9.5px",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Person.svelte",
+    "line": 615,
+    "snippet": "font-size: 8px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "8px",
+    "importedBy": [
+      "Desk.svelte",
+      "KnockBand.svelte",
+      "Panes.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\Programs.svelte",
+    "line": 271,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\SpareDesk.svelte",
+    "line": 53,
+    "snippet": "border-radius: 9px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "9px",
+    "importedBy": [
+      "Floor.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-font-size",
+    "name": "Font size outside DESIGN.md",
+    "description": "A literal font-size is off the type ramp documented in DESIGN.md typography. Use a documented size step or update the design system if the new step is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\components\\TopBar.svelte",
+    "line": 77,
+    "snippet": "font-size: 15px is off the DESIGN.md type ramp",
+    "advisory": true,
+    "ignoreValue": "15px",
+    "importedBy": [
+      "App.svelte"
+    ]
+  },
+  {
+    "antipattern": "design-system-radius",
+    "name": "Radius outside DESIGN.md",
+    "description": "A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Yash\\Documents\\agent-moshpit\\src\\styles\\base.css",
+    "line": 262,
+    "snippet": "border-radius: 4px is outside the DESIGN.md rounded scale",
+    "advisory": true,
+    "ignoreValue": "4px",
+    "importedBy": [
+      "main.ts"
+    ]
+  }
+]

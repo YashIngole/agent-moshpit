@@ -1,7 +1,7 @@
 <script lang="ts">
   // The amber band: whoever has a hand up, and the way to their terminal.
   // The question itself is on their screen, so the band only points at it.
-  // It exists only while someone is waiting whose terminal is not already in front.
+  // It stays until the program confirms that the question has been answered.
   import { office } from '../lib/office.svelte'
   import { elapsed } from '../lib/time'
   import { place } from '../lib/words'
@@ -9,8 +9,7 @@
 
   let chosen = $state<string | null>(null)
 
-  // Someone whose terminal is on screen is already being attended to.
-  const waiting = $derived(office.waiting.filter(a => !office.open.has(a.id) || (office.zoomed !== '' && office.zoomed !== a.id)))
+  const waiting = $derived(office.waiting)
   // The one picked here, else whoever has waited longest.
   const current = $derived(waiting.find(a => a.id === chosen) ?? waiting[0])
   const others = $derived(waiting.filter(a => a.id !== current?.id))
@@ -22,7 +21,7 @@
     <span class="face"><Person look={current.look} phase="needs_you" portrait /></span>
     <div class="who">
       <p class="kicker">needs you · {waited}</p>
-      <h2>{current.title}</h2>
+      <h2 title={current.title}>{current.title}</h2>
     </div>
     <p class="what">
       <code>{current.harness_tag.toLowerCase()}</code>
@@ -35,7 +34,7 @@
       <div class="queue">
         <span>also waiting</span>
         {#each others as agent (agent.id)}
-          <button type="button" onclick={() => (chosen = agent.id)}>{agent.title}</button>
+          <button type="button" title={agent.title} onclick={() => (chosen = agent.id)}>{agent.title}</button>
         {/each}
       </div>
     {/if}
@@ -161,10 +160,10 @@
     background: rgba(20, 14, 0, 0.1);
   }
 
-  /* A narrow window: one line, who and the way to them. The rest is in their terminal. */
+  /* Keep identity and action together; the other waiting desks get their own row. */
   @media (max-width: 720px) {
     .band {
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       gap: var(--s-3);
       padding: 6px var(--s-3);
     }
@@ -172,25 +171,26 @@
       width: 32px;
     }
     .who {
-      flex: 1;
+      flex: 1 1 100px;
     }
-    .what,
-    .queue span {
+    .what {
       display: none;
     }
     .queue {
-      flex: none;
-      flex-basis: auto;
-      order: 3;
-      padding-top: 0;
-      border-top: 0;
+      flex: 1 1 100%;
+      min-width: 0;
     }
     .queue button {
-      max-width: 12ch;
+      max-width: min(24ch, 100%);
     }
     .answer {
       height: 30px;
       padding: 0 10px;
     }
+  }
+  @media (max-width: 420px) {
+    .face { display: none; }
+    .who { max-width: none; }
+    .answer { padding: 0 var(--s-2); }
   }
 </style>

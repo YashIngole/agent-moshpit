@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const PORT = 4174
+const PORT = Number(process.env.MOSHPIT_UI_PORT || 4174)
 const base = `http://localhost:${PORT}/`
 
 const checks = []
@@ -165,7 +165,7 @@ try {
   // ── someone waiting ──
   await page.getByRole('button', { name: 'Open their terminal' }).click()
   check('the band opens the terminal of whoever is waiting', await until(async () => (await page.locator('.pane h2', { hasText: 'Fix the checkout total' }).count()) === 1))
-  check('and then has nothing more to say', (await page.locator('.band').count()) === 0)
+  check('the waiting cue stays until the question is answered', (await page.locator('.band').count()) === 1)
   await page.keyboard.press('Control+Backquote')
   check('back on the floor, it does again', await until(async () => (await page.locator('.band').count()) === 1))
 
@@ -757,6 +757,87 @@ try {
   await page.getByRole('button', { name: 'More', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Voice input' }).click()
   await page.screenshot({ path: path.join(shots, 'voice-panel-desktop.png') })
+  await page.context().close()
+
+  // ── review fixes: visible recovery and reliable attention ──
+  for (const [width, height] of [[1024, 700], [340, 420]]) {
+    page = await open('demo=office&still', width, height)
+    await page.getByRole('button', { name: 'New agent', exact: true }).click()
+    await page.getByRole('button', { name: 'Start agent', exact: true }).click()
+    const folder = page.locator('#new-cwd')
+    const fieldError = page.locator('#new-cwd-error')
+    check(`missing Folder receives focus at ${width}`, await folder.evaluate(el => document.activeElement === el))
+    check(`Folder error is linked and visible at ${width}`, await folder.getAttribute('aria-invalid') === 'true' && await folder.getAttribute('aria-describedby') === 'new-cwd-error' && await fieldError.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight }))
+    await folder.fill('C:/code/shop')
+    check(`correcting Folder clears its error at ${width}`, await fieldError.count() === 0)
+    await page.locator('#new-title').focus()
+    check(`focused Name is clear of the actions at ${width}`, await page.locator('#new-title').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.panel footer').getBoundingClientRect().top))
+    await page.context().close()
+  }
+
+  page = await open('demo=office&still', 640, 700)
+  await page.getByRole('button', { name: 'Open their terminal', exact: true }).click()
+  await page.getByRole('button', { name: 'New agent', exact: true }).click()
+  check('covering a waiting terminal does not remove its attention cue', await page.locator('.band').count() === 1)
+  check('covered terminals are not reported as watched', await until(async () => (await page.evaluate(() => window.__demo.watched.length)) === 0))
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /Show agent statuses/ }).click()
+  await page.getByRole('menuitem', { name: /in trouble/ }).click()
+  check('compact keyboard-accessible status control opens the trouble terminal', await until(async () => (await page.locator('.pane[data-pane="demo-7"]').count()) === 1))
+  await page.context().close()
+
+  page = await open('demo=office&still&problem')
+  await desk(page, 2).click()
+  check('desk navigation preserves the unresolved startup warning', await page.locator('.problem-strip').count() === 1)
+  await page.locator('.problem-strip').getByRole('button', { name: 'Dismiss', exact: true }).click()
+  check('startup warning can be explicitly dismissed', await page.locator('.problem-strip').count() === 0)
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Configuration warning/ }).click()
+  check('dismissed warning remains recoverable with its file action', await page.locator('.problem-strip').getByRole('button', { name: 'Open harnesses.json', exact: true }).count() === 1)
+  await page.context().close()
+
+  page = await open('demo=calm&still')
+  await desk(page, 3).focus()
+  await page.keyboard.press('Delete')
+  await desk(page, 4).focus()
+  await page.keyboard.press('Delete')
+  const undoAll = page.getByRole('button', { name: 'Undo all', exact: true })
+  check('consecutive removals retain one explicit batch Undo', await undoAll.count() === 1)
+  await undoAll.focus()
+  await sleep(8200)
+  check('Undo does not expire while its action holds keyboard focus', await undoAll.count() === 1)
+  await undoAll.click()
+  check('batch Undo restores both removed desks', await until(async () => (await desk(page, 3).count()) === 1 && (await desk(page, 4).count()) === 1))
+  await page.context().close()
+
+  page = await open('demo=crowd&still', 1280, 800)
+  const roomTops = await page.locator('.floor .room').evaluateAll(rooms => rooms.slice(0, 2).map(room => Math.round(room.getBoundingClientRect().top)))
+  check('two crowd rooms share a row at 1280', roomTops.length === 2 && roomTops[0] === roomTops[1])
+  await page.context().close()
+
+  page = await open('demo=office&still', 1024, 700)
+  await desk(page, 2).click()
+  await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
+  check('two laptop panes start with a compact floor', await page.locator('.floor').evaluate(el => el.getBoundingClientRect().width < 300))
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Compact floor/ }).click()
+  check('a visible control expands the floor when requested', await page.locator('.floor').evaluate(el => el.getBoundingClientRect().width >= 400))
+  await page.context().close()
+
+  page = await open('demo=crowd&still&update', 340, 420)
+  check('minimum-size attention retains an identity slot', await page.locator('.band .who').evaluate(el => el.getBoundingClientRect().width > 80))
+  check('minimum-size attention stays within the viewport', await page.locator('.band').evaluate(el => el.scrollWidth <= el.clientWidth))
+  check('minimum-size crowd gives each nameplate the remaining row', await page.locator('.floor .plate').first().evaluate(el => el.getBoundingClientRect().width > 120))
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.keyboard.press('End')
+  check('More menu scrolls internally without moving the app', await page.locator('.sheet').evaluate(el => { const r = el.getBoundingClientRect(); return scrollY === 0 && r.top >= 0 && r.bottom <= innerHeight }))
+  await page.context().close()
+
+  page = await open('demo=office&still', 1024, 700)
+  await desk(page, 6).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: /Stop their program/ }).click()
+  await desk(page, 6).click({ button: 'right' })
+  check('latest-conversation menu hint is readable in full', await page.getByRole('menuitem', { name: /Continue latest/ }).locator('span').evaluate(el => el.scrollHeight <= el.clientHeight))
   await page.context().close()
 
   check('nothing went wrong on the page', errors.length === 0, errors.join(' | '))

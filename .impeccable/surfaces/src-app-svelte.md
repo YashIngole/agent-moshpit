@@ -46,7 +46,6 @@ Where the build differs from the mockups it was drawn from:
 Known and left as they are:
 
 - The app icon, the tray icons and the favicon (`assets/brand/`, `public/favicon.svg`, `src-tauri/icons/`) are still the first version's drawing: a teal tile, an oak desk, and a yellow dot for "needs you". Only the mark in the top bar was redrawn for this look.
-- Two small labels are under 4.5:1 because they are dimmed with opacity on top of a quiet ink: the `ctrl ↵` hint at the foot of the New agent form (2.7:1 on the panel) and the "get" beside a program that is not installed yet (3.5:1 on the field fill).
 - Button labels are lowercase in the bar, on the band and in Agent programs, and in sentence case in the New agent form, in menus and in notices.
 - The title of the New agent panel is weight 750; the other two panels' titles are 650.
 - `--carpet-line`, `--carpet-deep` and `--strip` are declared in `tokens.css` and used nowhere.

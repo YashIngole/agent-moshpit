@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-09T08:39:10.336Z",
+  "generatedAt": "2026-10-09T08:44:56.203Z",
   "title": "Design System: Agent Moshpit",
   "extensions": {
     "colorMeta": {
@@ -1121,7 +1121,7 @@
       },
       {
         "name": "The Ink Shade Rule",
-        "body": "Red has one shade for shapes and a lighter one for words: `trouble` for a dot, a tag and a screen, `trouble-ink` for anything that is read. On amber, everything is `needs-ink`. Text is held to 4.5:1 and marks and field edges to 3:1 on every surface they sit on; the tightest pairs of tokens are `ink-3` on `inset` at 4.7:1 and `field-line` on `inset` at 3.3:1. Two small labels fall short as built, because they are also dimmed with opacity: the `ctrl ↵` hint at the foot of the New agent form (2.7:1) and the \"get\" beside a program that is not installed yet (3.5:1).",
+        "body": "Red has one shade for shapes and a lighter one for words: `trouble` for a dot, a tag and a screen, `trouble-ink` for anything that is read. On amber, everything is `needs-ink`. Text is held to 4.5:1 and marks and field edges to 3:1 on every surface they sit on; the tightest pairs of tokens are `ink-3` on `inset` at 4.7:1 and `field-line` on `inset` at 3.3:1.",
         "section": "colors"
       },
       {

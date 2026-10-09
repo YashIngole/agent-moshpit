@@ -335,7 +335,7 @@ Graphite, and four colours that each mean one thing.
 
 **The Word And Shape Rule.** A status is never colour alone. Each has a word (Needs you, Working, Done, Idle, Trouble, Starting, Away), a pose, something on the screen, and a 7px dot, which is a hollow ring for Away and Starting. The dot never appears without its word.
 
-**The Ink Shade Rule.** Red has one shade for shapes and a lighter one for words: `trouble` for a dot, a tag and a screen, `trouble-ink` for anything that is read. On amber, everything is `needs-ink`. Text is held to 4.5:1 and marks and field edges to 3:1 on every surface they sit on; the tightest pairs of tokens are `ink-3` on `inset` at 4.7:1 and `field-line` on `inset` at 3.3:1. Two small labels fall short as built, because they are also dimmed with opacity: the `ctrl ↵` hint at the foot of the New agent form (2.7:1) and the "get" beside a program that is not installed yet (3.5:1).
+**The Ink Shade Rule.** Red has one shade for shapes and a lighter one for words: `trouble` for a dot, a tag and a screen, `trouble-ink` for anything that is read. On amber, everything is `needs-ink`. Text is held to 4.5:1 and marks and field edges to 3:1 on every surface they sit on; the tightest pairs of tokens are `ink-3` on `inset` at 4.7:1 and `field-line` on `inset` at 3.3:1.
 
 ## Typography
 
@@ -409,7 +409,7 @@ Drawings are built from rounded rectangles, circles and strokes with round ends,
 - **Danger:** transparent, words and edge in `trouble-ink`, `trouble-wash` under the pointer. Only inside the box that asks before a busy agent is stopped, restarted or removed.
 - **On the band:** one button, `needs-ink` with amber words at weight 600, 34px tall (30px in a narrow window). Its focus ring is `needs-ink`.
 - **Icon buttons:** a 28px square with 7px corners in a pane's header, `ink-2` turning to `ink` on `inset` under the pointer. The panel's close is 30px, the bar's menu button 32px, the + on a room's sign 22px. The × in the corner of a desk is 24px on `panel` with a `wall` edge; it shows only while the pointer or the keyboard is on that desk, and turns `trouble-ink` under the pointer.
-- **A key beside its action:** a key cap in Geist Mono at 0.6875rem with a 1px edge in the colour of the words around it, 4px corners, at 60% opacity: `n`, `ctrl` and a backtick.
+- **A key beside its action:** a key cap in Geist Mono at 0.6875rem with a 1px edge in the colour of the words around it, 4px corners, at 60% opacity: `n`, `ctrl` and a backtick. The `ctrl ↵` beside Start agent is the one cap that is not dimmed: it is `ink-3` at 0.75rem, and dimming that would take it under 4.5:1.
 - **Case:** the words are lowercase in the bar, on the band and in Agent programs, and in sentence case in the New agent form, in menus and in notices. This has not been made one way.
 
 ### Chips

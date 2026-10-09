@@ -330,6 +330,10 @@
     font-family: var(--mono);
     font-size: 10.5px;
     font-weight: 500;
+  }
+  /* Dimmed only on the chosen option's light fill. On the field it is already the
+     quietest ink, and dimmed as well it would be under 4.5:1. */
+  .pick label.on .get {
     opacity: 0.8;
   }
   .newer {
@@ -387,11 +391,14 @@
     border-top: 1px solid var(--line);
     background: var(--panel);
   }
+  /* The quietest ink at its full strength: a key cap's usual dimming on top of it
+     would be under 4.5:1 on the panel. */
   .keys {
     margin-left: auto;
     font-family: var(--mono);
     font-size: var(--t-xs);
     color: var(--ink-3);
+    opacity: 1;
   }
   .more {
     flex: 1 1 auto;

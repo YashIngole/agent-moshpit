@@ -1,0 +1,119 @@
+/*
+ * The office after hours: graphite rooms on a faint grid, matte desks, and the
+ * only bright things are screens and the one colour that means "needs you".
+ *
+ * Four colours mean something and are used for nothing else:
+ *   amber  needs you        green  done
+ *   red    trouble          blue   at work (the light of a screen)
+ *
+ * Text and marks are checked against every surface they sit on (WCAG 2.2 AA):
+ * 4.5:1 for text, 3:1 for marks and the edges of fields.
+ */
+:root {
+  color-scheme: dark;
+
+  /* the rooms */
+  --bg: #0a0c0f;
+  --carpet: #111418;
+  --carpet-line: #161a1f;
+  --carpet-deep: #0a0c0f;
+  --grid: rgba(255, 255, 255, 0.028);
+  --wall: #252b33;
+  --chrome: #0d0f12;
+  --panel: #13161a;
+  --inset: #1b1f25;
+  --line: #20252c;
+  --field-line: #66707d;
+  --select: #2c3a55;
+
+  /* ink */
+  --ink: #e7eaf0;
+  --ink-2: #a0a8b4;
+  --ink-3: #808a98;
+
+  /* furniture */
+  --chair: #23272e;
+  --chair-edge: #343a43;
+  --desk: #2a2f36;
+  --desk-edge: #1b1f24;
+  --desk-leg: #15181c;
+  --mat: #1a1d22;
+  --kbd: #0f1114;
+  --keycaps: #3a414b;
+  --bezel: #0b0d10;
+  --screen: #10161f;
+  --screen-off: #07090b;
+
+  /* meaning; the -ink shades are for words, the plain ones for shapes */
+  --needs: #ffb224;
+  --needs-ink: #140e00;
+  --done: #3ccf91;
+  --trouble: #ff5f56;
+  --trouble-ink: #ff7b73;
+  --trouble-wash: #2a1416;
+  --work: #82aaff;
+  --quiet: #808a98;
+
+  /* depth: furniture stands on a soft shadow; only what floats gets a lift */
+  --shadow: rgba(0, 0, 0, 0.45);
+  --shadow-strong: rgba(0, 0, 0, 0.62);
+  --lift: 0 1px 2px var(--shadow), 0 12px 32px -10px var(--shadow-strong);
+
+  /* controls */
+  --button: #e7eaf0;
+  --button-ink: #0a0c0f;
+  --button-hover: #ffffff;
+  --focus: #e7eaf0;
+
+  /* a terminal. The sixteen colours are the ones a program asks for by number,
+     tuned to this glass: the night colours an editor uses. */
+  --term: #0b0d10;
+  --term-ink: #d5dae2;
+  --term-dim: #6c7684;
+  --term-line: #20252c;
+  --term-select: #2c3a55;
+  --ansi-0: #1b1f25;
+  --ansi-1: #ff5f56;
+  --ansi-2: #3ccf91;
+  --ansi-3: #ffb224;
+  --ansi-4: #82aaff;
+  --ansi-5: #c099ff;
+  --ansi-6: #86e1fc;
+  --ansi-7: #c8d0dc;
+  --ansi-8: #5c6573;
+  --ansi-9: #ff8a82;
+  --ansi-10: #6fe0b0;
+  --ansi-11: #ffcb6b;
+  --ansi-12: #a6c1ff;
+  --ansi-13: #d4b8ff;
+  --ansi-14: #b4ecfd;
+  --ansi-15: #f4f6fa;
+
+  /* type */
+  --font: 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-md: 0.875rem;
+  --t-lg: 1rem;
+  --t-xl: 1.25rem;
+
+  /* space and shape */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --r-1: 7px;
+  --r-2: 10px;
+  --r-3: 12px;
+  --bar: 52px;
+  --panel-width: 380px;
+  /* the floor beside terminals that have been given the room */
+  --strip: 264px;
+
+  /* motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --quick: 180ms;
+  --settle: 240ms;
+}

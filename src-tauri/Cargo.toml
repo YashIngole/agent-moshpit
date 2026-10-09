@@ -1,0 +1,55 @@
+[package]
+name = "agent-moshpit"
+version = "0.2.0"
+description = "A small desktop office for coding agents: Claude Code, Codex and the rest, each in a terminal of its own"
+license = "MIT"
+edition = "2021"
+rust-version = "1.89"
+
+[lib]
+name = "agent_moshpit_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync"] }
+getrandom = "0.3"
+portable-pty = "0.9"
+vt100 = "0.16"
+
+[target.'cfg(windows)'.dependencies]
+# Already part of the webview; named here to turn off its browser keys (F5 reloading the window).
+webview2-com = "0.39"
+windows-core = "0.62"
+# Already part of the notification plugin; named here for toasts that open a desk when clicked.
+windows = { version = "0.62", features = ["Foundation", "Data_Xml_Dom", "UI_Notifications"] }
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Line tables keep backtraces useful without the bulk of full debug info.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

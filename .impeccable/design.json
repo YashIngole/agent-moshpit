@@ -1,0 +1,1172 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-09T08:39:10.336Z",
+  "title": "Design System: Agent Moshpit",
+  "extensions": {
+    "colorMeta": {
+      "needs": {
+        "role": "primary",
+        "displayName": "Amber",
+        "canonical": "#ffb224",
+        "tonalRamp": [
+          "oklch(15.0% 0.164 75.8)",
+          "oklch(26.4% 0.164 75.8)",
+          "oklch(37.9% 0.164 75.8)",
+          "oklch(49.3% 0.164 75.8)",
+          "oklch(60.7% 0.164 75.8)",
+          "oklch(72.1% 0.164 75.8)",
+          "oklch(83.6% 0.164 75.8)",
+          "oklch(95.0% 0.164 75.8)"
+        ]
+      },
+      "needs-ink": {
+        "role": "primary",
+        "displayName": "Ink On Amber",
+        "canonical": "#140e00",
+        "tonalRamp": [
+          "oklch(15.0% 0.034 92.0)",
+          "oklch(26.4% 0.034 92.0)",
+          "oklch(37.9% 0.034 92.0)",
+          "oklch(49.3% 0.034 92.0)",
+          "oklch(60.7% 0.034 92.0)",
+          "oklch(72.1% 0.034 92.0)",
+          "oklch(83.6% 0.034 92.0)",
+          "oklch(95.0% 0.034 92.0)"
+        ]
+      },
+      "done": {
+        "role": "secondary",
+        "displayName": "Done Green",
+        "canonical": "#3ccf91",
+        "tonalRamp": [
+          "oklch(15.0% 0.153 160.6)",
+          "oklch(26.4% 0.153 160.6)",
+          "oklch(37.9% 0.153 160.6)",
+          "oklch(49.3% 0.153 160.6)",
+          "oklch(60.7% 0.153 160.6)",
+          "oklch(72.1% 0.153 160.6)",
+          "oklch(83.6% 0.153 160.6)",
+          "oklch(95.0% 0.153 160.6)"
+        ]
+      },
+      "trouble": {
+        "role": "secondary",
+        "displayName": "Trouble Red",
+        "canonical": "#ff5f56",
+        "tonalRamp": [
+          "oklch(15.0% 0.197 26.7)",
+          "oklch(26.4% 0.197 26.7)",
+          "oklch(37.9% 0.197 26.7)",
+          "oklch(49.3% 0.197 26.7)",
+          "oklch(60.7% 0.197 26.7)",
+          "oklch(72.1% 0.197 26.7)",
+          "oklch(83.6% 0.197 26.7)",
+          "oklch(95.0% 0.197 26.7)"
+        ]
+      },
+      "trouble-ink": {
+        "role": "secondary",
+        "displayName": "Trouble Red, For Words",
+        "canonical": "#ff7b73",
+        "tonalRamp": [
+          "oklch(15.0% 0.162 25.4)",
+          "oklch(26.4% 0.162 25.4)",
+          "oklch(37.9% 0.162 25.4)",
+          "oklch(49.3% 0.162 25.4)",
+          "oklch(60.7% 0.162 25.4)",
+          "oklch(72.1% 0.162 25.4)",
+          "oklch(83.6% 0.162 25.4)",
+          "oklch(95.0% 0.162 25.4)"
+        ]
+      },
+      "trouble-wash": {
+        "role": "secondary",
+        "displayName": "Trouble Wash",
+        "canonical": "#2a1416",
+        "tonalRamp": [
+          "oklch(15.0% 0.036 14.6)",
+          "oklch(26.4% 0.036 14.6)",
+          "oklch(37.9% 0.036 14.6)",
+          "oklch(49.3% 0.036 14.6)",
+          "oklch(60.7% 0.036 14.6)",
+          "oklch(72.1% 0.036 14.6)",
+          "oklch(83.6% 0.036 14.6)",
+          "oklch(95.0% 0.036 14.6)"
+        ]
+      },
+      "work": {
+        "role": "secondary",
+        "displayName": "Screen Blue",
+        "canonical": "#82aaff",
+        "tonalRamp": [
+          "oklch(15.0% 0.131 264.3)",
+          "oklch(26.4% 0.131 264.3)",
+          "oklch(37.9% 0.131 264.3)",
+          "oklch(49.3% 0.131 264.3)",
+          "oklch(60.7% 0.131 264.3)",
+          "oklch(72.1% 0.131 264.3)",
+          "oklch(83.6% 0.131 264.3)",
+          "oklch(95.0% 0.131 264.3)"
+        ]
+      },
+      "quiet": {
+        "role": "neutral",
+        "displayName": "Quiet",
+        "canonical": "#808a98",
+        "tonalRamp": [
+          "oklch(15.0% 0.024 256.8)",
+          "oklch(26.4% 0.024 256.8)",
+          "oklch(37.9% 0.024 256.8)",
+          "oklch(49.3% 0.024 256.8)",
+          "oklch(60.7% 0.024 256.8)",
+          "oklch(72.1% 0.024 256.8)",
+          "oklch(83.6% 0.024 256.8)",
+          "oklch(95.0% 0.024 256.8)"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "The Building",
+        "canonical": "#0a0c0f",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "carpet": {
+        "role": "neutral",
+        "displayName": "Room Graphite",
+        "canonical": "#111418",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 255.6)",
+          "oklch(26.4% 0.009 255.6)",
+          "oklch(37.9% 0.009 255.6)",
+          "oklch(49.3% 0.009 255.6)",
+          "oklch(60.7% 0.009 255.6)",
+          "oklch(72.1% 0.009 255.6)",
+          "oklch(83.6% 0.009 255.6)",
+          "oklch(95.0% 0.009 255.6)"
+        ]
+      },
+      "grid": {
+        "role": "neutral",
+        "displayName": "Grid Line",
+        "canonical": "rgba(255, 255, 255, 0.028)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 89.9)",
+          "oklch(26.4% 0.000 89.9)",
+          "oklch(37.9% 0.000 89.9)",
+          "oklch(49.3% 0.000 89.9)",
+          "oklch(60.7% 0.000 89.9)",
+          "oklch(72.1% 0.000 89.9)",
+          "oklch(83.6% 0.000 89.9)",
+          "oklch(95.0% 0.000 89.9)"
+        ]
+      },
+      "wall": {
+        "role": "neutral",
+        "displayName": "Wall",
+        "canonical": "#252b33",
+        "tonalRamp": [
+          "oklch(15.0% 0.017 255.7)",
+          "oklch(26.4% 0.017 255.7)",
+          "oklch(37.9% 0.017 255.7)",
+          "oklch(49.3% 0.017 255.7)",
+          "oklch(60.7% 0.017 255.7)",
+          "oklch(72.1% 0.017 255.7)",
+          "oklch(83.6% 0.017 255.7)",
+          "oklch(95.0% 0.017 255.7)"
+        ]
+      },
+      "chrome": {
+        "role": "neutral",
+        "displayName": "Top Bar",
+        "canonical": "#0d0f12",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#13161a",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 255.6)",
+          "oklch(26.4% 0.009 255.6)",
+          "oklch(37.9% 0.009 255.6)",
+          "oklch(49.3% 0.009 255.6)",
+          "oklch(60.7% 0.009 255.6)",
+          "oklch(72.1% 0.009 255.6)",
+          "oklch(83.6% 0.009 255.6)",
+          "oklch(95.0% 0.009 255.6)"
+        ]
+      },
+      "inset": {
+        "role": "neutral",
+        "displayName": "Field Fill",
+        "canonical": "#1b1f25",
+        "tonalRamp": [
+          "oklch(15.0% 0.013 258.4)",
+          "oklch(26.4% 0.013 258.4)",
+          "oklch(37.9% 0.013 258.4)",
+          "oklch(49.3% 0.013 258.4)",
+          "oklch(60.7% 0.013 258.4)",
+          "oklch(72.1% 0.013 258.4)",
+          "oklch(83.6% 0.013 258.4)",
+          "oklch(95.0% 0.013 258.4)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divider",
+        "canonical": "#20252c",
+        "tonalRamp": [
+          "oklch(15.0% 0.015 256.8)",
+          "oklch(26.4% 0.015 256.8)",
+          "oklch(37.9% 0.015 256.8)",
+          "oklch(49.3% 0.015 256.8)",
+          "oklch(60.7% 0.015 256.8)",
+          "oklch(72.1% 0.015 256.8)",
+          "oklch(83.6% 0.015 256.8)",
+          "oklch(95.0% 0.015 256.8)"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#66707d",
+        "tonalRamp": [
+          "oklch(15.0% 0.024 255.0)",
+          "oklch(26.4% 0.024 255.0)",
+          "oklch(37.9% 0.024 255.0)",
+          "oklch(49.3% 0.024 255.0)",
+          "oklch(60.7% 0.024 255.0)",
+          "oklch(72.1% 0.024 255.0)",
+          "oklch(83.6% 0.024 255.0)",
+          "oklch(95.0% 0.024 255.0)"
+        ]
+      },
+      "select": {
+        "role": "neutral",
+        "displayName": "Selected Text",
+        "canonical": "#2c3a55",
+        "tonalRamp": [
+          "oklch(15.0% 0.051 263.0)",
+          "oklch(26.4% 0.051 263.0)",
+          "oklch(37.9% 0.051 263.0)",
+          "oklch(49.3% 0.051 263.0)",
+          "oklch(60.7% 0.051 263.0)",
+          "oklch(72.1% 0.051 263.0)",
+          "oklch(83.6% 0.051 263.0)",
+          "oklch(95.0% 0.051 263.0)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#e7eaf0",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 264.5)",
+          "oklch(26.4% 0.009 264.5)",
+          "oklch(37.9% 0.009 264.5)",
+          "oklch(49.3% 0.009 264.5)",
+          "oklch(60.7% 0.009 264.5)",
+          "oklch(72.1% 0.009 264.5)",
+          "oklch(83.6% 0.009 264.5)",
+          "oklch(95.0% 0.009 264.5)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Supporting Ink",
+        "canonical": "#a0a8b4",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 258.4)",
+          "oklch(26.4% 0.020 258.4)",
+          "oklch(37.9% 0.020 258.4)",
+          "oklch(49.3% 0.020 258.4)",
+          "oklch(60.7% 0.020 258.4)",
+          "oklch(72.1% 0.020 258.4)",
+          "oklch(83.6% 0.020 258.4)",
+          "oklch(95.0% 0.020 258.4)"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "canonical": "#808a98",
+        "tonalRamp": [
+          "oklch(15.0% 0.024 256.8)",
+          "oklch(26.4% 0.024 256.8)",
+          "oklch(37.9% 0.024 256.8)",
+          "oklch(49.3% 0.024 256.8)",
+          "oklch(60.7% 0.024 256.8)",
+          "oklch(72.1% 0.024 256.8)",
+          "oklch(83.6% 0.024 256.8)",
+          "oklch(95.0% 0.024 256.8)"
+        ]
+      },
+      "button": {
+        "role": "neutral",
+        "displayName": "Button",
+        "canonical": "#e7eaf0",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 264.5)",
+          "oklch(26.4% 0.009 264.5)",
+          "oklch(37.9% 0.009 264.5)",
+          "oklch(49.3% 0.009 264.5)",
+          "oklch(60.7% 0.009 264.5)",
+          "oklch(72.1% 0.009 264.5)",
+          "oklch(83.6% 0.009 264.5)",
+          "oklch(95.0% 0.009 264.5)"
+        ]
+      },
+      "button-ink": {
+        "role": "neutral",
+        "displayName": "Button Label",
+        "canonical": "#0a0c0f",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "button-hover": {
+        "role": "neutral",
+        "displayName": "Button, Hovered",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 89.9)",
+          "oklch(26.4% 0.000 89.9)",
+          "oklch(37.9% 0.000 89.9)",
+          "oklch(49.3% 0.000 89.9)",
+          "oklch(60.7% 0.000 89.9)",
+          "oklch(72.1% 0.000 89.9)",
+          "oklch(83.6% 0.000 89.9)",
+          "oklch(95.0% 0.000 89.9)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus Ring",
+        "canonical": "#e7eaf0",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 264.5)",
+          "oklch(26.4% 0.009 264.5)",
+          "oklch(37.9% 0.009 264.5)",
+          "oklch(49.3% 0.009 264.5)",
+          "oklch(60.7% 0.009 264.5)",
+          "oklch(72.1% 0.009 264.5)",
+          "oklch(83.6% 0.009 264.5)",
+          "oklch(95.0% 0.009 264.5)"
+        ]
+      },
+      "chair": {
+        "role": "tertiary",
+        "displayName": "Chair",
+        "canonical": "#23272e",
+        "tonalRamp": [
+          "oklch(15.0% 0.014 261.7)",
+          "oklch(26.4% 0.014 261.7)",
+          "oklch(37.9% 0.014 261.7)",
+          "oklch(49.3% 0.014 261.7)",
+          "oklch(60.7% 0.014 261.7)",
+          "oklch(72.1% 0.014 261.7)",
+          "oklch(83.6% 0.014 261.7)",
+          "oklch(95.0% 0.014 261.7)"
+        ]
+      },
+      "chair-edge": {
+        "role": "tertiary",
+        "displayName": "Chair Edge",
+        "canonical": "#343a43",
+        "tonalRamp": [
+          "oklch(15.0% 0.018 258.4)",
+          "oklch(26.4% 0.018 258.4)",
+          "oklch(37.9% 0.018 258.4)",
+          "oklch(49.3% 0.018 258.4)",
+          "oklch(60.7% 0.018 258.4)",
+          "oklch(72.1% 0.018 258.4)",
+          "oklch(83.6% 0.018 258.4)",
+          "oklch(95.0% 0.018 258.4)"
+        ]
+      },
+      "desk": {
+        "role": "tertiary",
+        "displayName": "Desk",
+        "canonical": "#2a2f36",
+        "tonalRamp": [
+          "oklch(15.0% 0.014 256.8)",
+          "oklch(26.4% 0.014 256.8)",
+          "oklch(37.9% 0.014 256.8)",
+          "oklch(49.3% 0.014 256.8)",
+          "oklch(60.7% 0.014 256.8)",
+          "oklch(72.1% 0.014 256.8)",
+          "oklch(83.6% 0.014 256.8)",
+          "oklch(95.0% 0.014 256.8)"
+        ]
+      },
+      "desk-edge": {
+        "role": "tertiary",
+        "displayName": "Desk Edge",
+        "canonical": "#1b1f24",
+        "tonalRamp": [
+          "oklch(15.0% 0.011 254.1)",
+          "oklch(26.4% 0.011 254.1)",
+          "oklch(37.9% 0.011 254.1)",
+          "oklch(49.3% 0.011 254.1)",
+          "oklch(60.7% 0.011 254.1)",
+          "oklch(72.1% 0.011 254.1)",
+          "oklch(83.6% 0.011 254.1)",
+          "oklch(95.0% 0.011 254.1)"
+        ]
+      },
+      "desk-leg": {
+        "role": "tertiary",
+        "displayName": "Desk Leg",
+        "canonical": "#15181c",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 255.6)",
+          "oklch(26.4% 0.009 255.6)",
+          "oklch(37.9% 0.009 255.6)",
+          "oklch(49.3% 0.009 255.6)",
+          "oklch(60.7% 0.009 255.6)",
+          "oklch(72.1% 0.009 255.6)",
+          "oklch(83.6% 0.009 255.6)",
+          "oklch(95.0% 0.009 255.6)"
+        ]
+      },
+      "mat": {
+        "role": "tertiary",
+        "displayName": "Desk Mat",
+        "canonical": "#1a1d22",
+        "tonalRamp": [
+          "oklch(15.0% 0.011 260.7)",
+          "oklch(26.4% 0.011 260.7)",
+          "oklch(37.9% 0.011 260.7)",
+          "oklch(49.3% 0.011 260.7)",
+          "oklch(60.7% 0.011 260.7)",
+          "oklch(72.1% 0.011 260.7)",
+          "oklch(83.6% 0.011 260.7)",
+          "oklch(95.0% 0.011 260.7)"
+        ]
+      },
+      "kbd": {
+        "role": "tertiary",
+        "displayName": "Keyboard",
+        "canonical": "#0f1114",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "keycaps": {
+        "role": "tertiary",
+        "displayName": "Key Caps",
+        "canonical": "#3a414b",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 257.3)",
+          "oklch(26.4% 0.020 257.3)",
+          "oklch(37.9% 0.020 257.3)",
+          "oklch(49.3% 0.020 257.3)",
+          "oklch(60.7% 0.020 257.3)",
+          "oklch(72.1% 0.020 257.3)",
+          "oklch(83.6% 0.020 257.3)",
+          "oklch(95.0% 0.020 257.3)"
+        ]
+      },
+      "bezel": {
+        "role": "tertiary",
+        "displayName": "Monitor Bezel",
+        "canonical": "#0b0d10",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "screen": {
+        "role": "tertiary",
+        "displayName": "Screen",
+        "canonical": "#10161f",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 258.3)",
+          "oklch(26.4% 0.020 258.3)",
+          "oklch(37.9% 0.020 258.3)",
+          "oklch(49.3% 0.020 258.3)",
+          "oklch(60.7% 0.020 258.3)",
+          "oklch(72.1% 0.020 258.3)",
+          "oklch(83.6% 0.020 258.3)",
+          "oklch(95.0% 0.020 258.3)"
+        ]
+      },
+      "screen-off": {
+        "role": "tertiary",
+        "displayName": "Dark Screen",
+        "canonical": "#07090b",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 245.0)",
+          "oklch(26.4% 0.006 245.0)",
+          "oklch(37.9% 0.006 245.0)",
+          "oklch(49.3% 0.006 245.0)",
+          "oklch(60.7% 0.006 245.0)",
+          "oklch(72.1% 0.006 245.0)",
+          "oklch(83.6% 0.006 245.0)",
+          "oklch(95.0% 0.006 245.0)"
+        ]
+      },
+      "term": {
+        "role": "neutral",
+        "displayName": "Terminal Glass",
+        "canonical": "#0b0d10",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 258.4)",
+          "oklch(26.4% 0.007 258.4)",
+          "oklch(37.9% 0.007 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.007 258.4)",
+          "oklch(83.6% 0.007 258.4)",
+          "oklch(95.0% 0.007 258.4)"
+        ]
+      },
+      "term-ink": {
+        "role": "neutral",
+        "displayName": "Terminal Text",
+        "canonical": "#d5dae2",
+        "tonalRamp": [
+          "oklch(15.0% 0.012 259.8)",
+          "oklch(26.4% 0.012 259.8)",
+          "oklch(37.9% 0.012 259.8)",
+          "oklch(49.3% 0.012 259.8)",
+          "oklch(60.7% 0.012 259.8)",
+          "oklch(72.1% 0.012 259.8)",
+          "oklch(83.6% 0.012 259.8)",
+          "oklch(95.0% 0.012 259.8)"
+        ]
+      },
+      "term-dim": {
+        "role": "neutral",
+        "displayName": "Pane Edge, Held",
+        "canonical": "#6c7684",
+        "tonalRamp": [
+          "oklch(15.0% 0.025 256.8)",
+          "oklch(26.4% 0.025 256.8)",
+          "oklch(37.9% 0.025 256.8)",
+          "oklch(49.3% 0.025 256.8)",
+          "oklch(60.7% 0.025 256.8)",
+          "oklch(72.1% 0.025 256.8)",
+          "oklch(83.6% 0.025 256.8)",
+          "oklch(95.0% 0.025 256.8)"
+        ]
+      },
+      "term-line": {
+        "role": "neutral",
+        "displayName": "Line Between Panes",
+        "canonical": "#20252c",
+        "tonalRamp": [
+          "oklch(15.0% 0.015 256.8)",
+          "oklch(26.4% 0.015 256.8)",
+          "oklch(37.9% 0.015 256.8)",
+          "oklch(49.3% 0.015 256.8)",
+          "oklch(60.7% 0.015 256.8)",
+          "oklch(72.1% 0.015 256.8)",
+          "oklch(83.6% 0.015 256.8)",
+          "oklch(95.0% 0.015 256.8)"
+        ]
+      },
+      "term-select": {
+        "role": "neutral",
+        "displayName": "Terminal Selection",
+        "canonical": "#2c3a55",
+        "tonalRamp": [
+          "oklch(15.0% 0.051 263.0)",
+          "oklch(26.4% 0.051 263.0)",
+          "oklch(37.9% 0.051 263.0)",
+          "oklch(49.3% 0.051 263.0)",
+          "oklch(60.7% 0.051 263.0)",
+          "oklch(72.1% 0.051 263.0)",
+          "oklch(83.6% 0.051 263.0)",
+          "oklch(95.0% 0.051 263.0)"
+        ]
+      },
+      "ansi-0": {
+        "role": "neutral",
+        "displayName": "Terminal Black",
+        "canonical": "#1b1f25",
+        "tonalRamp": [
+          "oklch(15.0% 0.013 258.4)",
+          "oklch(26.4% 0.013 258.4)",
+          "oklch(37.9% 0.013 258.4)",
+          "oklch(49.3% 0.013 258.4)",
+          "oklch(60.7% 0.013 258.4)",
+          "oklch(72.1% 0.013 258.4)",
+          "oklch(83.6% 0.013 258.4)",
+          "oklch(95.0% 0.013 258.4)"
+        ]
+      },
+      "ansi-1": {
+        "role": "neutral",
+        "displayName": "Terminal Red",
+        "canonical": "#ff5f56",
+        "tonalRamp": [
+          "oklch(15.0% 0.197 26.7)",
+          "oklch(26.4% 0.197 26.7)",
+          "oklch(37.9% 0.197 26.7)",
+          "oklch(49.3% 0.197 26.7)",
+          "oklch(60.7% 0.197 26.7)",
+          "oklch(72.1% 0.197 26.7)",
+          "oklch(83.6% 0.197 26.7)",
+          "oklch(95.0% 0.197 26.7)"
+        ]
+      },
+      "ansi-2": {
+        "role": "neutral",
+        "displayName": "Terminal Green",
+        "canonical": "#3ccf91",
+        "tonalRamp": [
+          "oklch(15.0% 0.153 160.6)",
+          "oklch(26.4% 0.153 160.6)",
+          "oklch(37.9% 0.153 160.6)",
+          "oklch(49.3% 0.153 160.6)",
+          "oklch(60.7% 0.153 160.6)",
+          "oklch(72.1% 0.153 160.6)",
+          "oklch(83.6% 0.153 160.6)",
+          "oklch(95.0% 0.153 160.6)"
+        ]
+      },
+      "ansi-3": {
+        "role": "neutral",
+        "displayName": "Terminal Yellow",
+        "canonical": "#ffb224",
+        "tonalRamp": [
+          "oklch(15.0% 0.164 75.8)",
+          "oklch(26.4% 0.164 75.8)",
+          "oklch(37.9% 0.164 75.8)",
+          "oklch(49.3% 0.164 75.8)",
+          "oklch(60.7% 0.164 75.8)",
+          "oklch(72.1% 0.164 75.8)",
+          "oklch(83.6% 0.164 75.8)",
+          "oklch(95.0% 0.164 75.8)"
+        ]
+      },
+      "ansi-4": {
+        "role": "neutral",
+        "displayName": "Terminal Blue",
+        "canonical": "#82aaff",
+        "tonalRamp": [
+          "oklch(15.0% 0.131 264.3)",
+          "oklch(26.4% 0.131 264.3)",
+          "oklch(37.9% 0.131 264.3)",
+          "oklch(49.3% 0.131 264.3)",
+          "oklch(60.7% 0.131 264.3)",
+          "oklch(72.1% 0.131 264.3)",
+          "oklch(83.6% 0.131 264.3)",
+          "oklch(95.0% 0.131 264.3)"
+        ]
+      },
+      "ansi-5": {
+        "role": "neutral",
+        "displayName": "Terminal Magenta",
+        "canonical": "#c099ff",
+        "tonalRamp": [
+          "oklch(15.0% 0.147 300.6)",
+          "oklch(26.4% 0.147 300.6)",
+          "oklch(37.9% 0.147 300.6)",
+          "oklch(49.3% 0.147 300.6)",
+          "oklch(60.7% 0.147 300.6)",
+          "oklch(72.1% 0.147 300.6)",
+          "oklch(83.6% 0.147 300.6)",
+          "oklch(95.0% 0.147 300.6)"
+        ]
+      },
+      "ansi-6": {
+        "role": "neutral",
+        "displayName": "Terminal Cyan",
+        "canonical": "#86e1fc",
+        "tonalRamp": [
+          "oklch(15.0% 0.095 219.0)",
+          "oklch(26.4% 0.095 219.0)",
+          "oklch(37.9% 0.095 219.0)",
+          "oklch(49.3% 0.095 219.0)",
+          "oklch(60.7% 0.095 219.0)",
+          "oklch(72.1% 0.095 219.0)",
+          "oklch(83.6% 0.095 219.0)",
+          "oklch(95.0% 0.095 219.0)"
+        ]
+      },
+      "ansi-7": {
+        "role": "neutral",
+        "displayName": "Terminal White",
+        "canonical": "#c8d0dc",
+        "tonalRamp": [
+          "oklch(15.0% 0.019 258.4)",
+          "oklch(26.4% 0.019 258.4)",
+          "oklch(37.9% 0.019 258.4)",
+          "oklch(49.3% 0.019 258.4)",
+          "oklch(60.7% 0.019 258.4)",
+          "oklch(72.1% 0.019 258.4)",
+          "oklch(83.6% 0.019 258.4)",
+          "oklch(95.0% 0.019 258.4)"
+        ]
+      },
+      "ansi-8": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Black",
+        "canonical": "#5c6573",
+        "tonalRamp": [
+          "oklch(15.0% 0.025 259.2)",
+          "oklch(26.4% 0.025 259.2)",
+          "oklch(37.9% 0.025 259.2)",
+          "oklch(49.3% 0.025 259.2)",
+          "oklch(60.7% 0.025 259.2)",
+          "oklch(72.1% 0.025 259.2)",
+          "oklch(83.6% 0.025 259.2)",
+          "oklch(95.0% 0.025 259.2)"
+        ]
+      },
+      "ansi-9": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Red",
+        "canonical": "#ff8a82",
+        "tonalRamp": [
+          "oklch(15.0% 0.143 25.1)",
+          "oklch(26.4% 0.143 25.1)",
+          "oklch(37.9% 0.143 25.1)",
+          "oklch(49.3% 0.143 25.1)",
+          "oklch(60.7% 0.143 25.1)",
+          "oklch(72.1% 0.143 25.1)",
+          "oklch(83.6% 0.143 25.1)",
+          "oklch(95.0% 0.143 25.1)"
+        ]
+      },
+      "ansi-10": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Green",
+        "canonical": "#6fe0b0",
+        "tonalRamp": [
+          "oklch(15.0% 0.125 163.7)",
+          "oklch(26.4% 0.125 163.7)",
+          "oklch(37.9% 0.125 163.7)",
+          "oklch(49.3% 0.125 163.7)",
+          "oklch(60.7% 0.125 163.7)",
+          "oklch(72.1% 0.125 163.7)",
+          "oklch(83.6% 0.125 163.7)",
+          "oklch(95.0% 0.125 163.7)"
+        ]
+      },
+      "ansi-11": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Yellow",
+        "canonical": "#ffcb6b",
+        "tonalRamp": [
+          "oklch(15.0% 0.128 81.1)",
+          "oklch(26.4% 0.128 81.1)",
+          "oklch(37.9% 0.128 81.1)",
+          "oklch(49.3% 0.128 81.1)",
+          "oklch(60.7% 0.128 81.1)",
+          "oklch(72.1% 0.128 81.1)",
+          "oklch(83.6% 0.128 81.1)",
+          "oklch(95.0% 0.128 81.1)"
+        ]
+      },
+      "ansi-12": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Blue",
+        "canonical": "#a6c1ff",
+        "tonalRamp": [
+          "oklch(15.0% 0.093 266.2)",
+          "oklch(26.4% 0.093 266.2)",
+          "oklch(37.9% 0.093 266.2)",
+          "oklch(49.3% 0.093 266.2)",
+          "oklch(60.7% 0.093 266.2)",
+          "oklch(72.1% 0.093 266.2)",
+          "oklch(83.6% 0.093 266.2)",
+          "oklch(95.0% 0.093 266.2)"
+        ]
+      },
+      "ansi-13": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Magenta",
+        "canonical": "#d4b8ff",
+        "tonalRamp": [
+          "oklch(15.0% 0.102 302.3)",
+          "oklch(26.4% 0.102 302.3)",
+          "oklch(37.9% 0.102 302.3)",
+          "oklch(49.3% 0.102 302.3)",
+          "oklch(60.7% 0.102 302.3)",
+          "oklch(72.1% 0.102 302.3)",
+          "oklch(83.6% 0.102 302.3)",
+          "oklch(95.0% 0.102 302.3)"
+        ]
+      },
+      "ansi-14": {
+        "role": "neutral",
+        "displayName": "Terminal Bright Cyan",
+        "canonical": "#b4ecfd",
+        "tonalRamp": [
+          "oklch(15.0% 0.061 218.4)",
+          "oklch(26.4% 0.061 218.4)",
+          "oklch(37.9% 0.061 218.4)",
+          "oklch(49.3% 0.061 218.4)",
+          "oklch(60.7% 0.061 218.4)",
+          "oklch(72.1% 0.061 218.4)",
+          "oklch(83.6% 0.061 218.4)",
+          "oklch(95.0% 0.061 218.4)"
+        ]
+      },
+      "ansi-15": {
+        "role": "neutral",
+        "displayName": "Terminal Bright White",
+        "canonical": "#f4f6fa",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 264.5)",
+          "oklch(26.4% 0.006 264.5)",
+          "oklch(37.9% 0.006 264.5)",
+          "oklch(49.3% 0.006 264.5)",
+          "oklch(60.7% 0.006 264.5)",
+          "oklch(72.1% 0.006 264.5)",
+          "oklch(83.6% 0.006 264.5)",
+          "oklch(95.0% 0.006 264.5)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The title of a side panel, and the one line of the empty office."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "The agent's name on the band."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Sentences and fields. A desk's name at weight 600, a menu item at 600 to 650."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "A toast, a notice, the list of keys. A form label and an option in a choice at weight 650."
+      },
+      "note": {
+        "displayName": "Note",
+        "purpose": "The hint under a field, a note in a panel, the second line of a menu item."
+      },
+      "sign": {
+        "displayName": "Sign",
+        "purpose": "A room's sign: the folder's name with a slash after it. The wordmark is the same voice at 15px."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "The words on a button."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "The counts in the top bar, the head count on a sign, a version number."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "The lowercase line under a desk's name: dot, word, how long, program tag. 11px in a pane's header and in the list."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "The uppercase heads of the sections inside a panel, and \"also waiting\" on the band."
+      },
+      "terminal": {
+        "displayName": "Terminal",
+        "purpose": "A program's own screen. The user can step it between 9 and 24px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 32px -10px rgba(0, 0, 0, 0.62)",
+        "purpose": "What floats: a menu, the toast, the find bar, the note while files are dragged over a pane, and the side panel when it lies over terminals."
+      },
+      {
+        "name": "ground",
+        "value": "an ellipse filled rgba(0, 0, 0, 0.45), drawn under each desk",
+        "purpose": "Furniture standing on the floor. Part of the drawing, not a box shadow."
+      },
+      {
+        "name": "spill",
+        "value": "an ellipse in the screen's colour at 16% opacity, blurred 6px",
+        "purpose": "The light of a screen falling on the desk: blue at work, amber, green or red by status, grey when idle or starting, none when away."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Every state change: an exponential ease-out from an already visible default."
+      },
+      {
+        "name": "quick",
+        "value": "180ms",
+        "purpose": "Hover and press on controls and desks, a menu unfolding."
+      },
+      {
+        "name": "settle",
+        "value": "240ms",
+        "purpose": "The band dropping in, the side panel arriving, the toast rising, a tag popping over a desk."
+      },
+      {
+        "name": "beat",
+        "value": "320ms",
+        "purpose": "The shared clock that switches people between fixed poses. Off while the window is hidden or under reduced motion."
+      },
+      {
+        "name": "blink",
+        "value": "130ms every 4300ms",
+        "purpose": "Working and idle people blink."
+      },
+      {
+        "name": "walk-in",
+        "value": "720ms, once",
+        "purpose": "A new agent walks to their chair. Never on window open."
+      },
+      {
+        "name": "found",
+        "value": "1.4s, once",
+        "purpose": "The ring of ink on a desk found from a count in the top bar."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "bar-key-hints-hide",
+        "value": "860px"
+      },
+      {
+        "name": "terminals-or-panel-take-the-window",
+        "value": "760px"
+      },
+      {
+        "name": "band-on-one-line",
+        "value": "720px"
+      },
+      {
+        "name": "wordmark-and-counts-hide",
+        "value": "620px"
+      },
+      {
+        "name": "bar-buttons-shorten",
+        "value": "520px"
+      },
+      {
+        "name": "desks-in-rows",
+        "value": "560px (width of the floor, a container query)"
+      },
+      {
+        "name": "desks-lose-their-line",
+        "value": "340px (width of the floor, a container query)"
+      },
+      {
+        "name": "floor-as-a-list",
+        "value": "300px (width the floor was dragged to, beside terminals)"
+      },
+      {
+        "name": "pane-header-drops-place-and-tag",
+        "value": "430px (width of the pane's header, a container query)"
+      },
+      {
+        "name": "pane-header-drops-time",
+        "value": "260px (width of the pane's header, a container query)"
+      },
+      {
+        "name": "smallest-window",
+        "value": "340px by 420px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action of a place: new agent, Start agent, Carry on.",
+      "html": "<button class=\"ds-btn\">+ new agent <kbd>n</kbd></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border-radius: 7px; font: 650 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: nowrap; cursor: pointer; transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid transparent; background: var(--button, #e7eaf0); color: var(--button-ink, #0a0c0f); } .ds-btn:hover { background: var(--button-hover, #ffffff); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; } .ds-btn kbd { padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font: 500 0.6875rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; opacity: 0.6; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "The action beside a primary one: back to the floor, Cancel, Browse, Dismiss.",
+      "html": "<button class=\"ds-btn-quiet\">back to the floor <kbd>ctrl `</kbd></button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border-radius: 7px; font: 650 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: nowrap; cursor: pointer; transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid var(--wall, #252b33); background: transparent; color: var(--ink, #e7eaf0); } .ds-btn-quiet:hover { background: var(--inset, #1b1f25); } .ds-btn-quiet:active { transform: translateY(1px); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; } .ds-btn-quiet kbd { padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font: 500 0.6875rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; opacity: 0.6; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Only inside the box that asks before a busy agent is stopped, restarted or removed.",
+      "html": "<button class=\"ds-btn-danger\">Remove</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border-radius: 7px; font: 650 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: nowrap; cursor: pointer; transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid currentColor; background: transparent; color: var(--trouble-ink, #ff7b73); } .ds-btn-danger:hover { background: var(--trouble-wash, #2a1416); } .ds-btn-danger:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Anything typed into. The edge holds 3:1 against the fill and the panel.",
+      "html": "<input class=\"ds-field\" placeholder=\"The project they work in\" />",
+      "css": ".ds-field { display: block; box-sizing: border-box; width: 260px; min-height: 34px; padding: 7px 12px; border: 1px solid var(--field-line, #66707d); border-radius: 7px; background: var(--inset, #1b1f25); color: var(--ink, #e7eaf0); font: 400 0.875rem/1.4 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; } .ds-field::placeholder { color: var(--ink-3, #808a98); opacity: 1; } .ds-field:hover { border-color: var(--ink-2, #a0a8b4); } .ds-field:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 0; border-color: var(--focus, #e7eaf0); }"
+    },
+    {
+      "name": "Choice",
+      "kind": "input",
+      "refersTo": "choice",
+      "description": "One of a few, held in a single control: which program takes the task, which editor opens files.",
+      "html": "<div class=\"ds-pick\" role=\"radiogroup\" aria-label=\"Who should take it?\"><label class=\"ds-on\"><input type=\"radio\" name=\"ds-pick\" checked />Claude Code</label><label><input type=\"radio\" name=\"ds-pick\" />Codex</label><label><input type=\"radio\" name=\"ds-pick\" />Gemini CLI</label></div>",
+      "css": ".ds-pick { display: flex; flex-wrap: wrap; gap: 3px; width: 320px; padding: 3px; border: 1px solid var(--field-line, #66707d); border-radius: 7px; background: var(--inset, #1b1f25); } .ds-pick label { display: grid; flex: 1 1 auto; min-height: 28px; padding: 0 12px; place-items: center; border-radius: 4px; color: var(--ink-2, #a0a8b4); font: 650 0.8125rem/1.4 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; white-space: nowrap; cursor: pointer; } .ds-pick label:hover { color: var(--ink, #e7eaf0); } .ds-pick label.ds-on, .ds-pick label:has(input:checked) { background: var(--button, #e7eaf0); color: var(--button-ink, #0a0c0f); } .ds-pick label:has(input:focus-visible) { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; } .ds-pick input { position: absolute; opacity: 0; pointer-events: none; }"
+    },
+    {
+      "name": "Status And Program Tag",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Every status is a dot and its word; away and starting are a hollow ring. Which program an agent is, is a word in a tag.",
+      "html": "<div class=\"ds-states\"><span class=\"ds-status ds-needs\"><i></i>needs you</span><span class=\"ds-status ds-working\"><i></i>working</span><span class=\"ds-status ds-done\"><i></i>done</span><span class=\"ds-status ds-trouble\"><i></i>trouble</span><span class=\"ds-status\"><i></i>idle</span><span class=\"ds-status ds-away\"><i></i>away</span><span class=\"ds-tag\">claude</span></div>",
+      "css": ".ds-states { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; width: 320px; } .ds-status { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-2, #a0a8b4); font: 400 11.5px/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: nowrap; } .ds-status i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--quiet, #808a98); } .ds-needs { color: var(--needs, #ffb224); font-weight: 600; } .ds-needs i { background: var(--needs, #ffb224); } .ds-working i { background: var(--work, #82aaff); } .ds-done i { background: var(--done, #3ccf91); } .ds-trouble { color: var(--trouble-ink, #ff7b73); } .ds-trouble i { background: var(--trouble, #ff5f56); } .ds-away i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--quiet, #808a98); } .ds-tag { padding: 0 6px; border: 1px solid var(--wall, #252b33); border-radius: 5px; color: var(--ink-2, #a0a8b4); font: 400 11px/1.6 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; text-transform: lowercase; white-space: nowrap; }"
+    },
+    {
+      "name": "The Band",
+      "kind": "custom",
+      "refersTo": "band",
+      "description": "Exists only while an agent waits whose terminal is not in front: who, which program, where, and the one way to their terminal.",
+      "html": "<div class=\"ds-band\"><div class=\"ds-band-who\"><span>needs you · 48 sec</span><strong>Fix the checkout total</strong></div><p><code>claude</code> is waiting for your answer <em>in shop · fix/checkout-total</em></p><button class=\"ds-band-go\">open their terminal</button></div>",
+      "css": ".ds-band { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px 10px 18px; background: var(--needs, #ffb224); color: var(--needs-ink, #140e00); font: 400 0.875rem/1.4 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; } .ds-band-who { display: grid; gap: 2px; } .ds-band-who span { font: 600 11.5px/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; } .ds-band-who strong { font-size: 1rem; font-weight: 650; line-height: 1.25; } .ds-band p { flex: 1 1 260px; margin: 0; } .ds-band code { padding: 2px 6px; border-radius: 4px; background: rgba(20, 14, 0, 0.12); font: 400 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; } .ds-band em { margin-left: 6px; font: 400 0.75rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; opacity: 0.7; } .ds-band-go { height: 34px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--needs-ink, #140e00); color: var(--needs, #ffb224); font: 600 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; text-transform: lowercase; cursor: pointer; } .ds-band-go:hover { background: #2a1f04; } .ds-band-go:focus-visible { outline: 2px solid var(--needs-ink, #140e00); outline-offset: 2px; }"
+    },
+    {
+      "name": "Desk Nameplate",
+      "kind": "custom",
+      "refersTo": "desk",
+      "description": "Under every drawing: the name, the status line with how long and which program, and a line or two about what is going on. This one's terminal is open.",
+      "html": "<button type=\"button\" class=\"ds-plate\"><span class=\"ds-plate-name\">Refactor auth middleware</span><span class=\"ds-plate-status\"><span><i></i>working</span><span class=\"ds-plate-since\">12 min</span><span class=\"ds-plate-tag\">codex</span></span><span class=\"ds-plate-doing\">Working</span></button>",
+      "css": ".ds-plate { display: grid; gap: 4px; width: 220px; padding: 8px 12px 12px; border: 0; border-radius: 10px; background: rgba(130, 170, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(130, 170, 255, 0.24); text-align: left; cursor: pointer; font-family: 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; } .ds-plate:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; } .ds-plate-name { color: var(--ink, #e7eaf0); font-size: 0.875rem; font-weight: 600; line-height: 1.25; } .ds-plate-status { display: flex; align-items: center; gap: 7px; color: var(--ink-2, #a0a8b4); font: 400 11.5px/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; } .ds-plate-status > span:first-child { display: inline-flex; align-items: center; gap: 7px; } .ds-plate-status i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--work, #82aaff); } .ds-plate-since { color: var(--ink-3, #808a98); } .ds-plate-tag { margin-left: auto; padding: 0 6px; border: 1px solid var(--wall, #252b33); border-radius: 5px; color: var(--ink-2, #a0a8b4); font: 400 11px/1.6 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; text-transform: lowercase; white-space: nowrap; } .ds-plate-doing { color: var(--ink-3, #808a98); font-size: 12.5px; line-height: 1.35; }"
+    },
+    {
+      "name": "Room",
+      "kind": "card",
+      "refersTo": "room",
+      "description": "One per project: graphite under a faint grid inside a 1px wall, with a sign and an empty desk for adding someone.",
+      "html": "<section class=\"ds-room\"><h3>shop<span>/</span> <small>3 agents</small></h3><button type=\"button\" class=\"ds-spare\"><i><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M8 3v10M3 8h10\"/></svg></i>add an agent</button></section>",
+      "css": ".ds-room { width: 280px; padding: 12px 14px 14px; border: 1px solid var(--wall, #252b33); border-radius: 12px; background: linear-gradient(var(--grid, rgba(255, 255, 255, 0.028)) 1px, transparent 1px) 0 0 / 28px 28px, linear-gradient(90deg, var(--grid, rgba(255, 255, 255, 0.028)) 1px, transparent 1px) 0 0 / 28px 28px, var(--carpet, #111418); } .ds-room h3 { margin: 0 0 6px; padding: 0 6px; color: var(--ink, #e7eaf0); font: 600 0.875rem/1.3 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; } .ds-room h3 span { color: var(--ink-3, #808a98); } .ds-room small { margin-left: 8px; color: var(--ink-3, #808a98); font-size: 0.75rem; font-weight: 400; } .ds-spare { display: grid; gap: 8px; place-content: center; justify-items: center; width: 100%; min-height: 120px; padding: 12px; border: 1px dashed var(--wall, #252b33); border-radius: 10px; background: transparent; color: var(--ink-3, #808a98); font: 400 0.8125rem/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; cursor: pointer; transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-spare:hover, .ds-spare:focus-visible { border-color: var(--field-line, #66707d); background: rgba(255, 255, 255, 0.025); color: var(--ink, #e7eaf0); } .ds-spare i { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--wall, #252b33); border-radius: 9px; } .ds-spare svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }"
+    },
+    {
+      "name": "Pane Header",
+      "kind": "custom",
+      "refersTo": "pane-header",
+      "description": "Where the office's part of a terminal ends: name, status, how long, where, and which program. The line of ink along the top says the keyboard goes here.",
+      "html": "<header class=\"ds-pane\"><div><strong>Refactor auth middleware</strong><span><i></i>working · 12 min · shop · refactor/auth</span></div><em>codex</em><button type=\"button\" aria-label=\"Put this terminal away\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M3.5 3.5l9 9M12.5 3.5l-9 9\"/></svg></button></header>",
+      "css": ".ds-pane { display: flex; align-items: center; gap: 8px; width: 360px; padding: 7px 8px 7px 10px; border-top: 2px solid var(--ink, #e7eaf0); border-bottom: 1px solid var(--line, #20252c); background: var(--panel, #13161a); font-family: 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; } .ds-pane div { display: grid; flex: 1; gap: 2px; min-width: 0; } .ds-pane strong { color: var(--ink, #e7eaf0); font-size: 13.5px; font-weight: 600; line-height: 1.25; } .ds-pane span { display: flex; align-items: center; gap: 6px; color: var(--ink-3, #808a98); font: 400 11px/1.4 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: nowrap; } .ds-pane i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--work, #82aaff); } .ds-pane em { font-style: normal; padding: 0 6px; border: 1px solid var(--wall, #252b33); border-radius: 5px; color: var(--ink-2, #a0a8b4); font: 400 11px/1.6 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace; text-transform: lowercase; white-space: nowrap; } .ds-pane button { display: grid; flex: none; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2, #a0a8b4); cursor: pointer; } .ds-pane button:hover { background: var(--inset, #1b1f25); color: var(--ink, #e7eaf0); } .ds-pane button:focus-visible { outline: 2px solid var(--focus, #e7eaf0); outline-offset: 2px; } .ds-pane svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }"
+    },
+    {
+      "name": "Menu",
+      "kind": "custom",
+      "refersTo": "menu-sheet",
+      "description": "A desk's or a terminal's menu: each item a name with a quiet line under it. One of the few things that float.",
+      "html": "<div class=\"ds-menu\" role=\"menu\"><button type=\"button\" role=\"menuitem\">Open beside the others<span>Ctrl+Enter, or Ctrl and a click</span></button><button type=\"button\" role=\"menuitem\">Rename<span>F2</span></button><hr /><button type=\"button\" role=\"menuitem\" class=\"ds-menu-danger\">Remove this desk<span>Ends their program; Undo for a moment. Delete</span></button></div>",
+      "css": ".ds-menu { display: grid; gap: 2px; width: 280px; padding: 8px; border: 1px solid var(--line, #20252c); border-radius: 10px; background: var(--panel, #13161a); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 32px -10px rgba(0, 0, 0, 0.62); } .ds-menu button { display: grid; padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink, #e7eaf0); font: 600 0.875rem/1.4 'Geist Variable', 'Segoe UI', system-ui, -apple-system, sans-serif; text-align: left; cursor: pointer; } .ds-menu button:hover, .ds-menu button:focus-visible { background: var(--inset, #1b1f25); outline: none; } .ds-menu span { color: var(--ink-3, #808a98); font-size: 0.75rem; font-weight: 400; line-height: 1.35; } .ds-menu .ds-menu-danger { color: var(--trouble-ink, #ff7b73); } .ds-menu hr { margin: 4px 0; border: 0; border-top: 1px solid var(--line, #20252c); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Raised Hand",
+    "overview": "The window is an office after hours. Each project is a graphite room on a faint grid, each agent is a person at a matte desk, and the only bright things are their screens and the one colour that means \"needs you\". How a person sits says how their program is doing. Almost all of it is dark and quiet, and it is drawn that way on purpose: when an agent needs an answer an arm goes up and waves, an amber tag with a question mark pops over the desk, the screen turns amber, and a band in the same amber runs across the top of the window with one button on it, the way to their terminal. One raised hand in a dark room cannot be missed.\n\nThe office draws people and furniture. It does not draw work. Every agent is a real command-line program in a terminal pane, and what it says, asks and shows is its own screen, in the sixteen colours a program asks for by number. The office's part of a pane ends at its header: a face, a name, a status and a program tag. There is no conversation view, no diff and no Approve button of the office's own, because the program already has them.\n\nEverything the office does draw is flat vector, made in code: a desk is a few rounded rectangles, a person is a head, a torso and two arms. People are told apart by skin, hair, clothes, what is on their head and what is on their desk, all picked from one stable number, so the same agent always looks the same. The look is dark only; there is no day theme. Density is low on the floor and tight beside the terminals, where the floor can shrink to a strip of names. The owner's references are a virtual office like Gather for the floor and BridgeSpace for the grid of terminals.",
+    "keyCharacteristics": [
+      "A room of people, not a table of rows: a status is a pose, a screen, a word and a dot, together.",
+      "One loud colour for one meaning: amber is \"needs you\".",
+      "Dark only: graphite surfaces a few steps apart, and light that comes from screens.",
+      "Two voices of type: Geist for names and sentences, Geist Mono for the office's signs, status, tags, buttons and keys.",
+      "A terminal belongs to its program. The office gives it a background, a selection colour and sixteen colours, and draws nothing in it.",
+      "Movement is a few fixed poses on a shared beat; nothing moves while the window is hidden."
+    ],
+    "rules": [
+      {
+        "name": "The Four Meanings Rule",
+        "body": "In what the office draws, amber, done green, trouble red and screen blue each mean one thing and are used for nothing else. Nobody is dressed in amber, green or red. Selected text takes a shade of the room (`select`), never amber. The mark for something new in a terminal, and the one for an update being out, is a dot of ink. Which program an agent is, is a word in a tag, never a colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Word And Shape Rule",
+        "body": "A status is never colour alone. Each has a word (Needs you, Working, Done, Idle, Trouble, Starting, Away), a pose, something on the screen, and a 7px dot, which is a hollow ring for Away and Starting. The dot never appears without its word.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink Shade Rule",
+        "body": "Red has one shade for shapes and a lighter one for words: `trouble` for a dot, a tag and a screen, `trouble-ink` for anything that is read. On amber, everything is `needs-ink`. Text is held to 4.5:1 and marks and field edges to 3:1 on every surface they sit on; the tightest pairs of tokens are `ink-3` on `inset` at 4.7:1 and `field-line` on `inset` at 3.3:1. Two small labels fall short as built, because they are also dimmed with opacity: the `ctrl ↵` hint at the foot of the New agent form (2.7:1) and the \"get\" beside a program that is not installed yet (3.5:1).",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Voices Rule",
+        "body": "Geist Mono is the office speaking as a building: signs, counts, status, program tags, buttons, keys, commands, paths and versions. Geist is for what a person named or reads as a sentence: an agent's name, a panel's title, a description, a form label, a menu item.",
+        "section": "typography"
+      },
+      {
+        "name": "The Numbers Hold Still Rule",
+        "body": "Numerals are tabular everywhere, so a running time does not shift the words beside it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Stand On The Floor Rule",
+        "body": "Things in a room stand on a drawn shadow. A box shadow is for something that floats above the window, and it is always the same one.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Light Is Light Rule",
+        "body": "Nothing glows to show that it is selected, pressed or important. The only glow in the window is light from a screen or a lamp. State is shown with a fill, a 1px line or a 2px ring.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep amber for \"needs you\" alone: the band, the \"?\" tag, the waiting screen and its light, the words and their dot, the dot beside the count in the bar.",
+      "**Do** give every status its word, its dot, its pose and its screen.",
+      "**Do** use `trouble-ink` for red words and `trouble` for red shapes, and check new text at 4.5:1 on `inset`, the lightest surface it can sit on.",
+      "**Do** set the office's own fixtures (signs, counts, status, tags, buttons, keys, commands) in Geist Mono, and names and sentences in Geist.",
+      "**Do** draw furniture and people from rounded rectangles, circles and round-ended strokes in flat fills, standing on the drawn ground shadow.",
+      "**Do** make loops out of two to four fixed poses on the shared beat, and stop them while the window is hidden or the system asks for less motion.",
+      "**Do** keep desks where they are on the floor. A change of status changes the person, not the seating; only the list beside the terminals gathers whoever is waiting at its top.",
+      "**Do** lead to the terminal. The band, a desk and a notification all end at the program's own screen.",
+      "**Do** say which program an agent is with a word in a tag.",
+      "**Do** put a menu, a toast or a bar that floats on `panel` with a 1px line, 10px corners and the one lift."
+    ],
+    "donts": [
+      "**Don't** draw again what a program already shows: no conversation, no diff, no question and no answer button of the office's own.",
+      "**Don't** dress anyone in amber, green or red, or use a status colour for decoration, for news or for telling programs apart.",
+      "**Don't** sort or filter the floor by status.",
+      "**Don't** use a running CSS animation for a loop; one restyles the page sixty times a second for as long as it exists.",
+      "**Don't** add box shadows to things that stand in a room, or make anything glow that is not light from a screen or a lamp.",
+      "**Don't** imitate wood, fabric or glass with gradients. The only gradients are the lines of a room's grid.",
+      "**Don't** style what is inside a terminal beyond its background, its selection and its sixteen colours.",
+      "**Don't** put a toast over the foot of a terminal, where a program shows its prompt and its choices.",
+      "**Don't** use a dialog where the side panel or a menu will do; asking before a busy agent is ended happens inside the menu that offered it."
+    ]
+  }
+}

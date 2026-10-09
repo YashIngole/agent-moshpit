@@ -1,0 +1,37 @@
+pty-proof, 2026-10-08, Windows 11 (10.0.26300), Claude Code 2.1.290, Codex 0.160.0, portable-pty 0.9.0
+
+The question: can one windowed app run Claude Code and Codex as its own children, each in a
+pseudo-terminal, without any of them getting a window (and so a taskbar button) of its own?
+
+The answer: yes.
+
+  check.ps1 -Commands "C:\Users\Yash\.local\bin\claude.exe","cmd.exe /d /c codex" -Hold 14
+
+--- what the proof started
+self 37224
+child 12240 C:\Users\Yash\.local\bin\claude.exe
+child 2312 cmd.exe /d /c codex
+--- processes under the proof (pid, parent, name)
+  5580   2312  node.exe
+  9192   5580  codex.exe
+  2312  37224  cmd.exe
+ 12240  37224  claude.exe
+ 30188  37224  conhost.exe
+ 36280  37224  conhost.exe
+ 37224  40248  pty-proof.exe
+--- visible windows owned by any of them
+(none)
+--- visible windows that were not there before, from anyone
+(none)
+--- left running afterwards
+(none)
+
+What each program drew into its pseudo-terminal (escape codes removed):
+
+  claude.exe, 1192 bytes: its own "Accessing workspace ... Is this a project you created or one
+  you trust?" screen, with "Yes, I trust this folder" and "Enter to confirm · Esc to cancel".
+
+  codex, 3130 bytes: ">_ OpenAI Codex (v0.160.0)", "loading", and its start-up drawing.
+
+Not covered here: drawing those bytes in a window (xterm.js), typing into them from a window,
+resizing, and attaching to a session that some other terminal started.

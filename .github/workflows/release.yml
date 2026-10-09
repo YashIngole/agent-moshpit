@@ -1,0 +1,70 @@
+# Builds installers for the three systems when a version tag is pushed, and
+# attaches them to a draft GitHub release. A person reads the draft and publishes it.
+#
+# The installers are not signed with a bought certificate, so Windows and macOS
+# warn the first time. The macOS app is signed ad hoc (see tauri.conf.json), which
+# is what lets it open at all on Apple Silicon.
+#
+# Assets are named without the version, so that
+# https://github.com/<owner>/<repo>/releases/latest/download/<name> always points
+# at the newest one. The download page (site/) links to those names.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          # Both Macs are built on Apple Silicon; the Intel one is cross-compiled.
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Linux packages Tauri needs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential patchelf file
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Agent Moshpit ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }}
+          releaseAssetNamePattern: 'agent-moshpit_[platform]_[arch][setup][ext]'

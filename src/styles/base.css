@@ -1,0 +1,285 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-md);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  /* A desktop app: text is selected on purpose, not by dragging across the floor. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+#app {
+  height: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Text a person may want to copy stays selectable. */
+.selectable,
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: auto;
+}
+
+/* Words for a screen reader, where the page already says the same thing with a shape. */
+.aloud {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Selected text takes a shade of the room. Amber is kept for "needs you". */
+::selection {
+  background: var(--select);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
+/* Scrollbars belong to the room, not to the browser. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--wall) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wall);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── controls shared across the app ─────────────────────────────────────── */
+
+.button {
+  font-family: var(--mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+  background: var(--button);
+  color: var(--button-ink);
+  font-weight: 650;
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  transition:
+    background var(--quick) var(--ease),
+    transform var(--quick) var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.55;
+}
+
+.button.quiet {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--wall);
+}
+
+.button.quiet:hover:not(:disabled) {
+  background: var(--inset);
+}
+
+.button.danger {
+  background: transparent;
+  color: var(--trouble-ink);
+  border-color: currentColor;
+}
+
+.button.danger:hover:not(:disabled) {
+  background: var(--trouble-wash);
+}
+
+.field {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px var(--s-3);
+  border: 1px solid var(--field-line);
+  border-radius: var(--r-1);
+  background: var(--inset);
+  color: var(--ink);
+  font-size: var(--t-md);
+}
+
+.field::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+
+.field:hover {
+  border-color: var(--ink-2);
+}
+
+.field:focus-visible {
+  outline-offset: 0;
+  border-color: var(--focus);
+}
+
+textarea.field {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--s-1);
+  font-size: var(--t-sm);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.hint {
+  margin-top: var(--s-1);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+.problem {
+  font-size: var(--t-sm);
+  color: var(--trouble-ink);
+}
+
+code,
+.code {
+  font-family: var(--mono);
+  font-size: 0.94em;
+}
+
+/* A status as a small mark beside its word. Each has its own look, so the colour is
+   never the only thing that says it: a ring for away, a hollow ring for starting. */
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--quiet);
+}
+.dot.needs_you {
+  background: var(--needs);
+}
+.dot.working {
+  background: var(--work);
+}
+.dot.done {
+  background: var(--done);
+}
+.dot.failed {
+  background: var(--trouble);
+}
+.dot.asleep,
+.dot.starting {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--quiet);
+}
+/* Someone at work: the mark breathes on the shared beat. */
+html[data-b2='1'] .dot.working {
+  opacity: 0.45;
+}
+html.still .dot.working {
+  opacity: 1;
+}
+
+/* A key to press, written beside what it does. */
+kbd {
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+/* When the window is hidden or the user asked for less motion, nothing moves (see lib/beat.ts).
+   It keeps moving while unfocused: that is when someone glances over at it. */
+html.still *,
+html.still *::before,
+html.still *::after {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

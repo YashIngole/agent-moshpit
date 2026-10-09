@@ -1,0 +1,67 @@
+# Checks on every push and pull request, on the three systems the app targets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Linux packages Tauri needs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Interface types
+        run: npm run check
+
+      - name: Interface unit tests
+        run: npm test
+
+      - name: Interface build
+        run: npm run build
+
+      # Uses the Chrome or Edge already on the runner; nothing is downloaded.
+      - name: Interface in a browser, with demo data
+        run: node tools/e2e/ui-demo.mjs
+
+      - name: Core lint
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Core tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Desktop build
+        run: npx tauri build --no-bundle

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Agent Moshpit",
+  "version": "0.2.0",
+  "identifier": "io.github.yashingole.agentmoshpit",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
+      "devCsp": "default-src 'self' 'unsafe-inline' ws://localhost:1420 http://localhost:1420 ipc: http://ipc.localhost data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "A small desktop office for coding agents",
+    "longDescription": "Claude Code, Codex and the rest, each in a terminal of its own inside one window, drawn as people at desks. You see who is working, who needs you and who is done.",
+    "homepage": "https://agentmoshpit.com",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Agent Moshpit contributors",
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

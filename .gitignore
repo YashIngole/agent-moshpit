@@ -1,0 +1,18 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.log
+.DS_Store
+Thumbs.db
+
+# impeccable working files that are local to one machine
+.impeccable/config.local.json
+.impeccable/questions/
+.impeccable/review/
+
+# Claude Code worktrees made in this checkout
+.claude/worktrees/
+
+# The app's own window with its demo data, built into the site by `npm run build:site`
+site/demo/

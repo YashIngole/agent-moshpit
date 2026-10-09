@@ -1,0 +1,11 @@
+[package]
+name = "pty-proof"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# A spike, built on its own: not part of the app.
+[workspace]
+
+[dependencies]
+portable-pty = "0.9"

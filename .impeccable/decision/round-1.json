@@ -1,0 +1,166 @@
+{
+  "title": "Choose Agent Moshpit's visual world",
+  "question": "The roll assigned Do Not Disturb. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Do Not Disturb",
+      "kicker": "THE ROLL",
+      "lineage": "hotel and office door hangers",
+      "thesis": "Every agent is a door, and its hanger tells you whether to knock.",
+      "palette": ["#0F2A2E", "#2C5A5E", "#F6B21B", "#EFE7DA", "#F0654A"],
+      "materials": ["die-cut cardstock", "flat print colour", "condensed capitals"],
+      "viewport": "A corridor of doors, one row per agent, hanger at the handle; anyone saying PLEASE KNOCK moves to the top.",
+      "risk": "A hanger holds two or three words, and the classic red-for-keep-out is given up so the loudest colour means 'needs you'.",
+      "raised": [
+        { "from": "challenger-crouwel", "raise": "Every hanger, row and gap snaps to one visible module." },
+        { "from": "challenger-monochrome", "raise": "Only hangers carry saturated colour; the rest of the shell stays on one petrol scale." },
+        { "from": "challenger-centre-rail", "raise": "Each state also has its own printed mark, so no status depends on colour alone." },
+        { "from": "challenger-guide-map", "raise": "When someone needs you, that zone owns the top of the window as one flat colour field." },
+        { "from": "challenger-datamatics", "raise": "A working agent shows a strip of its real recent tool calls, one bar per call, instead of a spinner." }
+      ],
+      "wireframe": {
+        "cols": 8,
+        "rows": 12,
+        "regions": [
+          { "label": "Agent Moshpit · 2 need you", "x": 0, "y": 0, "w": 8, "h": 1 },
+          { "label": "PLEASE KNOCK: question + Approve / Deny", "x": 0, "y": 1, "w": 8, "h": 3, "accent": true },
+          { "label": "doors: agent, what it is doing", "x": 0, "y": 4, "w": 6, "h": 6 },
+          { "label": "hangers", "x": 6, "y": 4, "w": 2, "h": 6, "accent": true },
+          { "label": "done today · New agent", "x": 0, "y": 10, "w": 8, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "The In/Out Board",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "office staff in/out boards with sliding pegs",
+      "thesis": "One board, four columns, a peg per agent: read down a column to see who needs you.",
+      "palette": ["#1E2327", "#D9DEE2", "#F2A900", "#35B26F", "#E5484D"],
+      "materials": ["enamel board", "sliding pegs", "engraved capitals"],
+      "viewport": "Names down the left; WORKING, NEEDS YOU, DONE and IDLE across the top; one peg sliding along each row.",
+      "risk": "The most familiar of the hand: close to a status table, the least playful, and tight in a narrow window.",
+      "wireframe": {
+        "cols": 8,
+        "rows": 12,
+        "regions": [
+          { "label": "Agent Moshpit", "x": 0, "y": 0, "w": 8, "h": 1 },
+          { "label": "agent names", "x": 0, "y": 1, "w": 3, "h": 9 },
+          { "label": "WORKING", "x": 3, "y": 1, "w": 1, "h": 9 },
+          { "label": "NEEDS YOU", "x": 4, "y": 1, "w": 2, "h": 9, "accent": true },
+          { "label": "DONE", "x": 6, "y": 1, "w": 1, "h": 9 },
+          { "label": "IDLE", "x": 7, "y": 1, "w": 1, "h": 9 },
+          { "label": "selected agent: question, reply", "x": 0, "y": 10, "w": 8, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-gate-board",
+      "label": "Gate Board",
+      "verdict": "competitive",
+      "lineage": "boarding passes and airport gate boards",
+      "thesis": "Agents are flights: the board reranks by urgency, and a changed row stays lit until you have seen it.",
+      "palette": ["#14161A", "#F2F2EE", "#FFC400", "#8A9099"],
+      "materials": ["fixed column grid", "tabular figures", "scannable block"],
+      "viewport": "A fixed-column board, most urgent first; opening an agent shows its boarding pass: task, repository, branch, model, elapsed.",
+      "case": "Fuses cleanly and equals the hangers on clarity, and travel suits the name. It is an airport, not an office, so it loses on the brief's own picture.",
+      "risk": "Reads as a status display for flights rather than a place where colleagues work.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board.webp",
+      "wireframe": {
+        "cols": 8,
+        "rows": 12,
+        "regions": [
+          { "label": "Agent Moshpit · departures", "x": 0, "y": 0, "w": 8, "h": 1 },
+          { "label": "AGENT", "x": 0, "y": 1, "w": 2, "h": 7 },
+          { "label": "TASK · REPO", "x": 2, "y": 1, "w": 4, "h": 7 },
+          { "label": "STATUS", "x": 6, "y": 1, "w": 2, "h": 7, "accent": true },
+          { "label": "boarding pass of the selected agent", "x": 0, "y": 8, "w": 8, "h": 4 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-guide-map",
+      "label": "Gardens Guide Map",
+      "verdict": "declined",
+      "lineage": "zoo and gardens visitor maps",
+      "thesis": "Each workspace is a swelling lobe of flat colour with its agents standing on it.",
+      "palette": ["#F5F1E4", "#8ED462", "#F5E211", "#FF705D", "#2BA0FF"],
+      "materials": ["flat colour lobes", "capsule controls"],
+      "viewport": "One green headland per repository, agents as markers on its coast, capsule controls in yellow and coral.",
+      "case": "The most playful of the hand, but one lobe per screen hides the other agents, and overshooting motion fights a status strip read in peripheral vision.",
+      "kept": "Colour committed at region scale, not sprinkled as accents.",
+      "risk": "A map shows where things are, not who needs you.",
+      "hero": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map-hero.webp"
+    },
+    {
+      "id": "challenger-centre-rail",
+      "label": "Centre-Rail Reference",
+      "verdict": "declined",
+      "lineage": "wide-margin reference editions",
+      "thesis": "Two short columns around a rail of keys, with notes bracketed in the margin.",
+      "palette": ["#EDE6D6", "#1C1B19", "#D8432B"],
+      "materials": ["one-pixel rules", "small roman type"],
+      "viewport": "Agents set as reference entries; a waiting question hangs in the margin, bracketed to its line.",
+      "case": "Loses both axes: bookish rather than an office, and small roman columns cannot be read in a sideways glance.",
+      "kept": "A full vocabulary of printed marks for state, so nothing depends on colour.",
+      "risk": "Reads as a document, not a workplace.",
+      "hero": "https://impeccable.style/worlds/cards/rw-centre-rail-reference-setting-hero.webp"
+    },
+    {
+      "id": "challenger-crouwel",
+      "label": "Grid Specimen",
+      "verdict": "declined",
+      "lineage": "Wim Crouwel's gridded type specimens",
+      "thesis": "Status words assembled cell by cell on a visible construction grid.",
+      "palette": ["#FFFFFF", "#1A1A1A", "#2F6BFF", "#E63329"],
+      "materials": ["construction grid", "cell-built letterforms"],
+      "viewport": "Monumental grid-built status words over a small grotesk list of agents.",
+      "case": "Fuses poorly: specimen-scale letterforms fight a dense agent list and a narrow window.",
+      "kept": "A strict visible module that every element snaps to.",
+      "risk": "Legibility drops fast at small sizes.",
+      "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp"
+    },
+    {
+      "id": "challenger-datamatics",
+      "label": "Datamatics",
+      "verdict": "declined",
+      "lineage": "Ryoji Ikeda's black-and-white data fields",
+      "thesis": "Agents as barcode columns in pure black and white.",
+      "palette": ["#000000", "#FFFFFF"],
+      "materials": ["barcode fields", "monospace numerics"],
+      "viewport": "A wall of hairline bars, one column per agent, numbers packed in the margin.",
+      "case": "Loses both axes: cold rather than a place to enjoy, bars cannot be read as status, and strobing is hostile in peripheral vision.",
+      "kept": "Activity drawn from real data: a strip of actual tool calls, not a spinner.",
+      "risk": "Unreadable at a glance.",
+      "hero": "https://impeccable.style/worlds/cards/ikeda-datamatics-hero.webp"
+    },
+    {
+      "id": "challenger-monochrome",
+      "label": "Monochrome Product",
+      "verdict": "declined",
+      "lineage": "neutral-scale software marketing pages",
+      "thesis": "Near-black on near-white with a single accent used sparingly.",
+      "palette": ["#FAFAF9", "#17181A", "#8B8D91", "#3B5BDB"],
+      "materials": ["neutral scale", "hairline borders"],
+      "viewport": "A quiet list of agents in one neutral scale with one accent.",
+      "case": "Fuses poorly: a claim-and-proof marketing form has no shape for a live floor, and one accent cannot separate four states.",
+      "kept": "Colour restraint: saturated colour appears only where it carries status.",
+      "risk": "Indistinguishable from any dashboard.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-monochrome-product-marketing-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": false },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard: pixel office",
+    "thesis": "A top-down pixel-art room with an animated character at every desk.",
+    "palette": ["#2B2D42", "#8D99AE", "#EDF2F4", "#EF233C", "#FFD166"],
+    "materials": ["pixel sprites", "tiled floor"],
+    "viewport": "The whole room in one view; a speech bubble appears over an agent that needs you.",
+    "risk": "Hermes Pixel Office and Agent Office already ship this for Hermes; Agent Moshpit would differ only by being a native app you can act from."
+  },
+  "steer": true
+}

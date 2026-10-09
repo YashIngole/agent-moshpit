@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Moshpit: a small office for your coding agents</title>
+    <meta name="description" content="A free desktop app for Windows, macOS and Linux. Claude Code, Codex and the rest run as the real programs, each in a terminal of its own inside one window, drawn as people at desks. One look tells you who is working, who is done and who needs you." />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://agentmoshpit.com/" />
+    <meta property="og:title" content="Agent Moshpit: a small office for your coding agents" />
+    <meta property="og:description" content="Claude Code, Codex and the rest, each in a terminal of its own inside one window, drawn as people at desks. Free, MIT, for Windows, macOS and Linux." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip" href="#download">Skip to the downloads</a>
+
+    <header class="bar">
+      <a class="brand" href="#top" aria-label="Agent Moshpit, top of the page">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="On this page">
+        <a href="#see">what you see</a>
+        <a href="#facts">the facts</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="#download">download</a>
+    </header>
+
+    <main id="top">
+      <section class="opening">
+        <h1>A small office for your coding agents.</h1>
+        <p class="lede">
+          Claude Code, Codex, Gemini CLI and the rest run as the real programs, each in a terminal of its own inside one window.
+          Each is drawn as a person at a desk, so one look tells you who is working, who is done, and who has a hand up because they need you.
+        </p>
+
+        <div class="get">
+          <a class="button big" id="get" href="#download">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13.5h10" /></svg>
+            <span id="get-words">Download</span>
+          </a>
+          <p class="also" id="also">Free and open source, for <a href="#windows">Windows</a>, <a href="#macos">macOS</a> and <a href="#linux">Linux</a>. <a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads</a></p>
+        </div>
+
+        <figure class="window" id="window">
+          <div class="glass">
+            <picture>
+              <source media="(max-width: 620px)" srcset="img/terminals-narrow.webp" width="840" height="1120" />
+              <img
+                src="img/terminals.webp"
+                width="2480"
+                height="1600"
+                alt="The Agent Moshpit window. On the left, the floor: agents drawn as people at desks, each with a name, a status and the program it is. Beside it, the terminals of the agents being watched, each headed by its agent. An amber band across the top names the one agent who needs you and offers to open their terminal."
+                fetchpriority="high"
+              />
+            </picture>
+          </div>
+          <figcaption>
+            <span class="tag">demo data</span>
+            <span id="window-words">The app's window. The amber band across the top says who needs you.</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="room" id="see" aria-labelledby="see-sign">
+        <div class="sign">
+          <h2 id="see-sign">what you see<span class="slash">/</span></h2>
+          <span>6 states</span>
+        </div>
+        <ul class="cast" aria-label="What each status looks like">
+          <li>
+            <img src="img/pose-needs.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b class="needs-word"><i class="dot needs"></i>needs you</b>
+            <span>A hand up. It has stopped on a question only you can answer.</span>
+          </li>
+          <li>
+            <img src="img/pose-working.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b><i class="dot work"></i>working</b>
+            <span>Typing, with code on the screen.</span>
+          </li>
+          <li>
+            <img src="img/pose-done.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b><i class="dot done"></i>done</b>
+            <span>Leaning back. It finished something you have not looked at yet.</span>
+          </li>
+          <li>
+            <img src="img/pose-idle.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b><i class="dot idle"></i>idle</b>
+            <span>Sitting at a prompt, with nothing to do.</span>
+          </li>
+          <li>
+            <img src="img/pose-trouble.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b><i class="dot trouble"></i>trouble</b>
+            <span>Hands on their head. The program stopped with an error.</span>
+          </li>
+          <li>
+            <img src="img/pose-away.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
+            <b><i class="dot away"></i>away</b>
+            <span>Asleep. Not running; the desk keeps where they left off.</span>
+          </li>
+        </ul>
+        <div class="split">
+          <div class="prose">
+            <h3>Their terminal is the real thing.</h3>
+            <p>
+              Click a desk and their terminal opens beside the floor. Everything under a pane's header is the program's own screen: its prompt, its slash commands, its approvals.
+              The office draws none of it. You answer a question where the program asks it.
+            </p>
+            <p>
+              Open as many as you like, side by side or in a grid. Close the window and the agents keep working; the tray icon and a notification tell you when one needs you.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="img/office.webp"
+              width="2480"
+              height="2242"
+              loading="lazy"
+              decoding="async"
+              alt="The floor by itself: three rooms, shop, api and infra, with seven agents at their desks. One has a hand up, one is leaning back with a green tick, one has their hands on their head beside a red screen, and one is asleep."
+            />
+            <figcaption><span class="tag">demo data</span> The floor by itself: a room for each project, a desk for each agent.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="room" id="facts" aria-labelledby="facts-sign">
+        <div class="sign">
+          <h2 id="facts-sign">the facts<span class="slash">/</span></h2>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Free</dt>
+            <dd>No price, no paid tier, no account to make.</dd>
+          </div>
+          <div>
+            <dt>MIT licensed</dt>
+            <dd>All of the source is <a href="https://github.com/YashIngole/agent-moshpit">on GitHub</a>. Read it, build it, change it.</dd>
+          </div>
+          <div>
+            <dt>Your own CLIs, your own sign-ins</dt>
+            <dd>It starts the <code>claude</code>, <code>codex</code> or <code>gemini</code> you already have, the way your terminal does. It keeps no API key and no model setting.</dd>
+          </div>
+          <div>
+            <dt>Sends nothing anywhere</dt>
+            <dd>No telemetry and no analytics. The one thing it asks the internet itself is whether npm has a newer version of your CLIs, and that <a href="https://github.com/YashIngole/agent-moshpit#what-it-sends">can be turned off</a>.</dd>
+          </div>
+          <div>
+            <dt>Thirteen programs, and yours</dt>
+            <dd>
+              <ul class="programs"><li>Claude Code</li><li>Codex</li><li>Gemini CLI</li><li>Hermes</li><li>OpenCode</li><li>Copilot CLI</li><li>Amp</li><li>Qwen Code</li><li>Crush</li><li>Cursor CLI</li><li>Aider</li><li>Goose</li><li>Droid</li></ul>
+              Add any other with <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/programs.md#adding-a-program-of-your-own">a few lines of JSON</a>.
+            </dd>
+          </div>
+          <div>
+            <dt>Where it has been used</dt>
+            <dd>On Windows 11, every day. The macOS and Linux builds pass the same automated checks and have not been used by hand yet. <a href="https://github.com/YashIngole/agent-moshpit/issues">Say what breaks</a>.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="room" id="download" aria-labelledby="download-sign">
+        <div class="sign">
+          <h2 id="download-sign">download<span class="slash">/</span></h2>
+          <span>3 systems</span>
+        </div>
+        <div class="systems">
+          <article class="system" id="windows" data-os="windows">
+            <h3>Windows</h3>
+            <p class="needs-os">Windows 11, 64-bit. Windows 10 should work and has not been tried.</p>
+            <ul class="files">
+              <li><a class="file" data-file="windows" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Installer</b><code>.exe</code></a></li>
+              <li><a class="file" data-file="windows-msi" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64.msi"><b>MSI package</b><code>.msi</code></a></li>
+            </ul>
+            <p class="first"><b>The first time:</b> Windows says it protected your PC. Choose <i>More info</i>, then <i>Run anyway</i>.</p>
+          </article>
+          <article class="system" id="macos" data-os="mac">
+            <h3>macOS</h3>
+            <p class="needs-os">macOS 10.15 or later.</p>
+            <ul class="files">
+              <li><a class="file" data-file="mac-arm" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_aarch64.dmg"><b>Apple Silicon</b><code>.dmg</code></a></li>
+              <li><a class="file" data-file="mac-intel" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_x64.dmg"><b>Intel</b><code>.dmg</code></a></li>
+            </ul>
+            <p class="first"><b>The first time:</b> macOS refuses to open it. Go to <i>System Settings</i>, <i>Privacy &amp; Security</i>, and choose <i>Open Anyway</i>.</p>
+          </article>
+          <article class="system" id="linux" data-os="linux">
+            <h3>Linux</h3>
+            <p class="needs-os">64-bit, with WebKitGTK 4.1.</p>
+            <ul class="files">
+              <li><a class="file" data-file="linux-appimage" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Any distribution</b><code>.AppImage</code></a></li>
+              <li><a class="file" data-file="linux-deb" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.deb"><b>Debian, Ubuntu</b><code>.deb</code></a></li>
+              <li><a class="file" data-file="linux-rpm" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_x86_64.rpm"><b>Fedora, openSUSE</b><code>.rpm</code></a></li>
+            </ul>
+            <p class="first"><b>The first time:</b> an AppImage has to be made runnable: <code>chmod +x</code> the file, then start it.</p>
+          </article>
+        </div>
+        <p class="after">
+          The installers are not signed with a paid certificate yet, which is why Windows and macOS ask the first time.
+          <a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads and the release notes</a> are on GitHub.
+          You also need at least one agent CLI, installed and signed in the way its makers say; the office can install the ones published on npm for you.
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program it can run.
+        This page sets no cookies and loads nothing from anyone else. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+
+    <script src="site.js" defer></script>
+  </body>
+</html>

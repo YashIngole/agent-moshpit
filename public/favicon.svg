@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The app icon, simplified to survive at 16 pixels. -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#15302E"/>
+  <rect x="19" y="27" width="26" height="18" rx="9" fill="#4C9BE8"/>
+  <circle cx="32" cy="23" r="10.5" fill="#F2C9A1"/>
+  <path d="M21.5 23a10.5 10.5 0 0 1 21 0c-2.6-4.2-6.1-6.4-10.5-6.4S24.1 18.8 21.5 23z" fill="#2B2B3A"/>
+  <rect x="10" y="38" width="44" height="15" rx="5" fill="#D0A06E"/>
+</svg>

@@ -160,7 +160,18 @@ mod tests {
             script
         };
         let editor = Editor { known: &KNOWN[0], found: harness::find(&program.to_string_lossy()).unwrap() };
-        editor.open(&file, Some(42)).unwrap();
+        // A file written a moment ago can be refused as "busy" on Linux: another test that
+        // starts a program at the same instant holds it open until its own program is running.
+        // An editor that was installed long ago never is, so this is the test's to wait out.
+        let mut opened = editor.open(&file, Some(42));
+        for _ in 0..100 {
+            if !matches!(&opened, Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            opened = editor.open(&file, Some(42));
+        }
+        opened.unwrap();
         let mut text = String::new();
         for _ in 0..100 {
             text = std::fs::read_to_string(&said).unwrap_or_default();

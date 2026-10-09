@@ -27,7 +27,7 @@ const until = async (ready, ms = 35000) => {
 }
 let app, browser, page
 try {
-  app = launch({ port: 9264, env: { MOSHPIT_INSTANCE: 'mcp-e2e', MOSHPIT_DATA_DIR: data, MOSHPIT_MCP_TEST_REPORT: report, MOSHPIT_UPDATE_URL: 'http://127.0.0.1:1/latest.json' } })
+  app = launch({ port: 9264, env: { MOSHPIT_INSTANCE: 'mcpe2e', MOSHPIT_DATA_DIR: data, MOSHPIT_MCP_TEST_REPORT: report, MOSHPIT_UPDATE_URL: 'http://127.0.0.1:1/latest.json' } })
   ;({ browser, page } = await attach(9264))
   await page.waitForSelector('.floor')
   const invoke = (command, args) => page.evaluate(async ({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args })
@@ -64,7 +64,7 @@ try {
 } finally {
   await browser?.close().catch(() => {})
   if (app?.child.pid) killTree(app.child.pid)
-  forgetAddress('mcp-e2e')
+  forgetAddress('mcpe2e')
   // Only this fixture's explicitly created temporary directory is removed.
   assert.ok(path.resolve(data).startsWith(path.resolve(os.tmpdir()) + path.sep))
   assert.ok(path.basename(data).startsWith('moshpit-mcp-desktop-'))

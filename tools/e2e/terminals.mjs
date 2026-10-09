@@ -19,7 +19,7 @@
 // The app runs as the named office `e2e`, with its own data folder. The clipboard
 // is read once and never written; nothing real is typed or clicked on the desktop.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
@@ -190,7 +190,10 @@ try {
   await page.mouse.up()
   await page.keyboard.up('Control')
   const asked = () => (existsSync(opened) ? readFileSync(opened, 'utf8') : '')
-  check('Ctrl and a click opens it in the editor on this computer, at its line', await until(() => asked().includes('-g') && asked().includes(`${path.join(work, 'src', 'app.ts')}:42`), 8000), asked())
+  // The editor receives a canonical path. Windows CI may give Node an 8.3
+  // TEMP alias, so compare the actual file path rather than that alias's spelling.
+  const expectedFile = `${realpathSync.native(path.join(work, 'src', 'app.ts'))}:42`
+  check('Ctrl and a click opens it in the editor on this computer, at its line', await until(() => asked().includes('-g') && asked().toLowerCase().includes(expectedFile.toLowerCase()), 8000), `expected ${expectedFile}; got ${asked()}`)
   await page.mouse.move(across.x + 10, across.y + across.height - 10)
 
   // ── a second agent; panes split, close and come back ─────────────────────

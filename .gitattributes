@@ -1,0 +1,2 @@
+# Scripts that are run by a Unix shell keep Unix line ends, whatever system checks them out.
+*.sh text eol=lf

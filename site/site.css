@@ -636,6 +636,70 @@ h3 {
   color: inherit;
   opacity: 0.66;
 }
+/* A command to paste, where one does the job of an installer. */
+.or {
+  margin-top: 16px;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+.or.first-way {
+  margin-top: 16px;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--wall);
+  border-radius: var(--r-1);
+  background: var(--bg);
+}
+.line code {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.line.usual {
+  border-color: var(--ink-3);
+}
+.copy {
+  flex: none;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--wall);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background var(--quick) var(--ease),
+    color var(--quick) var(--ease);
+}
+.copy:hover {
+  background: var(--inset);
+  color: var(--ink);
+}
+.line.usual .copy {
+  border-color: transparent;
+  background: var(--button);
+  color: var(--button-ink);
+  font-weight: 650;
+}
+.line.usual .copy:hover {
+  background: var(--button-hover);
+}
 .first {
   margin-top: 14px;
   color: var(--ink-3);

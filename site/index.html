@@ -185,7 +185,7 @@
           <span>3 systems</span>
         </div>
         <div class="systems">
-          <article class="system" id="windows" data-os="windows">
+          <article class="system" id="windows">
             <h3>Windows</h3>
             <p class="needs-os">Windows 11, 64-bit. Windows 10 is untried.</p>
             <ul class="files">
@@ -193,17 +193,18 @@
               <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64.msi"><b>MSI package</b><code>.msi</code></a></li>
             </ul>
             <p class="first"><b>The first time:</b> Windows says it protected your PC. Choose <i>More info</i>, then <i>Run anyway</i>.</p>
+            <p class="or">Or in PowerShell, which asks nothing:</p>
+            <div class="line"><code>irm https://agentmoshpit.com/install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" hidden>copy</button></div>
           </article>
-          <article class="system" id="macos" data-os="mac">
+          <article class="system" id="macos">
             <h3>macOS</h3>
-            <p class="needs-os">macOS 10.15 or later.</p>
-            <ul class="files">
-              <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_aarch64.dmg"><b>Apple Silicon</b><code>.dmg</code></a></li>
-              <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_x64.dmg"><b>Intel</b><code>.dmg</code></a></li>
-            </ul>
-            <p class="first"><b>The first time:</b> macOS refuses to open it. Go to <i>System Settings</i>, <i>Privacy &amp; Security</i>, and choose <i>Open Anyway</i>.</p>
+            <p class="needs-os">macOS 10.15 or later, Apple Silicon or Intel.</p>
+            <p class="or first-way">Paste this into Terminal:</p>
+            <div class="line usual"><code>curl -fsSL https://agentmoshpit.com/install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" hidden>copy</button></div>
+            <p class="first">It puts Agent Moshpit in Applications and opens it. The <a href="install.sh">script</a> is short, if you want to read it first.</p>
+            <p class="first">There is a .dmg too, for <a href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_aarch64.dmg">Apple Silicon</a> and for <a href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_x64.dmg">Intel</a>. macOS refuses to open an app from one until you allow it under <i>System Settings</i>, <i>Privacy &amp; Security</i>. The command has no such step.</p>
           </article>
-          <article class="system" id="linux" data-os="linux">
+          <article class="system" id="linux">
             <h3>Linux</h3>
             <p class="needs-os">64-bit, with WebKitGTK 4.1.</p>
             <ul class="files">
@@ -212,10 +213,12 @@
               <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_x86_64.rpm"><b>Fedora, openSUSE</b><code>.rpm</code></a></li>
             </ul>
             <p class="first"><b>The first time:</b> an AppImage has to be made runnable: <code>chmod +x</code> the file, then start it.</p>
+            <p class="or">Or in a terminal, which picks the right one:</p>
+            <div class="line"><code>curl -fsSL https://agentmoshpit.com/install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" hidden>copy</button></div>
           </article>
         </div>
         <p class="after">
-          The installers are not signed with a paid certificate yet, which is why Windows and macOS ask the first time.
+          The app is not signed with a paid certificate yet, which is why Windows asks the first time and why macOS is given a command instead of a file to click.
           <a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads and the release notes</a> are on GitHub.
           You also need at least one agent CLI, installed and signed in the way its makers say; the office can install the ones published on npm for you.
         </p>

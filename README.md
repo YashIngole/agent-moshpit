@@ -22,20 +22,21 @@ A small desktop office for coding agents. Claude Code, Codex, Antigravity CLI an
 
 ## Install
 
-Get the installer for your system from [agentmoshpit.com](https://agentmoshpit.com) or the [latest release](https://github.com/YashIngole/agent-moshpit/releases/latest):
+**macOS**, in Terminal:
 
-| System | File |
-| --- | --- |
-| Windows 11 | `agent-moshpit_windows_x64-setup.exe` (or the `.msi`) |
-| macOS, Apple Silicon | `agent-moshpit_darwin_aarch64.dmg` |
-| macOS, Intel | `agent-moshpit_darwin_x64.dmg` |
-| Linux | `.AppImage`, `.deb` or `.rpm` |
+```sh
+curl -fsSL https://agentmoshpit.com/install.sh | sh
+```
 
-The installers are not code-signed yet, so the first launch needs one extra step:
+**Windows**: the [installer](https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe) (on "Windows protected your PC", choose **More info**, then **Run anyway**), or in PowerShell, which asks nothing:
 
-- **Windows:** on "Windows protected your PC", choose **More info**, then **Run anyway**.
-- **macOS:** open **System Settings → Privacy & Security** and choose **Open Anyway**.
-- **Linux:** `chmod +x` the AppImage before running it.
+```powershell
+irm https://agentmoshpit.com/install.ps1 | iex
+```
+
+**Linux**: the [AppImage](https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage), [.deb](https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.deb) or [.rpm](https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_x86_64.rpm), or the same command as macOS, which picks the right one.
+
+The commands fetch the newest release from this repository, install it and open it; the scripts are [install.sh](site/install.sh) and [install.ps1](site/install.ps1). The app is not code-signed yet, which is why macOS gets a command: a `.dmg` is on the [releases page](https://github.com/YashIngole/agent-moshpit/releases/latest), but macOS refuses to open it until you allow it under **System Settings → Privacy & Security**. Once installed, the app offers its own updates.
 
 You also need at least one agent CLI, installed and signed in the way its makers describe. The app finds the ones you have and can install those published on npm.
 
@@ -68,6 +69,7 @@ Nothing about you or your work. It asks two questions about versions, when it st
 - [Programs](docs/programs.md): the CLIs it knows, and adding your own in `harnesses.json`
 - [Development](docs/development.md): building from source, how the code is laid out, tests
 - [Known limits](docs/limits.md)
+- [Code signing policy](docs/code-signing-policy.md), with what the app sends
 - [DESIGN.md](DESIGN.md) and [PRODUCT.md](PRODUCT.md): how it looks, and who it is for
 
 ## Building from source
@@ -81,6 +83,10 @@ npm run tauri build    # make an installer for the system you are on
 ```
 
 Tests and the layout of the code are in [development.md](docs/development.md).
+
+## Code signing policy
+
+The Windows installers are not signed yet. The project is applying for free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). Who may sign, what is signed and what the app sends are in the [code signing policy](docs/code-signing-policy.md).
 
 ## Licence
 

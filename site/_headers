@@ -21,3 +21,10 @@
 
 /demo/index.html
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+# The install scripts are read as text, by a shell and by a person.
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+
+/install.ps1
+  Content-Type: text/plain; charset=utf-8

@@ -1,11 +1,27 @@
-// agentmoshpit.com: one small thing, and the page is whole without it.
+// agentmoshpit.com: two small things, and the page is whole without either.
 //
-// The picture of the app at the top is replaced by the app's own window, running
-// here with its demo data (site/demo, made by `npm run build:site`).
+// 1. The picture of the app at the top is replaced by the app's own window, running
+//    here with its demo data (site/demo, made by `npm run build:site`).
+// 2. Each install command gets a button that copies it.
 //
 // This script sends nothing anywhere and stores nothing.
 ;(() => {
   'use strict'
+
+  // ── a command to paste: a button that copies it ──
+  for (const button of document.querySelectorAll('button.copy[data-copy]')) {
+    if (!navigator.clipboard) continue
+    button.hidden = false
+    button.addEventListener('click', () => {
+      navigator.clipboard.writeText(button.dataset.copy).then(
+        () => {
+          button.textContent = 'copied'
+          setTimeout(() => (button.textContent = 'copy'), 1600)
+        },
+        () => {}
+      )
+    })
+  }
 
   // ── the app itself, where the picture of it is ──
 

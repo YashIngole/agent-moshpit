@@ -368,6 +368,10 @@ try {
   const first = page.locator('.pane', { hasText: 'First' })
   await first.waitFor()
   if ((await page.locator('.pane').count()) > 1) await first.getByRole('button', { name: 'Give this terminal the room' }).click()
+  // The accessibility tree contains visible rows, not the whole scrollback.
+  // Give the held startup output enough height before checking its full replay.
+  await page.setViewportSize({ width: 1280, height: 1200 })
+  await until(async () => (await screen('First')).includes('TASK: say hello & goodbye'), 8000)
   check('an away desk shows what its terminal last showed', await shows('First', 'YOU SAID: ping', 8000), await screen('First').catch(e => String(e)))
   const lines = (await screen('First')).split('\n').map(text => text.trim()).filter(Boolean)
   const at = text => lines.indexOf(text)

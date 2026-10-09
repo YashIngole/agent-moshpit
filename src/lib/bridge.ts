@@ -4,7 +4,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
-import type { Editor, NewAgentSpec, Settings, Snapshot, StartupProblem } from './types'
+import type { Editor, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
 
 /**
  * What a terminal sends. `kept` is true for the first piece only: the screen as
@@ -82,6 +82,15 @@ export interface Bridge {
   /** Closing the window quits, or leaves the office in the tray. */
   setCloseQuits(on: boolean): void
   version(): Promise<string>
+  /** The newer version of the office that is out, when one is; and each time that changes. */
+  newer(): Promise<Newer | null>
+  onNewer(fn: (newer: Newer | null) => void): () => void
+  /**
+   * Put the newer version in place and start the office again. The core asks first when
+   * that would end someone's work: false is the user saying not now. It rejects with words
+   * for the user when the update could not be had, and nothing was changed.
+   */
+  updateNow(): Promise<boolean>
 }
 
 function subscribe<T>(name: string, fn: (payload: T) => void): () => void {
@@ -164,7 +173,10 @@ function tauriBridge(): Bridge {
     quit: () => void invoke('quit'),
     settings: () => invoke<Settings>('settings'),
     setCloseQuits: on => void invoke('set_close_quits', { on }),
-    version: () => invoke<string>('app_version')
+    version: () => invoke<string>('app_version'),
+    newer: () => invoke<Newer | null>('newer_version'),
+    onNewer: fn => subscribe<Newer | null>('office:newer', fn),
+    updateNow: () => invoke<boolean>('update_now')
   }
 }
 

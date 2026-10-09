@@ -16,6 +16,7 @@ mod pty;
 mod status;
 #[cfg(windows)]
 mod toast;
+mod update;
 
 use engine::{Handle, Shell};
 use model::{NewAgent, Phase, Snapshot};
@@ -466,10 +467,17 @@ fn say_still_running(app: &AppHandle) {
     let _ = std::fs::write(told, "");
 }
 
-fn quit_now(app: &AppHandle) {
+/// What has to be done before the office goes away, for good or to come back as a
+/// newer version: the window's place is kept, every program is ended, and the desks
+/// and their screens are saved.
+pub(crate) fn put_away(app: &AppHandle) {
     QUITTING.store(true, Ordering::Relaxed);
     app.state::<WindowMemory>().save();
     app.state::<Handle>().shutdown();
+}
+
+fn quit_now(app: &AppHandle) {
+    put_away(app);
     app.exit(0);
 }
 
@@ -735,6 +743,35 @@ fn quit(app: AppHandle) {
     request_quit(&app);
 }
 
+/// The newer version of the office that is out, when one is.
+#[tauri::command]
+fn newer_version(latest: State<'_, update::Latest>) -> Option<update::Newer> {
+    latest.newer.lock().unwrap().clone()
+}
+
+/// Put the newer version in place and start the office again, asking first when that
+/// would end someone's work. An error is words for the user, and nothing was changed.
+/// `Ok(false)` is the user saying not now.
+#[tauri::command]
+async fn update_now(app: AppHandle) -> Result<bool, String> {
+    if let Some(busy) = app.state::<Handle>().quit_words() {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.dialog()
+            .message(format!("The update restarts the office. {busy}"))
+            .title("Update Agent Moshpit?")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom("Update and restart".into(), "Not now".into()))
+            .show(move |go| {
+                let _ = tx.send(go);
+            });
+        if !rx.await.unwrap_or(false) {
+            return Ok(false);
+        }
+    }
+    update::install(&app).await.map(|()| true)
+}
+
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -783,6 +820,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             snapshot,
             new_agent,
@@ -810,6 +848,8 @@ pub fn run() {
             watch,
             open_page,
             quit,
+            newer_version,
+            update_now,
             app_version,
             pick_folder
         ])
@@ -872,6 +912,9 @@ pub fn run() {
             app.manage(StartupProblems(problems));
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
+
+            app.manage(update::Latest::default());
+            update::watch(app.handle());
 
             HAS_TRAY.store(build_tray(app.handle()).is_ok(), Ordering::Relaxed);
             // `--hidden` is for starting with the computer: tray only, no window.

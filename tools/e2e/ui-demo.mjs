@@ -605,6 +605,36 @@ try {
   check('the hint after putting a pane away points at Stop', await until(async () => ((await page.locator('.toast').textContent()) ?? '').includes('→ Stop')))
   await page.context().close()
 
+  // ── a newer version of the office itself ──
+  page = await open('demo=office&still')
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  check('with nothing newer out, the menu offers no update of the office', (await page.getByRole('menuitem', { name: /Update to/ }).count()) === 0)
+  await page.context().close()
+
+  page = await open('demo=office&still&update')
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  const offer = page.getByRole('menuitem', { name: /Update to 0\.3\.1/ })
+  check('a newer version of the office is offered first in the menu, beside the one you have', (await page.getByRole('menuitem').first().textContent())?.includes('Update to 0.3.1') && ((await offer.textContent()) ?? '').includes('You have 0.3.0'))
+  await offer.click()
+  check('choosing it asks the core for the update, once', await until(async () => (await page.evaluate(() => window.__demo.updates)) === 1))
+  check('and a "not now" is said, with the offer left in the menu', await until(async () => ((await page.locator('.toast').textContent()) ?? '').includes('Not updated')))
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  check('where it still is', (await page.getByRole('menuitem', { name: /Update to 0\.3\.1/ }).count()) === 1)
+  await page.context().close()
+
+  page = await open('demo=office&still&update=fails')
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Update to 0\.3\.1/ }).click()
+  check(
+    'an update that cannot be had says why, and where else to get it',
+    await until(async () => {
+      const said = (await page.locator('.toast').textContent()) ?? ''
+      return ['could not be fetched', 'Nothing was changed', 'agentmoshpit.com'].every(words => said.includes(words))
+    })
+  )
+  check('with a button to the download page', (await page.locator('.toast').getByRole('button', { name: 'Open the page' }).count()) === 1)
+  await page.context().close()
+
   check('nothing went wrong on the page', errors.length === 0, errors.join(' | '))
 } catch (error) {
   check('the checks ran to the end', false, error?.stack ?? error)

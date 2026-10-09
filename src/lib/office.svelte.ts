@@ -4,7 +4,7 @@ import { tick } from 'svelte'
 import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
 import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
-import type { Agent, Editor, Harness, Job, NewAgentSpec, Phase, Snapshot } from './types'
+import type { Agent, Editor, Harness, Job, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 
 /** The side panel, when there is one. Terminals are not a panel: they are the room. */
 export type Panel = { kind: 'new'; cwd: string; harness: string } | { kind: 'programs' } | { kind: 'keys' } | null
@@ -154,6 +154,9 @@ class Office {
   copyOnSelect = $state(REMEMBERED.copySelect)
   /** Closing the window quits, rather than leaving the office in the tray. Kept by the core. */
   closeQuits = $state(false)
+  /** A newer version of the office that is out, and whether it is being fetched right now. */
+  newer = $state<Newer | null>(null)
+  updating = $state(false)
   #problem = $state('')
   /** Something that could not be done, said once. */
   get problem() {
@@ -262,6 +265,10 @@ class Office {
       s => (this.closeQuits = s.close_quits),
       () => {}
     )
+    void bridge.newer().then(
+      newer => (this.newer = newer),
+      () => {}
+    )
     void bridge.startupProblems().then(
       problems => {
         if (problems.length === 0) return
@@ -280,7 +287,7 @@ class Office {
         () => {}
       )
     takeOpening()
-    const stops = [bridge.onSnapshot(s => this.#take(s)), bridge.onNewAgent(() => this.openNew()), bridge.onOpenDesk(takeOpening)]
+    const stops = [bridge.onSnapshot(s => this.#take(s)), bridge.onNewAgent(() => this.openNew()), bridge.onOpenDesk(takeOpening), bridge.onNewer(newer => (this.newer = newer))]
     const onVisibility = () => {
       this.#syncClock()
       this.#report()
@@ -532,6 +539,24 @@ class Office {
   setCloseQuits(on: boolean) {
     this.closeQuits = on
     bridge.setCloseQuits(on)
+  }
+
+  /**
+   * Fetch the newer version and start the office again as it. The core asks first when
+   * anyone is busy. If it cannot be had, that is said, with the way to get it by hand.
+   */
+  async updateOffice() {
+    const newer = this.newer
+    if (!newer || this.updating) return
+    this.updating = true
+    this.say(`Getting version ${newer.version}. The office starts again when it is in place.`, undefined, 120_000)
+    try {
+      if (!(await bridge.updateNow())) this.say('Not updated. It stays in the menu for when you are ready.')
+    } catch (why) {
+      this.say(`${typeof why === 'string' ? why : 'The update could not be had.'} It can also be downloaded from agentmoshpit.com.`, { label: 'Open the page', run: () => bridge.openPage('https://agentmoshpit.com/#download') }, 20_000)
+    } finally {
+      this.updating = false
+    }
   }
 
   setCopyOnSelect(on: boolean) {

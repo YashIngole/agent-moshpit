@@ -15,7 +15,9 @@ npm run tauri build -- --debug --no-bundle     # only the program, with debuggin
 
 The last one leaves `agent-moshpit.exe` in `src-tauri/target/debug`, or in `debug` under your cargo target folder if you have set one. The installers are not signed, so Windows and macOS will warn the first time. The macOS app is signed ad hoc, with no certificate, which is what lets it open at all on Apple Silicon.
 
-A release is made by pushing a tag: `.github/workflows/release.yml` builds the installers for the three systems and attaches them to a draft release, which a person reads and publishes.
+A release is made by pushing a tag: `.github/workflows/release.yml` builds the installers for the three systems and attaches them to a draft release, which a person reads and publishes. The draft's text is `docs/releases/<tag>.md`.
+
+The same run signs what an installed office updates itself from, with the app's own update key (the repository secret `TAURI_SIGNING_PRIVATE_KEY`; its public half is in `tauri.conf.json`), and writes `latest.json`, which a running office reads to learn that a newer version is out. That signing is asked for by `src-tauri/tauri.release.conf.json`, which only the release run uses, so a build on your own computer needs no key. The key has nothing to do with Windows or Apple code signing.
 
 Start the app with `--hidden` to go straight to the tray, for example from a start-up entry.
 

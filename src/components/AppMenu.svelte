@@ -42,10 +42,24 @@
 <div class="menu" bind:this={root} onkeydown={onKey} role="presentation">
   <button type="button" class="more" aria-label="More" aria-haspopup="menu" aria-expanded={open} onclick={() => (open ? close() : (open = true))}>
     <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
-    {#if office.outdated.length > 0}<i class="news" title="Updates are out"></i>{/if}
+    {#if office.outdated.length > 0 || office.newer}<i class="news" title="Updates are out"></i>{/if}
   </button>
   {#if open}
     <div class="sheet" role="menu">
+      {#if office.newer}
+        <button
+          type="button"
+          role="menuitem"
+          disabled={office.updating}
+          onclick={() => {
+            close()
+            void office.updateOffice()
+          }}
+        >
+          Update to {office.newer.version}
+          <span>{office.updating ? 'On its way' : `You have ${version}. The office starts again; agents carry on where their programs can`}</span>
+        </button>
+      {/if}
       <button
         type="button"
         role="menuitem"

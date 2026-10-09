@@ -7,6 +7,11 @@
 # warn the first time. The macOS app is signed ad hoc (see tauri.conf.json), which
 # is what lets it open at all on Apple Silicon.
 #
+# What an office already installed updates itself from is signed with the app's own
+# update key: the secret TAURI_SIGNING_PRIVATE_KEY here, its public half in
+# tauri.conf.json. The last job writes latest.json, which a running office reads to
+# learn that a newer version is out (tools/release-manifest.mjs).
+#
 # Assets are named without the version, so that
 # https://github.com/<owner>/<repo>/releases/latest/download/<name> always points
 # at the newest one. The download page (site/) links to those names.
@@ -100,7 +105,26 @@ jobs:
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           releaseId: ${{ needs.draft.outputs.release_id }}
-          args: --target ${{ matrix.target }}
+          # tauri.release.conf.json asks for the signed files an office updates itself from.
+          args: --target ${{ matrix.target }} --config src-tauri/tauri.release.conf.json
           releaseAssetNamePattern: 'agent-moshpit_[platform]_[arch][setup][ext]'
+          # Four builds writing one latest.json at once can lose each other's part: it is written once, below.
+          uploadUpdaterJson: false
+
+  # latest.json, from the signatures the builds attached.
+  manifest:
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Write latest.json and attach it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/release-manifest.mjs "$GITHUB_REPOSITORY" "${{ needs.draft.outputs.release_id }}" "$TAG"

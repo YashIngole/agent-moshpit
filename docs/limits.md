@@ -16,4 +16,5 @@
 - Updating a program while agents are running it can fail on Windows until they stop.
 - The tray icon and its menu are not covered by any automated test.
 - One window, no sounds.
-- Installers are not signed with a certificate (the macOS app is signed ad hoc only), so Windows and macOS warn the first time. The app has no updater of its own.
+- Installers are not signed with a certificate (the macOS app is signed ad hoc only), so Windows and macOS warn the first time.
+- Updating from inside the app is new in 0.3.0, and is checked only as far as this: the real app, asked by a test, finds a newer version and offers it without fetching anything. Fetching a real update and putting it in place has not been run by hand on any system. Version 0.2.0 has no updater: get 0.3.0 from the download page.

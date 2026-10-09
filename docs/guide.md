@@ -16,7 +16,7 @@ Agent Moshpit starts the agent programs you already have, each in a pseudo-termi
 
 - **It runs your own programs with their own sign-ins.** It keeps no account, no API key and no model setting. Whatever `claude` or `codex` does when you type it in a terminal, it does here.
 - **It is not a harness.** There is no conversation view, no diff view and no Approve button of the office's own. A question is answered where the program asks it.
-- **It sends nothing anywhere itself**, with one exception: unless `MOSHPIT_NO_UPDATE_CHECK` is set, it asks npm (`npm view <package> version`) for the newest version of each installed program that is published there, when it starts and every 12 hours. There is no telemetry and no remote font or script. The programs it starts talk to their own services as they always do. An install or an update runs only when you press its button, in a terminal where you see every line.
+- **It sends nothing about you or your work.** It asks two questions about versions, when it starts and every 12 hours, unless `MOSHPIT_NO_UPDATE_CHECK` is set: npm (`npm view <package> version`), for the newest version of each installed program that is published there, and its own releases on GitHub, for a newer version of the office. There is no telemetry and no remote font or script. The programs it starts talk to their own services as they always do. An install or an update runs only when you press its button, in a terminal where you see every line.
 - **Nothing is a separate window.** There is one Agent Moshpit button in the taskbar. Each program is a process of its own under the app, and is ended when the app quits.
 - **It shows the agents you start from it.** A session you started in another terminal, or in a desktop app, does not appear.
 - **A link in a terminal opens in your browser**, and only if it is an `https` address or an `http` one on this computer. The window itself cannot be sent anywhere. A file path is only ever handed to your editor: nothing a program prints is run.
@@ -146,6 +146,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 - **Closing the window quits**, off by default.
 - **Keys.** Every shortcut in one list.
 - **Quit Agent Moshpit.**
+- **Update to …**, at the top, when a newer version of the office is out (a dot on ⋯ says so). Choosing it fetches the update, checks it against the app's own key, puts it in place and starts the office again. If anyone is busy you are asked first, and told who will carry on. Nothing is fetched before you choose it. If it cannot be had, the office says why and offers the download page instead.
 
 ## Keys
 
@@ -190,7 +191,8 @@ What does not come back is a terminal's scrollback beyond that last screen.
 
 | Variable | What it does |
 | --- | --- |
-| `MOSHPIT_NO_UPDATE_CHECK` | Set to anything, the office never asks npm for newer versions. |
+| `MOSHPIT_NO_UPDATE_CHECK` | Set to anything, the office never asks for newer versions: not npm about the agent programs, and not GitHub about itself. |
+| `MOSHPIT_UPDATE_URL` | Ask this address about newer versions of the office instead of its releases on GitHub. Used by the tests. |
 | `MOSHPIT_DATA_DIR` | Keep the office's files in this folder instead of the app's data folder. |
 | `MOSHPIT_INSTANCE` | A name (letters and digits) that makes this a separate office next to the one already open: its own window, data folder, window title ("Agent Moshpit (name)") and notification address. `--instance name` on the command line does the same. Used by the tests. |
 | `MOSHPIT_DEVTOOLS` | Set to anything, the webview's browser keys are left on (F5 reloads the window; in a debug build F12 opens the developer tools), for working on the window itself. Windows. |

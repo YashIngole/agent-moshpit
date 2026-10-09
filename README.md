@@ -17,6 +17,7 @@ A small desktop office for coding agents. Claude Code, Codex, Antigravity CLI an
 - **Side by side.** Open terminals in a grid beside the floor. Resize, rearrange and zoom them. [Every shortcut](docs/guide.md#keys) is listed in the app.
 - **Stays out of the way.** Close the window and the agents keep working from the tray. After a restart every desk is back with its last screen, and Claude Code, Codex, Antigravity CLI and Hermes carry on their conversations.
 - **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
+- **Updates when you say.** When a newer version is out, the ⋯ menu offers it. One click fetches it, checks it against the app's own key and starts the office again.
 - **Private.** No account, no telemetry. See [what it sends](#what-it-sends).
 
 ## Install
@@ -59,7 +60,7 @@ On macOS and Linux a few things are missing for now: a click on a notification d
 
 ## What it sends
 
-Nothing, with one exception: it asks npm for the newest version of each agent CLI you have installed, when it starts and every 12 hours. Set `MOSHPIT_NO_UPDATE_CHECK` to turn that off. The programs it runs talk to their own services as they always do.
+Nothing about you or your work. It asks two questions about versions, when it starts and every 12 hours: npm, for the newest version of each agent CLI you have installed, and GitHub, for the newest version of itself. Set `MOSHPIT_NO_UPDATE_CHECK` to turn both off. An update is only fetched when you choose it. The programs it runs talk to their own services as they always do.
 
 ## Documentation
 

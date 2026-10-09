@@ -3,7 +3,8 @@
 //   npm run dev, then http://localhost:1420/?demo=office
 //
 // Scenes: office (the default), calm, empty, crowd.
-// Add `&still` to stop anything from changing by itself.
+// Add `&still` to stop anything from changing by itself, and `&update` for an office
+// that has a newer version of itself to offer (`&update=fails` when it cannot be had).
 //
 // The terminals here are typed by hand: they show what a program might print and
 // echo what is typed into them. Nothing is started and nothing is sent anywhere.
@@ -110,13 +111,15 @@ function screen(who: Agent): string {
 
 /** What the pretend office was asked to do, for checks to read: `window.__demo` in a demo page. */
 interface Seen {
+  /** How many times the newer version was asked for. */
+  updates: number
   typed: { agent: string; data: string }[]
   opened: { agent: string | null; path: string; line: number | null; editor: string }[]
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { typed: [], opened: [] }
+  const seen: Seen = { updates: 0, typed: [], opened: [] }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -281,6 +284,14 @@ export function demoBridge(): Bridge {
     quit: () => {},
     settings: async () => ({ close_quits: closeQuits }),
     setCloseQuits: on => void (closeQuits = on),
-    version: async () => '0.2.0'
+    version: async () => '0.3.0',
+    newer: async () => (params.has('update') ? { version: '0.3.1' } : null),
+    onNewer: () => () => {},
+    // Nothing is fetched in a pretend office: it says so the way a failure would, or is asked for and noted.
+    updateNow: async () => {
+      seen.updates += 1
+      if (params.get('update') === 'fails') throw 'The update could not be fetched (no network). Nothing was changed.'
+      return false
+    }
   }
 }

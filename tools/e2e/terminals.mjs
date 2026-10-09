@@ -20,6 +20,7 @@
 // is read once and never written; nothing real is typed or clicked on the desktop.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -55,7 +56,24 @@ const opened = path.join(bin, 'opened.txt')
 mkdirSync(bin)
 writeFileSync(path.join(bin, 'cursor.cmd'), `@echo off\r\necho %* > "${opened}"\r\n`)
 const pathKey = Object.keys(process.env).find(key => key.toLowerCase() === 'path') ?? 'PATH'
-const env = { MOSHPIT_DATA_DIR: data, CLAUDE_CONFIG_DIR: claudeHome, [pathKey]: `${bin};${process.env[pathKey] ?? ''}` }
+
+// A pretend place for the office to ask about newer versions of itself: this computer,
+// saying that version 99 is out. What is asked for is counted, and the installer it
+// names must never be fetched, because nobody here asks for the update.
+const fetched = { manifest: 0, installer: 0 }
+const releases = createServer((request, response) => {
+  if (request.url?.startsWith('/latest.json')) {
+    fetched.manifest += 1
+    const { port } = releases.address()
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(JSON.stringify({ version: '99.0.0', notes: 'A pretend newer version, for the test.', pub_date: new Date().toISOString(), platforms: { 'windows-x86_64': { signature: 'not a signature', url: `http://127.0.0.1:${port}/installer.exe` } } }))
+  } else {
+    fetched.installer += 1
+    response.writeHead(404).end()
+  }
+})
+await new Promise(resolve => releases.listen(0, '127.0.0.1', resolve))
+const env = { MOSHPIT_DATA_DIR: data, CLAUDE_CONFIG_DIR: claudeHome, MOSHPIT_UPDATE_URL: `http://127.0.0.1:${releases.address().port}/latest.json`, [pathKey]: `${bin};${process.env[pathKey] ?? ''}` }
 
 let failed = 0
 function check(what, ok, detail = '') {
@@ -297,6 +315,13 @@ try {
   await page.getByRole('menuitemcheckbox', { name: /Closing the window quits/ }).click()
   await until(() => /"close_quits":\s*false/.test(chosen()), 5000)
 
+  // ── a newer version of the office itself is offered, and nothing is fetched unasked ──
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  check('a newer version of the office is offered in the menu', await until(async () => (await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).count()) === 1, 20000), JSON.stringify(fetched))
+  check('saying which version this one is', /You have \d+\.\d+\.\d+/.test((await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).textContent().catch(() => '')) ?? ''))
+  check('its releases were asked, and nothing was fetched', fetched.manifest >= 1 && fetched.installer === 0, JSON.stringify(fetched))
+  await page.keyboard.press('Escape')
+
   // ── the office quits and comes back: desks show where they left off ──────
   await until(async () => (await page.locator('.floor button.desk').evaluateAll(desks => desks.every(d => !/\b(working|starting|needs_you)\b/.test(d.className)))), 15000)
   fakes = nodes(child.pid)
@@ -348,6 +373,7 @@ try {
 } finally {
   killTree(child.pid)
   for (const row of fakes) killTree(row.pid)
+  releases.close()
   // Nothing of the test is left behind: not its address in the registry, not its folders.
   forgetAddress('e2e')
   await sleep(300)

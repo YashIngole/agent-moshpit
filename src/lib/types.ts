@@ -72,6 +72,11 @@ export interface StartupProblem {
   line: number | null
 }
 
+/** A newer version of the office itself that is out. */
+export interface Newer {
+  version: string
+}
+
 /** What the user chose that the core keeps. */
 export interface Settings {
   /** Closing the window quits the office instead of leaving it in the tray. */

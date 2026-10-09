@@ -59,7 +59,7 @@ A status is always a word and a pose as well as a colour. Four colours carry mea
 
 ## Terminals
 
-Click a desk and their terminal opens to the right of the floor, with the keyboard in it. A click on another desk shows that one in the same pane. Hold `Ctrl` as you click, or press `Ctrl+Enter` on a desk, to open it beside the others instead: two sit side by side, more make a grid, as many as you like.
+Click a desk and their terminal opens to the right of the floor, with the keyboard in it. A click on another desk shows that one in the same pane. Hold `Ctrl` as you click, or press `Ctrl+Enter` on a desk, to open it beside the others instead: two sit side by side, more make a grid, as many as you like. Do the same on a desk that is already open and its pane is put away again, with its program still running.
 
 - **Each pane is headed by its agent**: face, name, status, project and branch, and program.
 - **The grid stays as you made it.** A new pane goes beside its neighbour, and a closed one gives its room to a neighbour; nothing else moves. Drag any edge between two panes, or double-click one to make them all even. Drag a pane by its header onto another to swap the two.
@@ -173,12 +173,12 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | **On the floor** | |
 | Arrow keys | From desk to desk |
 | `Enter` | Open their terminal |
-| `Ctrl+Enter` | Open it beside the others |
+| `Ctrl+Enter` | Open it beside the others, or put it away again |
 | `F2` | Rename |
 | `Delete` | Take the desk away (it can be brought back for a moment) |
 | `Shift+F10` | The desk's menu |
 | **With the mouse** | |
-| `Ctrl` and a click | Open a desk beside the others |
+| `Ctrl` and a click | Open a desk beside the others, or put it away again |
 | `Ctrl` and a click on a file path | Open it in your editor, at its line |
 | `Ctrl` and the wheel | Bigger or smaller text, over a terminal |
 | Right-click | A desk's menu, or a terminal's |

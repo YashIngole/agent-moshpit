@@ -386,6 +386,15 @@ class Office {
     this.#place(id, beside)
   }
 
+  /**
+   * Ctrl and a click on a desk, or Ctrl+Enter: their terminal beside the others. On a
+   * desk whose terminal is there already, it is put away again; their program keeps running.
+   */
+  toggleBeside(id: string) {
+    if (has(this.layout, id)) this.closePane(id)
+    else this.show(id, true)
+  }
+
   /** Start a desk's program again, or carry on its conversation, in its pane. */
   async wake(id: string) {
     const agent = this.agents.find(a => a.id === id)

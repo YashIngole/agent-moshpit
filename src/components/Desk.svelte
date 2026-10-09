@@ -53,7 +53,7 @@
   function onKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      office.show(agent.id, true)
+      office.toggleBeside(agent.id)
     } else if (event.key === 'F2') {
       event.preventDefault()
       office.startRename(agent.id)
@@ -77,9 +77,9 @@
     tabindex={home ? 0 : -1}
     aria-label={describe(agent) + (unread ? ' Something new in their terminal.' : '')}
     aria-current={open ? 'true' : undefined}
-    title="Open their terminal. Ctrl and a click: beside the others. Right-click for more."
+    title="Open their terminal. Ctrl and a click: beside the others, or put away again. Right-click for more."
     bind:this={button}
-    onclick={event => office.show(agent.id, event.ctrlKey || event.metaKey)}
+    onclick={event => (event.ctrlKey || event.metaKey ? office.toggleBeside(agent.id) : office.show(agent.id))}
     onauxclick={event => {
       if (event.button === 1) {
         event.preventDefault()

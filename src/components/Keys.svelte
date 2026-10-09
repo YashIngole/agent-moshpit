@@ -39,7 +39,7 @@
       keys: [
         ['Arrow keys', 'From desk to desk'],
         ['Enter', 'Open their terminal'],
-        ['Ctrl+Enter', 'Open it beside the others'],
+        ['Ctrl+Enter', 'Open it beside the others, or put it away again'],
         ['F2', 'Rename'],
         ['Delete', 'Take the desk away (it can be brought back for a moment)'],
         ['Shift+F10', 'Everything else that can be done with a desk']
@@ -48,7 +48,7 @@
     {
       title: 'With the mouse',
       keys: [
-        ['Ctrl and a click', 'Open a desk beside the others'],
+        ['Ctrl and a click', 'Open a desk beside the others, or put it away again'],
         ['Ctrl and a click on a file path', editor ? `Open it in ${editor}, at its line` : 'Show it in its folder (no editor was found)'],
         ['Ctrl and the wheel', 'Bigger or smaller text, over a terminal'],
         ['Right-click', 'A desk’s menu, or a terminal’s'],

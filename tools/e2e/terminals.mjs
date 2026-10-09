@@ -24,7 +24,7 @@ import { createServer } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addressCommand, attach, forgetAddress, isRunning, killTree, launch, notices, openAddress, processes, sleep, windowTitle } from './lib.mjs'
+import { addressCommand, appPath, attach, forgetAddress, isRunning, killTree, launch, notices, openAddress, processes, sleep, windowTitle } from './lib.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const data = mkdtempSync(path.join(os.tmpdir(), 'moshpit-e2e-'))
@@ -317,9 +317,15 @@ try {
 
   // ── a newer version of the office itself is offered, and nothing is fetched unasked ──
   await page.getByRole('button', { name: 'More', exact: true }).click()
-  check('a newer version of the office is offered in the menu', await until(async () => (await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).count()) === 1, 20000), JSON.stringify(fetched))
-  check('saying which version this one is', /You have \d+\.\d+\.\d+/.test((await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).textContent().catch(() => '')) ?? ''))
-  check('its releases were asked, and nothing was fetched', fetched.manifest >= 1 && fetched.installer === 0, JSON.stringify(fetched))
+  if (/[\\/]debug[\\/]/i.test(appPath())) {
+    check('a newer version of the office is offered in the menu', await until(async () => (await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).count()) === 1, 20000), JSON.stringify(fetched))
+    check('saying which version this one is', /You have \d+\.\d+\.\d+/.test((await page.getByRole('menuitem', { name: /Update to 99\.0\.0/ }).textContent().catch(() => '')) ?? ''))
+    check('its releases were asked, and nothing was fetched', fetched.manifest >= 1 && fetched.installer === 0, JSON.stringify(fetched))
+  } else {
+    // A release build asks only over https: the pretend address on this computer is plain http, and is left alone.
+    await sleep(12000)
+    check('a release build does not ask a plain http address about newer versions', fetched.manifest === 0 && (await page.getByRole('menuitem', { name: /Update to/ }).count()) === 0, JSON.stringify(fetched))
+  }
   await page.keyboard.press('Escape')
 
   // ── the office quits and comes back: desks show where they left off ──────

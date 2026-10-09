@@ -102,6 +102,13 @@ try {
   check('Ctrl and a click opens a second pane', await until(async () => (await panes(page)) === 2))
   let b = await boxes(page)
   check('two panes sit side by side, evenly', b.length === 2 && b[0].y === b[1].y && Math.abs(b[0].w - b[1].w) <= 2, JSON.stringify(b))
+  // The same again on a desk that is open puts its pane away; the one beside it stays, and nobody is stopped.
+  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+  check('Ctrl and a click on an open desk puts its pane away again', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API'))
+  check('and their program keeps running', ((await desk(page, 2).getAttribute('class')) ?? '').includes('working') && ((await desk(page, 2).getAttribute('aria-current')) ?? '') !== 'true')
+  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+  check('and once more brings it back beside the other', await until(async () => (await panes(page)) === 2))
+  b = await boxes(page)
 
   // ── dragging the edge between two ──
   const edge = page.locator('.edge.column').first()

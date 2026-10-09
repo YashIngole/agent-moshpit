@@ -65,6 +65,12 @@ jobs:
 
       - run: npm ci
 
+      # The pinned native build script forwards CMake flags but does not track
+      # every flag as a Cargo rebuild input. Never reuse an older MSVC runtime.
+      - name: Refresh Windows native build configuration
+        if: runner.os == 'Windows'
+        run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys
+
       - name: Interface types
         run: npm run check
 

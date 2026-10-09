@@ -13,6 +13,9 @@ GGML_AVX512_VBMI = "OFF"
 GGML_AVX512_VNNI = "OFF"
 GGML_AVX512_BF16 = "OFF"
 CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
+# whisper.cpp declares an old CMake minimum; explicitly enable the policy
+# that makes MSVC_RUNTIME_LIBRARY effective.
+CMAKE_POLICY_DEFAULT_CMP0091 = "NEW"
 
 # Keep the native C++ and Rust runtime consistent and avoid requiring an
 # unbundled Microsoft C++ runtime DLL on a clean Windows installation.

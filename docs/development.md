@@ -4,6 +4,14 @@
 
 Node 22 (22.12 or later) or Node 24, Rust 1.89 or later, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your system.
 
+Local voice adds **CMake and a C++ toolchain** for pinned `whisper-rs = 0.16.0` / `whisper-rs-sys = 0.15.0` (vendored whisper.cpp 1.8.3), and native `cpal = 0.15.3`. GPU features and OpenMP are off. `.cargo/config.toml` disables host-native tuning and SSE4.2/AVX/AVX2/FMA/F16C/AVX512/AVX-VNNI options for distributable CPU builds. Do not replace these with `-march=native` or local-only flags. The actual CMake cache is included in the Windows verification record; old-CPU hardware has not been tested.
+
+- **Windows:** Visual Studio C++ tools, CMake, and a discoverable `libclang.dll` (`LIBCLANG_PATH` can name its folder). The pinned crate's packaged bindings include glibc layout assertions that fail on Windows, so bindings are generated for this target. Existing LLVM/libclang can be reused; no audio SDK is installed separately.
+- **Linux:** add `libasound2-dev` and `cmake` to Tauri's build packages. `WHISPER_DONT_GENERATE_BINDINGS=1` uses the packaged bindings on 64-bit Linux and avoids libclang. Runtime capture requires working ALSA libraries/default input (PipeWire/PulseAudio systems commonly expose an ALSA route).
+- **macOS:** CMake, Xcode command-line tools and libclang for target bindings. Native capture uses CoreAudio. `src-tauri/Info.plist` supplies the microphone usage description and `Entitlements.plist` the audio-input entitlement. The CI/release workflow retains both ARM and Intel Mac targets; permission behavior requires a bundled app smoke test.
+
+CI uses the runner's existing LLVM on Windows/macOS and packaged Linux bindings. New voice platform compilation has not yet run on remote CI in this local-only session. Model weights are never bundled or fetched during a build.
+
 ## Build and run
 
 ```sh
@@ -42,6 +50,8 @@ src-tauri/src/   the core, in Rust
   link.rs          the agent-moshpit:// address that opens a desk
   toast.rs         Windows notifications that can be clicked
   model.rs         what the window is told about the office: plain data
+  voice/           bounded device PCM conversion, local CPU recognition, pinned verified model downloads,
+                   cancellation generations, and no-Enter terminal delivery
 src/             the window, in Svelte 5
   App.svelte       the frame, the office's own keys, dropped files
   components/      the floor, a desk, a person, the amber band, the top bar and its menu,
@@ -83,6 +93,26 @@ node tools/e2e/terminals.mjs
 `node tools/e2e/real-clis.mjs` starts the real Claude Code and Codex with no task and types nothing into them, to check what only the real programs can show: the badge agreeing with the visible trust dialog or ready prompt, two empty Codex desks in the same folder refusing to borrow existing session IDs, and Codex staying idle while its pane is resized. A program that is not installed is skipped.
 
 Every test of the real app runs it as its own named office with its own data folder (`MOSHPIT_INSTANCE`, `MOSHPIT_DATA_DIR`), so an office you have open is left alone, and none of them asks npm for versions.
+
+### Voice checks without a microphone
+
+Unit tests cover actual PCM formats/channel boundaries, 60-second bounds, silence/short rejection, ANSI/control sanitization, state cancellation, pinned file size/hash, atomic completion, hidden panes, restarted PTY generations, and excluding voice echo from saved screens. `npm run test:ui` adds deterministic demo listening/transcribing/failure/download/remove/cancel tests; it stubs clipboard writes and never uses a microphone or downloads a model.
+
+The debug build accepts **`MOSHPIT_VOICE_WAV` only with a named `MOSHPIT_INSTANCE` and explicit `MOSHPIT_DATA_DIR`**. It requires PCM16 WAV, no longer than 60 seconds, and feeds the same conversion/recognition path. A bad fixture fails without opening a microphone. Release builds never read this variable. This is a test hook, not an audio-file feature.
+
+For the opt-in real-app fixture test, provide isolated storage with whisper.cpp v1.8.3's `samples/jfk.wav` and the pinned models, then:
+
+```powershell
+$env:CARGO_TARGET_DIR = 'D:/rust/target/voice-to-text'
+$env:MOSHPIT_INSTANCE = 'voicebuild'
+$env:MOSHPIT_DATA_DIR = 'D:/rust/target/voice-to-text/test-data'
+npm run tauri build -- --debug --no-bundle
+$env:MOSHPIT_VOICE_FIXTURES = 'D:/rust/target/voice-fixtures'
+node tools/e2e/voice-app.mjs             # requires existing model fixtures
+node tools/e2e/voice-app.mjs --download  # explicitly exercise production model downloads if absent
+```
+
+The helper supplies its own named instance and temporary data folder, starts only the fake agent, verifies both stored model hashes/sizes, checks WAV recognition without Enter, and closes/reopens the window to verify cancellation. It leaves model fixtures in the supplied test storage for reuse; nothing is installed or copied into the user's office. Fixture latency is one recorded clip, not a performance or accent-quality benchmark. Real desktop microphone smoke checks need separate explicit permission. [Results and remaining checks](reviews/voice-validation-2026-10-09.md).
 
 ## The site
 

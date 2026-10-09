@@ -1,6 +1,10 @@
 # Known limits
 
 - Not used by hand on macOS or Linux. CI builds both and runs the automated checks there, and that is all that is known about them.
+- Local voice's native microphone permissions, default-device routing and unplug/reconnect behavior have not been checked by hand on any OS. Windows validation uses demo audio and an explicit prerecorded-WAV debug fixture. macOS/Linux voice build changes await CI; existing cross-platform CI success predates this feature.
+- Voice is CPU-only and capped at 60 seconds. Energy filtering rejects silence/short clips but is not a speech detector and cannot guarantee no hallucinations. Accent, Hindi/Hinglish, vocabulary accuracy and general latency/RSS remain unestablished; a prerecorded English fixture is not a speech-quality benchmark.
+- Voice uses only the system's default microphone. There is no in-app device picker, streaming transcript, cloud fallback or text rewriting. Its shortcut can be changed or disabled when a CLI binds it.
+- A desk that receives voice text skips the app's saved-screen file for that app run, to avoid storing its echo. The CLI may still save the conversation itself. Download cancellation during a stalled network read can take up to 30 seconds; capture and transcription cancellation are independent.
 - A desk says that an agent is working, not on what. The programs do not say.
 - Status read from a terminal's behaviour is a reading, not a report. A program that asks a question without ringing its terminal looks idle or done. Answering a raised hand while the window is behind other windows can show "done" for a moment.
 - Sessions started outside the office are not shown and cannot be brought in.

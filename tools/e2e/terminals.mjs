@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url'
 import { addressCommand, appPath, attach, forgetAddress, isRunning, killTree, launch, notices, openAddress, processes, sleep, windowTitle } from './lib.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+const instance = process.env.MOSHPIT_INSTANCE || 'e2e'
 const data = mkdtempSync(path.join(os.tmpdir(), 'moshpit-e2e-'))
 const work = mkdtempSync(path.join(os.tmpdir(), 'moshpit-work-'))
 // A folder nobody has told the stand-in "Claude" to trust.
@@ -120,7 +121,7 @@ try {
   }
 
   // ── a named office says so, and reads the clipboard without asking ───────
-  check('a named office says its name in the window title', windowTitle(child.pid).startsWith('Agent Moshpit (e2e)'), windowTitle(child.pid))
+  check('a named office says its name in the window title', windowTitle(child.pid).startsWith(`Agent Moshpit (${instance})`), windowTitle(child.pid))
   check('the window may read the clipboard without a prompt', await until(async () => (await page.evaluate(() => navigator.permissions.query({ name: 'clipboard-read' }).then(p => p.state))) === 'granted', 6000), await page.evaluate(() => navigator.permissions.query({ name: 'clipboard-read' }).then(p => p.state)))
   // A window driven by a test is not always in front; the page is told it is, as it would be when used.
   const session = await page.context().newCDPSession(page)
@@ -208,8 +209,8 @@ try {
   check('unwatched work ends with a flag', await until(async () => (await state('First')).includes('done'), 9000), await state('First'))
   // Read back from the notification centre: what a click on it opens is this desk's own address.
   const firstId = await desk('First').getAttribute('data-desk')
-  const told = () => notices('e2e').filter(xml => xml.includes('First is done'))
-  check('and a notification that opens their desk when it is clicked', await until(() => told().some(xml => xml.includes(`launch="agent-moshpit-e2e://desk/${firstId}" activationType="protocol"`)), 10000), notices('e2e').join(' | '))
+  const told = () => notices(instance).filter(xml => xml.includes('First is done'))
+  check('and a notification that opens their desk when it is clicked', await until(() => told().some(xml => xml.includes(`launch="agent-moshpit-${instance}://desk/${firstId}" activationType="protocol"`)), 10000), notices(instance).join(' | '))
   check('one for the desk, not one for every time', told().length === 1, String(told().length))
   // CDP can send keys to a background webview; reading requires native window focus.
   openAddress('agent-moshpit-e2e://open')
@@ -286,12 +287,12 @@ try {
   await page.locator('.pane', { hasText: 'Keys' }).getByRole('button', { name: 'Put this terminal away' }).click()
 
   // ── the address a clicked notification opens brings up that desk ─────────
-  const command = addressCommand('e2e')
-  check('Windows is told that the office opens its own address', command.includes('agent-moshpit.exe') && command.includes('--instance e2e') && command.includes('%1'), command.trim().split('\n').pop())
+  const command = addressCommand(instance)
+  check('Windows is told that the office opens its own address', command.includes('agent-moshpit.exe') && command.includes(`--instance ${instance}`) && command.includes('%1'), command.trim().split('\n').pop())
   await page.keyboard.press('Control+Backquote')
   await until(async () => (await page.locator('.pane').count()) === 0)
   const id = await desk('Asks').getAttribute('data-desk')
-  openAddress(`agent-moshpit-e2e://desk/${id}`)
+  openAddress(`agent-moshpit-${instance}://desk/${id}`)
   check('opening a desk’s address opens that desk’s terminal in the running office', await until(async () => (await page.locator('.pane h2', { hasText: 'Asks' }).count()) === 1, 15000), (await page.locator('.pane h2').allTextContents()).join(' | '))
   check('beside the terminals that were open', (await page.locator('.pane').count()) >= 2)
   check('and starts no second office', (await until(async () => processes(child.pid).filter(row => row.name.toLowerCase().includes('agent-moshpit')).length === 1, 6000)) && isRunning(child.pid))
@@ -384,7 +385,7 @@ try {
   for (const row of fakes) killTree(row.pid)
   releases.close()
   // Nothing of the test is left behind: not its address in the registry, not its folders.
-  forgetAddress('e2e')
+  forgetAddress(instance)
   await sleep(300)
   for (const folder of [data, work, fresh]) rmSync(folder, { recursive: true, force: true })
 }

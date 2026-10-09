@@ -96,6 +96,8 @@ struct State {
     saved: Vec<SavedDesk>,
     revision: u64,
     looks: u64,
+    /// Voice text must not end up in an app-owned screen file through PTY echo.
+    voice_used: HashSet<String>,
 }
 
 /// Something to tell the desktop. Queued, and said by a thread that holds no lock.
@@ -154,7 +156,19 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             kept.screen = Some(printed);
         }
     }
-    let state = State { office: Office::restore(seated, now_ms()), watched: HashSet::new(), focused: false, installed: HashMap::new(), latest: HashMap::new(), jobs: Vec::new(), told: None, saved, revision: 0, looks: 0 };
+    let state = State {
+        office: Office::restore(seated, now_ms()),
+        watched: HashSet::new(),
+        focused: false,
+        installed: HashMap::new(),
+        latest: HashMap::new(),
+        jobs: Vec::new(),
+        told: None,
+        saved,
+        revision: 0,
+        looks: 0,
+        voice_used: HashSet::new(),
+    };
     let home = harness::home_dir().unwrap_or_default();
     // The desktop is told things by this thread alone. Showing a snapshot or a
     // notice waits for the app's main thread, which may itself be waiting for the
@@ -362,6 +376,29 @@ impl Handle {
         Ok(())
     }
 
+    pub fn voice_target(&self, id: &str) -> Option<crate::voice::Target> {
+        let state = self.inner.state.lock().unwrap();
+        if !state.watched.contains(id) || !state.office.get(id)?.running { return None; }
+        Some(crate::voice::Target { agent: id.into(), run: self.inner.terms.generation(id)? })
+    }
+
+    pub fn voice_live(&self, target: &crate::voice::Target) -> bool {
+        self.voice_target(&target.agent).as_ref() == Some(target)
+    }
+
+    pub fn voice_write(&self, target: &crate::voice::Target, data: &[u8]) -> Result<(), String> {
+        let text = crate::voice::sanitize(std::str::from_utf8(data).map_err(|_| "The voice text was invalid and discarded.")?);
+        if text.is_empty() || text.len() > 32 * 1024 { return Err("The voice text was empty or too long and discarded.".into()); }
+        let mut state = self.inner.state.lock().unwrap();
+        if !state.watched.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
+            return Err("The recording's pane closed or its program stopped. Its text was discarded.".into());
+        }
+        self.inner.terms.write_generation(&target.agent, target.run, text.as_bytes())?;
+        state.voice_used.insert(target.agent.clone());
+        state.office.typed(&target.agent, now_ms());
+        Ok(())
+    }
+
     pub fn resize(&self, id: &str, cols: u16, rows: u16) {
         self.inner.terms.resize(id, cols, rows);
     }
@@ -489,7 +526,7 @@ impl Handle {
         let revision = state.revision;
         let saved = self.to_save(&state);
         // Only desks' screens: an install's terminal is not kept.
-        let mut screens: Vec<(String, Vec<u8>)> = self.inner.terms.screens(SCREEN_HISTORY).into_iter().filter(|(id, _)| state.office.get(id).is_some()).collect();
+        let mut screens: Vec<(String, Vec<u8>)> = self.inner.terms.screens(SCREEN_HISTORY).into_iter().filter(|(id, _)| state.office.get(id).is_some() && !state.voice_used.contains(id)).collect();
         // And those of the desks held aside, as they were: a screen not handed over is deleted.
         screens.extend(self.inner.aside.iter().filter_map(|a| Some((a.desk.id.clone(), a.screen.clone()?))));
         drop(state);
@@ -908,6 +945,31 @@ mod tests {
         assert!(engine.snapshot().agents.is_empty());
         assert!(until(|| shell.saved.lock().unwrap().is_empty()));
         engine.shutdown();
+    }
+
+    #[test]
+    fn voice_pins_a_live_run_rejects_stale_or_hidden_panes_and_does_not_save_echo() {
+        let shell = Arc::new(Quiet::default());
+        let engine = start(shell.clone(), vec![shell_kind()], vec![], vec![]);
+        let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false };
+        let id = engine.new_agent(spec, 80, 24).unwrap();
+        assert!(engine.voice_target(&id).is_none());
+        engine.watch(vec![id.clone()]);
+        let target = engine.voice_target(&id).unwrap();
+        assert!(engine.voice_live(&target));
+        let invalid = crate::voice::Target { run: target.run + 100, ..target.clone() };
+        assert!(engine.voice_write(&invalid, b"must-not-reach-the-terminal").is_err());
+        engine.watch(vec![]);
+        assert!(!engine.voice_live(&target));
+        assert!(engine.voice_write(&target, b"also-discarded").is_err());
+        engine.watch(vec![id.clone()]);
+        assert!(engine.voice_write(&target, b"voice\r\ntext\x1b[31m\x03").is_ok());
+        engine.restart(&id, 80, 24).unwrap();
+        assert!(!engine.voice_live(&target));
+        assert!(engine.voice_write(&target, b"stale-result").is_err());
+        assert_ne!(engine.voice_target(&id).unwrap().run, target.run);
+        engine.shutdown();
+        assert!(shell.screens.lock().unwrap().is_empty());
     }
 
     #[test]

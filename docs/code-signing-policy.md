@@ -23,6 +23,8 @@ Agent Moshpit has no telemetry and no analytics, and keeps no account.
 
 It makes two requests of its own, both about versions, when it starts and every 12 hours: it asks npm for the newest version of each agent program you have installed, and it asks this repository's releases on GitHub for a newer version of itself. Setting `MOSHPIT_NO_UPDATE_CHECK` turns both off. An update is fetched only when you choose it in the menu.
 
+Optional local voice input downloads a selected model from Hugging Face only when you choose Download. The host sees that model request. Microphone audio and recognized text stay on this computer; there is no hosted recognition or telemetry.
+
 The agent programs it starts (Claude Code, Codex and the rest) are other people's software, started at your request with your own sign-ins. They talk to their own services as they do in any terminal, under their own privacy policies.
 
 The website, agentmoshpit.com, sets no cookies and counts visits with Cloudflare Web Analytics.

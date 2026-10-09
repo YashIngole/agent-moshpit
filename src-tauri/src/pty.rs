@@ -300,6 +300,25 @@ impl Terminals {
         writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string())
     }
 
+    /// Identity of this live PTY session, independent of the CLI's conversation id.
+    pub fn generation(&self, id: &str) -> Option<u64> {
+        let terms = self.terms.lock().unwrap();
+        let term = terms.get(id)?;
+        term.live.as_ref()?;
+        Some(term.run)
+    }
+
+    /// The terminal text path with the run check and write in one critical section.
+    /// Holding the map prevents a restart from swapping the destination mid-write.
+    pub fn write_generation(&self, id: &str, run: u64, data: &[u8]) -> Result<(), String> {
+        let terms = self.terms.lock().unwrap();
+        let term = terms.get(id).filter(|t| t.run == run).ok_or("The recording's terminal session ended. Its text was discarded.")?;
+        let live = term.live.as_ref().ok_or("The recording's program stopped. Its text was discarded.")?;
+        term.screen.lock().unwrap().pulse.input(now_ms());
+        let mut writer = live.writer.lock().unwrap();
+        writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string())
+    }
+
     pub fn resize(&self, id: &str, cols: u16, rows: u16) {
         let screen = {
             let mut terms = self.terms.lock().unwrap();

@@ -11,6 +11,7 @@
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
+import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, type VoiceSettings, type VoiceView } from './voice'
 
 const MIN = 60_000
 
@@ -132,6 +133,35 @@ export function demoBridge(): Bridge {
   let jobs: Job[] = []
   let made = 0
   let closeQuits = false
+  let voiceSettings: VoiceSettings = { ...DEFAULT_VOICE }
+  let voice: VoiceView = { ...EMPTY_VOICE, models: [{ id: 'small', bytes: 190085487, ready: false }, { id: 'base', bytes: 59707625, ready: false }] }
+  let voiceEpoch = 0
+  let downloadEpoch = 0
+  let recordingLimit: ReturnType<typeof setTimeout> | undefined
+  const voiceChange = (patch: Partial<VoiceView>) => { voice = { ...voice, ...patch, sequence: voice.sequence + 1 } }
+  const cancelVoice = () => {
+    voiceEpoch += 1
+    clearTimeout(recordingLimit)
+    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', busy: false })
+  }
+  const finishVoice = () => {
+    if (voice.phase !== 'listening') throw 'Voice is not listening.'
+    clearTimeout(recordingLimit)
+    const epoch = voiceEpoch
+    const target = voice.agent!
+    voiceChange({ phase: 'transcribing' })
+    setTimeout(() => {
+      if (epoch !== voiceEpoch || !agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) return
+      if (['silence', 'short', 'inference-error'].includes(params.get('voice') ?? '')) {
+        voiceChange({ phase: 'error', agent: null, started_ms: null, busy: false, message: params.get('voice') === 'silence' ? 'No clear speech was heard. Check the default microphone and try again.' : params.get('voice') === 'short' ? 'That recording was too short. Speak for at least half a second, then stop.' : 'Local transcription stopped. Try a shorter recording.' })
+        return
+      }
+      const text = cleanVoice('Fix the\ncheckout total\x1b[31m\x1b[0m\x03')
+      seen.typed.push({ agent: target, data: text })
+      print(target, text)
+      voiceChange({ phase: 'idle', agent: null, started_ms: null, busy: false, message: 'Text inserted. Review it in the terminal; press Enter yourself to send.' })
+    }, 600)
+  }
   const listeners = new Set<(snapshot: Snapshot) => void>()
   const followers = new Map<string, Set<OnTerminal>>()
   const encoder = new TextEncoder()
@@ -216,7 +246,7 @@ export function demoBridge(): Bridge {
       fn(encoder.encode(printed.get(id) ?? ''), true)
       if (!followers.has(id)) followers.set(id, new Set())
       followers.get(id)!.add(fn)
-      return () => followers.get(id)?.delete(fn)
+      return () => { followers.get(id)?.delete(fn); if (voice.agent === id) cancelVoice() }
     },
     type: (id, data) => {
       seen.typed.push({ agent: id, data })
@@ -226,8 +256,8 @@ export function demoBridge(): Bridge {
       if (data === '\r' && who?.phase === 'needs_you') turn(id, 'working')
     },
     resize: () => {},
-    stop: id => turn(id, 'asleep'),
-    restart: async id => turn(id, 'idle'),
+    stop: id => { if (voice.agent === id) cancelVoice(); turn(id, 'asleep') },
+    restart: async id => { if (voice.agent === id) cancelVoice(); turn(id, 'idle') },
     showFolder: async () => {},
     editors: async () => (params.has('noeditor') ? [] : [{ id: 'cursor', name: 'Cursor' }, { id: 'zed', name: 'Zed' }]),
     openFile: async (agent, path, line, editor) => {
@@ -267,6 +297,7 @@ export function demoBridge(): Bridge {
       }
     },
     dismiss: id => {
+      if (voice.agent === id) cancelVoice()
       agents = agents.filter(a => a.id !== id)
       followers.delete(id)
       publish()
@@ -278,6 +309,7 @@ export function demoBridge(): Bridge {
     },
     watch: ids => {
       seen.watched = [...ids]
+      if (voice.agent && !ids.includes(voice.agent)) cancelVoice()
       if (agents.some(a => ids.includes(a.id) && a.unread)) {
         agents = agents.map(a => (ids.includes(a.id) ? { ...a, unread: false } : a))
         publish()
@@ -288,12 +320,38 @@ export function demoBridge(): Bridge {
     openPage: url => void window.open(url, '_blank', 'noopener'),
     pickFolder: async () => 'C:/code/shop',
     quit: () => {},
-    settings: async () => ({ close_quits: closeQuits }),
+    settings: async () => ({ close_quits: closeQuits, voice: { ...voiceSettings } }),
     setCloseQuits: on => void (closeQuits = on),
     version: async () => '0.3.0',
     newer: async () => (params.has('update') ? { version: '0.3.1' } : null),
     onNewer: () => () => {},
     // Nothing is fetched in a pretend office: it says so the way a failure would, or is asked for and noted.
+    voiceView: async () => structuredClone(voice),
+    voiceConfig: async settings => { cancelVoice(); voiceSettings = { ...settings } },
+    voiceStart: async target => {
+      if (!voiceSettings.enabled) throw 'Enable local voice in the Voice input panel first.'
+      if (!voice.models.some(m => m.id === voiceSettings.model && m.ready)) throw 'Download the selected voice model first, then try again.'
+      if (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) throw 'Select a visible terminal whose program is running before recording.'
+      if (voice.busy) throw 'The previous voice worker is finishing. Try again in a moment.'
+      cancelVoice()
+      if (params.get('voice') === 'mic-error') { voiceChange({ phase: 'error', message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
+      voiceChange({ phase: 'listening', agent: target, started_ms: Date.now(), busy: true })
+      recordingLimit = setTimeout(finishVoice, 60_000)
+    },
+    voiceStop: async () => finishVoice(),
+    voiceCancel: async () => cancelVoice(),
+    voiceDownload: async model => {
+      if (voice.downloading) throw 'A model is already being downloaded.'
+      const download = ++downloadEpoch
+      voiceChange({ downloading: model, received: 0, download_error: '' })
+      setTimeout(() => {
+        if (download !== downloadEpoch || voice.downloading !== model) return
+        if (params.get('voice') === 'download-error') voiceChange({ downloading: null, download_error: 'The model did not pass its size and SHA-256 check. Download it again.' })
+        else voiceChange({ downloading: null, models: voice.models.map(m => m.id === model ? { ...m, ready: true } : m) })
+      }, 400)
+    },
+    voiceCancelDownload: async () => { downloadEpoch += 1; voiceChange({ downloading: null, download_error: 'Download cancelled.' }) },
+    voiceRemove: async model => { cancelVoice(); voiceChange({ models: voice.models.map(m => m.id === model ? { ...m, ready: false } : m) }) },
     updateNow: async () => {
       seen.updates += 1
       if (params.get('update') === 'fails') throw 'The update could not be fetched (no network). Nothing was changed.'

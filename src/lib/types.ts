@@ -83,6 +83,7 @@ export interface Newer {
 export interface Settings {
   /** Closing the window quits the office instead of leaving it in the tray. */
   close_quits: boolean
+  voice: import('./voice').VoiceSettings
 }
 
 /** An editor on this computer that file paths can be opened in. */

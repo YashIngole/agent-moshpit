@@ -14,7 +14,7 @@ The pictures show the built-in demo data, not a real session. The people and the
 
 Agent Moshpit starts the agent programs you already have, each in a pseudo-terminal of its own, as child processes of the app. Everything under a pane's header is that program's own screen: its prompt, its slash commands, its approvals, its settings. The office draws none of it. What the office adds is the floor, where one look tells you the state of every agent and whoever needs you is brought to the top.
 
-- **It runs your own programs with their own sign-ins.** It keeps no account, no API key and no model setting. Whatever `claude` or `codex` does when you type it in a terminal, it does here.
+- **It runs your own programs with their own sign-ins.** It keeps no account, API key or agent model setting. Optional local voice has its own recognition model. Whatever `claude` or `codex` does when you type it in a terminal, it does here.
 - **It is not a harness.** There is no conversation view, no diff view and no Approve button of the office's own. A question is answered where the program asks it.
 - **It sends nothing about you or your work.** It asks two questions about versions, when it starts and every 12 hours, unless `MOSHPIT_NO_UPDATE_CHECK` is set: npm (`npm view <package> version`), for the newest version of each installed program that is published there, and its own releases on GitHub, for a newer version of the office. There is no telemetry and no remote font or script. The programs it starts talk to their own services as they always do. An install or an update runs only when you press its button, in a terminal where you see every line.
 - **Nothing is a separate window.** There is one Agent Moshpit button in the taskbar. Each program is a process of its own under the app, and is ended when the app quits.
@@ -85,6 +85,23 @@ Whatever you type goes to the program, apart from the office's own keys, which a
 
 Each terminal keeps 5,000 lines of scrollback, and the core keeps the last half megabyte each program printed, so a pane that was put away, or a window that was closed, comes back showing the screen as it stands.
 
+## Voice input
+
+Voice starts off. Open **⋯ → Voice input**, enable **local voice**, and explicitly download a model. The panel identifies **Hugging Face** as the model host before download; no account or payment is needed. Downloads go into the app's data folder, separate from the installer, and are checked for their exact size and SHA-256 before becoming usable. An interrupted or failed download is never used. **Remove** deletes a downloaded model.
+
+- **Small Q5_1**, recommended: 190,085,487 bytes (190.1 MB).
+- **Base Q5_1**, lighter: 59,707,625 bytes (59.7 MB).
+
+Select a terminal with a running program and press the **mic** in the top bar. The system's default microphone is used. Listening is **blue**, with the original terminal's name and elapsed time. **Stop and insert** stops the microphone and transcribes locally on the CPU. **Cancel voice input** discards the recording or pending result. Recording stops automatically at 60 seconds; very short and silent audio is rejected. No mic is opened by enabling voice or downloading a model.
+
+The default in-app toggle is **Ctrl+Shift+Space**. Choose **Ctrl+Alt+Shift+Space** or **No shortcut** in the panel if your program uses that key. The shortcut is reserved only while voice is enabled; plain Space and the office's existing keys retain their behavior. Holding the shortcut does not repeatedly toggle capture.
+
+Changing keyboard focus does not change the destination. Text goes only into the pane and live terminal session selected at recording start. Closing/putting away that pane, hiding it behind a zoomed pane, stopping/restarting its program, cancelling, changing voice settings, minimising or closing the window discards the pending recording/result. Closing to tray never keeps a hidden microphone running. Terminal controls and line breaks are stripped. **Voice never presses Enter or runs/submits the text.** Review it in the terminal and send it yourself.
+
+Choose automatic language detection, English or Hindi. Multilingual models do not establish usable Hindi/Hinglish, accent or technical-vocabulary accuracy. Try shorter recordings or Base if memory is constrained. On microphone failure, check OS microphone access and the default input device; the app stops capture and explains how to retry. Linux needs a working ALSA input; macOS asks for system consent.
+
+Audio and transcripts are kept only in memory and discarded after use or cancellation. Voice leaves the clipboard alone and makes no recognition or rewriting network request. To avoid retaining dictated text through terminal echo, a desk that receives voice text skips the app's saved-screen file for that app run; its conversation is still owned and potentially saved by its CLI. Other desks retain their usual screen snapshots. Voice's Windows recorded-WAV tests do not establish real microphone behavior. [Validation and remaining checks](reviews/voice-validation-2026-10-09.md).
+
 ## When someone needs you
 
 Amber means one thing here: someone needs you.
@@ -141,6 +158,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 ## The ⋯ menu
 
 - **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. This panel also chooses the editor that file paths open in.
+- **Voice input.** Enable local voice, download/remove models, choose language and the in-app toggle shortcut.
 - **Make the terminals even**, when more than one is open.
 - **Copy on select**, off by default.
 - **Closing the window quits**, off by default.
@@ -160,6 +178,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | `Ctrl+Shift+/` | The list of keys (`?` on the floor) |
 | `Esc` | Close a side panel or a menu, when the keyboard is not in a terminal |
 | **Terminals** | |
+| `Ctrl+Shift+Space` | Start / stop voice when enabled (configurable in Voice input) |
 | `Alt+1` … `Alt+9` | The keyboard to pane 1 to 9 |
 | `Ctrl+Shift+]` / `Ctrl+Shift+[` | The keyboard to the next pane, or the one before |
 | `Ctrl+Shift+Enter` | Give this pane the room, and put the others back |
@@ -211,7 +230,8 @@ The data folder is `%APPDATA%\io.github.yashingole.agentmoshpit` on Windows, `~/
 | --- | --- |
 | `desks.json` | The desks: which program, the name, the folder, and the id of the conversation when it is known. |
 | `window.json` | The window's size and place. |
-| `settings.json` | Whether closing the window quits. Written the first time you change it. |
+| `settings.json` | Whether closing the window quits; voice enabled/model/language/shortcut preferences. Written when changed. |
+| `voice-models/` | Verified optional model weights. No recordings or transcript files. Partial downloads are not used. |
 | `screens/` | Each desk's last screen, written when the office quits. |
 | `pasted/` | Pictures pasted into terminals. Cleared after a week. |
 | `harnesses.json` | Your own programs, if you wrote any. |

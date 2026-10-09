@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   check:
+    env:
+      MOSHPIT_INSTANCE: voiceci
+      MOSHPIT_DATA_DIR: ${{ github.workspace }}/.moshpit-ci-data
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +35,18 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential libasound2-dev cmake
+
+      - name: Use packaged Whisper bindings on Linux
+        if: runner.os == 'Linux'
+        run: echo "WHISPER_DONT_GENERATE_BINDINGS=1" >> "$GITHUB_ENV"
+
+      # The pinned packaged bindings contain glibc layouts. Windows and macOS
+      # generate target bindings using LLVM already installed on these runners.
+      - name: Windows libclang
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-Content $env:GITHUB_ENV 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
 
       - uses: actions/setup-node@v7
         with:
@@ -71,7 +85,7 @@ jobs:
 
       - name: Core tests
         working-directory: src-tauri
-        run: cargo test --locked --lib
+        run: cargo test --locked
 
       - name: Desktop build
         run: npx tauri build --debug --no-bundle

@@ -26,6 +26,14 @@ getrandom = "0.3"
 portable-pty = "0.9"
 vt100 = "0.16"
 tauri-plugin-updater = "2"
+cpal = "=0.15.3"
+whisper-rs = { version = "=0.16.0", default-features = false }
+# Reuse the updater's HTTP/TLS stack instead of shipping a second client version.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+sha2 = "0.10"
+# Only used by opt-in debug WAV fixtures; release builds never read audio files.
+hound = "3.5"
 
 [target.'cfg(windows)'.dependencies]
 # Already part of the webview; named here to turn off its browser keys (F5 reloading the window).

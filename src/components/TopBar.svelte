@@ -6,6 +6,7 @@
   import type { Phase } from '../lib/types'
   import AppMenu from './AppMenu.svelte'
   import Mark from './Mark.svelte'
+  import VoiceControl from './VoiceControl.svelte'
 
   const counts = $derived.by(() => {
     const count = (...phases: Phase[]) => office.agents.filter(a => phases.includes(a.phase)).length
@@ -53,6 +54,7 @@
   <button type="button" class="button new" aria-label="New agent" title="New agent (n, or Ctrl+Shift+N)" onclick={() => office.openNew()}>
     + <span class="words">new agent</span> <kbd>n</kbd>
   </button>
+  <VoiceControl />
   <AppMenu />
 </header>
 

@@ -18,6 +18,7 @@ mod storage;
 #[cfg(windows)]
 mod toast;
 mod update;
+mod voice;
 
 use engine::{Handle, Shell};
 use model::{NewAgent, Phase, Snapshot};
@@ -203,6 +204,7 @@ struct DataDir(PathBuf);
 struct Settings {
     /// Closing the window quits the office, as in most apps, instead of leaving it in the tray.
     close_quits: bool,
+    voice: voice::Settings,
 }
 
 struct Chosen {
@@ -314,6 +316,7 @@ fn open_window(app: &AppHandle) {
             builder = builder.position(x, y);
         }
         if let Ok(window) = builder.build() {
+            app.state::<voice::Voice>().window(true);
             allow_clipboard(&window);
             quiet_browser(&window);
             app.state::<Handle>().attention(true, true);
@@ -487,6 +490,7 @@ fn say_still_running(app: &AppHandle) {
 /// and their screens are saved.
 pub(crate) fn put_away(app: &AppHandle) {
     QUITTING.store(true, Ordering::Relaxed);
+    app.state::<voice::Voice>().shutdown();
     app.state::<WindowMemory>().save();
     app.state::<Handle>().shutdown();
 }
@@ -540,7 +544,8 @@ fn term_attach(handle: State<'_, Handle>, agent: String, on_data: Channel<Invoke
 }
 
 #[tauri::command]
-fn term_detach(handle: State<'_, Handle>, agent: String, token: u64) {
+fn term_detach(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agent: String, token: u64) {
+    voice.cancel_agent(&agent);
     handle.detach(&agent, token);
 }
 
@@ -555,13 +560,15 @@ fn term_resize(handle: State<'_, Handle>, agent: String, cols: u16, rows: u16) {
 }
 
 #[tauri::command]
-fn stop(handle: State<'_, Handle>, agent: String) {
+fn stop(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agent: String) {
+    voice.cancel_agent(&agent);
     handle.stop(&agent);
 }
 
 /// End a desk's program and start it again, in a terminal of the size given.
 #[tauri::command]
-async fn restart(handle: State<'_, Handle>, agent: String, cols: u16, rows: u16) -> Result<(), String> {
+async fn restart(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agent: String, cols: u16, rows: u16) -> Result<(), String> {
+    voice.cancel_agent(&agent);
     handle.restart(&agent, cols, rows)
 }
 
@@ -694,7 +701,8 @@ fn take_opening(opening: State<'_, Opening>) -> Option<String> {
 }
 
 #[tauri::command]
-fn dismiss(handle: State<'_, Handle>, agent: String) {
+fn dismiss(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agent: String) {
+    voice.cancel_agent(&agent);
     handle.dismiss(&agent);
 }
 
@@ -705,7 +713,8 @@ fn rename(handle: State<'_, Handle>, agent: String, title: String) {
 
 /// Which desks have their terminal on screen right now.
 #[tauri::command]
-fn watch(handle: State<'_, Handle>, agents: Vec<String>) {
+fn watch(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agents: Vec<String>) {
+    voice.watch(&agents);
     handle.watch(agents);
 }
 
@@ -800,6 +809,41 @@ fn app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
+fn voice_view(voice: State<'_, voice::Voice>) -> voice::View { voice.view() }
+
+#[tauri::command]
+fn voice_config(chosen: State<'_, Chosen>, voice: State<'_, voice::Voice>, settings: voice::Settings) -> Result<(), String> {
+    voice.cancel();
+    let mut now = chosen.now.lock().unwrap();
+    let updated = Settings { voice: settings, ..now.clone() };
+    let text = serde_json::to_string_pretty(&updated).map_err(|e| e.to_string())?;
+    // Unlike transient UI state, a failure to save this privacy preference is surfaced.
+    let tmp = chosen.path.with_extension("tmp");
+    std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, &chosen.path)).map_err(|e| format!("Voice settings could not be saved: {e}"))?;
+    *now = updated;
+    Ok(())
+}
+
+#[tauri::command]
+fn voice_start(app: AppHandle, handle: State<'_, Handle>, voice: State<'_, voice::Voice>, chosen: State<'_, Chosen>, agent: String) -> Result<(), String> {
+    if !app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(true)) {
+        return Err("Open the office window before recording.".into());
+    }
+    voice.start(handle.inner().clone(), agent, chosen.now.lock().unwrap().voice.clone())
+}
+
+#[tauri::command]
+fn voice_stop(voice: State<'_, voice::Voice>) -> Result<(), String> { voice.stop() }
+#[tauri::command]
+fn voice_cancel(voice: State<'_, voice::Voice>) { voice.cancel(); }
+#[tauri::command]
+fn voice_download(voice: State<'_, voice::Voice>, model: voice::Model) -> Result<(), String> { voice.download(model) }
+#[tauri::command]
+fn voice_cancel_download(voice: State<'_, voice::Voice>) { voice.cancel_download(); }
+#[tauri::command]
+fn voice_remove(voice: State<'_, voice::Voice>, model: voice::Model) -> Result<(), String> { voice.remove(model) }
+
+#[tauri::command]
 async fn pick_folder(window: WebviewWindow) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -874,18 +918,26 @@ pub fn run() {
             newer_version,
             update_now,
             app_version,
-            pick_folder
+            pick_folder,
+            voice_view, voice_config, voice_start, voice_stop, voice_cancel,
+            voice_download, voice_cancel_download, voice_remove
         ])
         .on_window_event(|window, event| {
             if window.label() != WINDOW {
                 return;
             }
             let handle = window.state::<Handle>();
+            if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) || window.is_minimized().unwrap_or(false) {
+                window.state::<voice::Voice>().window(false);
+                window.state::<voice::Voice>().shutdown();
+            }
+            if matches!(event, WindowEvent::Resized(_)) && !window.is_minimized().unwrap_or(true) { window.state::<voice::Voice>().window(true); }
             match event {
                 // Chosen in the window: closing it quits, asking first if anyone is busy.
                 WindowEvent::CloseRequested { api, .. } if HAS_TRAY.load(Ordering::Relaxed) && !QUITTING.load(Ordering::Relaxed) => {
                     if window.state::<Chosen>().now.lock().unwrap().close_quits {
                         api.prevent_close();
+                        window.state::<voice::Voice>().window(true);
                         request_quit(window.app_handle());
                     }
                 }
@@ -938,6 +990,7 @@ pub fn run() {
             app.manage(engine::start(shell, table, saved, kept));
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
+            app.manage(voice::Voice::new(dir.join("voice-models")));
 
             app.manage(update::Latest::default());
             update::watch(app.handle());
@@ -960,6 +1013,7 @@ pub fn run() {
                 api.prevent_exit();
             }
         }
+        RunEvent::Exit => app.state::<voice::Voice>().shutdown(),
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => open_window(app),
         _ => {

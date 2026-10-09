@@ -3,6 +3,8 @@
   // terminal belongs to its program.
   import { onMount } from 'svelte'
   import { office } from '../lib/office.svelte'
+  import { voice } from '../lib/voice.svelte'
+  import { shortcutLabel } from '../lib/voice'
 
   let first = $state<HTMLElement>()
   onMount(() => first?.focus())
@@ -16,7 +18,8 @@
         ['Ctrl+Shift+N', 'New agent (n on the floor)'],
         ['Ctrl+Shift+Q', 'Quit, asking first if anyone is busy'],
         ['Ctrl+Q', 'The same, when the keyboard is not in a terminal (there it is the program’s)'],
-        ['Ctrl+Shift+/', 'This list']
+        ['Ctrl+Shift+/', 'This list'],
+        [shortcutLabel(voice.settings.shortcut), 'Start / stop local voice when enabled; configure in More → Voice input']
       ]
     },
     {

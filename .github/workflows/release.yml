@@ -131,7 +131,7 @@ jobs:
 
       - name: Refresh Windows native build configuration
         if: runner.os == 'Windows'
-        run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys
+        run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys --release --target ${{ matrix.target }}
 
       - uses: tauri-apps/tauri-action@v1
         env:

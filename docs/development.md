@@ -12,6 +12,8 @@ Local voice adds **CMake and a C++ toolchain** for pinned `whisper-rs = 0.16.0` 
 
 CI uses the runner's existing LLVM on Windows/macOS and packaged Linux bindings. The release workflow requires the cross-platform checks before building installers. Model weights are never bundled or fetched during a build. See the [voice validation record](reviews/voice-validation-2026-10-09.md) for actual platform results and outstanding microphone checks.
 
+After changing native CMake flags, run `cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys` in this checkout's target directory before rebuilding. Add `--release` for release artifacts and `--target <triple>` when the build uses an explicit target. The pinned build script does not track every forwarded flag as a Cargo rebuild input. On Windows, `CMAKE_POLICY_DEFAULT_CMP0091=NEW` is required for its older CMake minimum to honor the static runtime setting; CI refreshes the native package and checks the executable's DLL imports.
+
 ## Build and run
 
 ```sh

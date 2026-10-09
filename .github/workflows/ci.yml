@@ -21,6 +21,7 @@ jobs:
     env:
       MOSHPIT_INSTANCE: voiceci
       MOSHPIT_DATA_DIR: ${{ github.workspace }}/.moshpit-ci-data
+      MOSHPIT_DIAGNOSTICS: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +91,21 @@ jobs:
 
       - name: Desktop build
         run: npx tauri build --debug --no-bundle
+
+      - name: Windows runtime linkage
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $dumpbin) { throw 'Visual Studio dumpbin was not found.' }
+          $dependencies = & $dumpbin.FullName /DEPENDENTS src-tauri/target/debug/agent-moshpit.exe
+          $dependencies
+          if ($LASTEXITCODE -ne 0) { throw 'The Windows executable could not be inspected.' }
+          if ($dependencies -match '(?i)\b(?:msvcp|msvcr|vcruntime)\d+[^\s]*\.dll') {
+            throw 'The app requires an unbundled Microsoft C++ runtime DLL.'
+          }
 
       # Edge Stable on the hosted image is not the WebView2 Runtime. Raw app
       # tests do not run an installer, so provision their required runtime here.

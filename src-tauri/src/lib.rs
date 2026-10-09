@@ -45,6 +45,8 @@ const TRAY_ICON_ATTENTION: &[u8] = include_bytes!("../icons/tray-attention.png")
 /// Whether there is a tray icon to come back from. Without one (some Linux
 /// desktops), closing the window has to quit, or the app could never be reached again.
 static HAS_TRAY: AtomicBool = AtomicBool::new(false);
+/// Keep the event loop alive while a first window is being built on its worker.
+static OPENING_WINDOW: AtomicBool = AtomicBool::new(false);
 
 /// The real `Shell`: the window, the tray and the notification centre.
 struct Desktop {
@@ -301,11 +303,14 @@ fn open_window(app: &AppHandle) {
     }
     // Built on its own thread: on Windows, creating a webview from inside an
     // event handler (a tray click, a second launch) deadlocks the event loop.
+    if OPENING_WINDOW.swap(true, Ordering::AcqRel) { return; }
     let app = app.clone();
     std::thread::spawn(move || {
         if app.get_webview_window(WINDOW).is_some() {
+            OPENING_WINDOW.store(false, Ordering::Release);
             return;
         }
+        if std::env::var_os("MOSHPIT_DIAGNOSTICS").is_some() { eprintln!("Creating desktop window"); }
         let remembered = *app.state::<WindowMemory>().last.lock().unwrap();
         let (width, height) = remembered.map_or((1280.0, 800.0), |p| (p.width.max(340.0), p.height.max(420.0)));
         let need = app.state::<Handle>().snapshot().agents.iter().filter(|a| a.phase == Phase::NeedsYou).count();
@@ -328,12 +333,20 @@ fn open_window(app: &AppHandle) {
         if let Some((x, y)) = remembered.as_ref().and_then(|p| on_screen(&app, p)) {
             builder = builder.position(x, y);
         }
-        if let Ok(window) = builder.build() {
-            app.state::<voice::Voice>().window(true);
-            allow_clipboard(&window);
-            quiet_browser(&window);
-            app.state::<Handle>().attention(true, true);
+        match builder.build() {
+            Ok(window) => {
+                if std::env::var_os("MOSHPIT_DIAGNOSTICS").is_some() { eprintln!("Desktop window created"); }
+                app.state::<voice::Voice>().window(true);
+                allow_clipboard(&window);
+                quiet_browser(&window);
+                app.state::<Handle>().attention(true, true);
+            }
+            Err(error) => {
+                eprintln!("The desktop window could not be created: {error}");
+                if !HAS_TRAY.load(Ordering::Acquire) { app.exit(1); }
+            }
         }
+        OPENING_WINDOW.store(false, Ordering::Release);
     });
 }
 
@@ -1016,6 +1029,7 @@ pub fn run() {
             update::watch(app.handle());
 
             HAS_TRAY.store(build_tray(app.handle()).is_ok(), Ordering::Relaxed);
+            if std::env::var_os("MOSHPIT_DIAGNOSTICS").is_some() { eprintln!("Desktop tray available: {}", HAS_TRAY.load(Ordering::Relaxed)); }
             // `--hidden` is for starting with the computer: tray only, no window.
             let hidden = std::env::args().any(|arg| arg == "--hidden");
             if !hidden || !HAS_TRAY.load(Ordering::Relaxed) {
@@ -1029,7 +1043,7 @@ pub fn run() {
     app.run(|app, event| match event {
         // Closing the last window is not quitting: the office keeps watching from the tray.
         RunEvent::ExitRequested { api, code, .. } => {
-            if code.is_none() && HAS_TRAY.load(Ordering::Relaxed) {
+            if code.is_none() && (HAS_TRAY.load(Ordering::Relaxed) || OPENING_WINDOW.load(Ordering::Acquire)) {
                 api.prevent_exit();
             }
         }

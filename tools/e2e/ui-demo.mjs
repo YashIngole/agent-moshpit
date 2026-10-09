@@ -290,8 +290,10 @@ try {
   check('Ctrl+Shift+F finds in a terminal', await until(async () => (await page.getByRole('searchbox').count()) + (await page.locator('.find input').count()) > 0))
   await page.keyboard.type('src')
   check('and says when it has found it', ((await page.locator('.find .hint').textContent()) ?? '') !== 'not found')
+  // What a failure of the next check has to say for itself: where the keyboard was, and what the field held.
+  const finding = await page.evaluate(() => ({ keyboard: `${document.activeElement?.tagName}.${document.activeElement?.className}`, field: document.querySelector('.find input')?.value ?? null }))
   await page.keyboard.press('Escape')
-  check('Escape closes the find bar', await until(async () => (await page.locator('.find').count()) === 0))
+  check('Escape closes the find bar', await until(async () => (await page.locator('.find').count()) === 0), JSON.stringify(finding))
 
   const target = page.locator('.pane').first()
   const targetTitle = (await target.locator('h2').textContent()) ?? ''
@@ -303,7 +305,7 @@ try {
     screen.dispatchEvent(new DragEvent('dragover', at))
     screen.dispatchEvent(new DragEvent('drop', at))
   })
-  check('a file dropped on a pane is pasted into it as its path', await until(async () => ((await page.locator('.pane', { hasText: targetTitle }).locator('.xterm-accessibility-tree').innerText()) ?? '').replace(/\n/g, '').includes('"C:/Users/you/Desktop/screenshot 1.png"')))
+  check('a file dropped on a pane is pasted into it as its path', await until(async () => ((await page.locator('.pane', { hasText: targetTitle }).locator('.xterm-accessibility-tree').innerText()) ?? '').replace(/\n/g, '').includes('"C:/Users/you/Desktop/screenshot 1.png"')), JSON.stringify(await page.evaluate(() => window.__demo.typed.slice(-3))))
 
   await page.locator('.grip').dblclick()
   check('the strip beside the terminals is a list of names', await until(async () => (await page.locator('.seat.listed').count()) > 0))

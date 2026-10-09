@@ -327,14 +327,15 @@ impl Terminals {
         let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
         // The same size again changes nothing, and the program draws nothing.
         if live.master.get_size().is_ok_and(|now| now.rows == size.rows && now.cols == size.cols) { return; }
-        // Keep the reader behind this lock until the resized screen is ready for its redraw.
-        let mut screen = term.screen.lock().unwrap();
-        if live.master.resize(size).is_err() { return; }
+        // Prepare for the redraw, then let the reader drain output during the native resize.
+        {
+            let mut screen = term.screen.lock().unwrap();
+            screen.pulse.resized(now_ms());
+            resize_rendered(&mut screen.visible, size.rows, size.cols);
+            screen.prior.screen_mut().set_size(size.rows, size.cols);
+        }
+        let _ = live.master.resize(size);
         term.size = Some((size.cols, size.rows));
-        // What it prints next is its screen drawn again at the new size.
-        screen.pulse.resized(now_ms());
-        resize_rendered(&mut screen.visible, size.rows, size.cols);
-        screen.prior.screen_mut().set_size(rows.max(2), cols.max(8));
     }
 
     /// End the program. Its last screen stays to be read.

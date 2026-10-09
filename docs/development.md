@@ -76,3 +76,17 @@ node tools/e2e/terminals.mjs
 `node tools/e2e/real-clis.mjs` starts the real Claude Code and Codex with no task and types nothing into them, to check what only the real programs can show: the question about trusting a folder, and Codex staying idle while its pane is resized. A program that is not installed is skipped.
 
 Every test of the real app runs it as its own named office with its own data folder (`MOSHPIT_INSTANCE`, `MOSHPIT_DATA_DIR`), so an office you have open is left alone, and none of them asks npm for versions.
+
+## The site
+
+`site/` is [agentmoshpit.com](https://agentmoshpit.com): one static page, with no build step of its own. Its opening is the app's own window running with the demo data, which `npm run build:site` builds into `site/demo` (not kept in git). The pictures are taken from that same window by `node tools/site-shots.mjs`; run it again when the window's look changes. `node tools/site-shots.mjs --serve` serves the folder on `http://localhost:4175` to look at it.
+
+The download buttons link to `https://github.com/YashIngole/agent-moshpit/releases/latest/download/<file>`. The release workflow names the files without a version, so those addresses always lead to the newest release and the site does not change when one is made.
+
+It is hosted on Cloudflare as static files. With a Cloudflare login (`npx wrangler login`):
+
+```sh
+npm run build:site
+npx wrangler deploy --config tools/cloudflare/site.jsonc     # agentmoshpit.com
+npx wrangler deploy --config tools/cloudflare/www.jsonc      # www.agentmoshpit.com, which only redirects
+```

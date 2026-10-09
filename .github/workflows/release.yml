@@ -1,6 +1,8 @@
 # Builds installers for the three systems when a version tag is pushed, and
 # attaches them to a draft GitHub release. A person reads the draft and publishes it.
 #
+# The draft's text is docs/releases/<tag>.md when that file exists.
+#
 # The installers are not signed with a bought certificate, so Windows and macOS
 # warn the first time. The macOS app is signed ad hoc (see tauri.conf.json), which
 # is what lets it open at all on Apple Silicon.
@@ -18,7 +20,36 @@ permissions:
   contents: write
 
 jobs:
+  # One draft, made first, so that the four builds below do not each make their own.
+  draft:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.draft.outputs.id }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find or make the draft release
+        id: draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          find_draft() { gh api "repos/$GITHUB_REPOSITORY/releases" --jq "[.[] | select(.tag_name == \"$TAG\" and .draft)][0].id // empty"; }
+          id=$(find_draft)
+          if [ -z "$id" ]; then
+            notes="docs/releases/$TAG.md"
+            if [ -f "$notes" ]; then
+              gh release create "$TAG" --draft --verify-tag --title "Agent Moshpit $TAG" --notes-file "$notes"
+            else
+              gh release create "$TAG" --draft --verify-tag --title "Agent Moshpit $TAG" --notes ""
+            fi
+            id=$(find_draft)
+          fi
+          test -n "$id"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: draft
     strategy:
       fail-fast: false
       matrix:
@@ -62,9 +93,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Agent Moshpit ${{ github.ref_name }}'
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.draft.outputs.release_id }}
           args: --target ${{ matrix.target }}
           releaseAssetNamePattern: 'agent-moshpit_[platform]_[arch][setup][ext]'

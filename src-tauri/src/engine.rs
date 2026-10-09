@@ -961,7 +961,7 @@ mod tests {
     fn voice_pins_a_live_run_rejects_stale_or_hidden_panes_and_does_not_save_echo() {
         let shell = Arc::new(Quiet::default());
         let engine = start(shell.clone(), vec![shell_kind()], vec![], vec![]);
-        let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false };
+        let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false, launch: Default::default() };
         let id = engine.new_agent(spec, 80, 24).unwrap();
         assert!(engine.voice_target(&id).is_none());
         engine.watch(vec![id.clone()]);

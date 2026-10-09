@@ -623,16 +623,16 @@ h3 {
   color: var(--ink-3);
   font-size: 0.8125rem;
 }
-/* The file for the system this page is being read on. */
-.file.yours {
+/* Each system's usual file. All three look alike: no system comes first. */
+.file.usual {
   border-color: transparent;
   background: var(--button);
   color: var(--button-ink);
 }
-.file.yours:hover {
+.file.usual:hover {
   background: var(--button-hover);
 }
-.file.yours code {
+.file.usual code {
   color: inherit;
   opacity: 0.66;
 }

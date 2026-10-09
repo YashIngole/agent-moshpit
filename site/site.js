@@ -1,78 +1,11 @@
-// agentmoshpit.com: two small things, and the page is whole without either.
+// agentmoshpit.com: one small thing, and the page is whole without it.
 //
-// 1. The download button is pointed at the file for the system this is read on.
-//    The links themselves are in the page (the "download" room); this only picks one.
-// 2. The picture of the app at the top is replaced by the app's own window, running
-//    here with its demo data (site/demo, made by `npm run build:site`).
+// The picture of the app at the top is replaced by the app's own window, running
+// here with its demo data (site/demo, made by `npm run build:site`).
 //
 // This script sends nothing anywhere and stores nothing.
 ;(() => {
   'use strict'
-
-  // ── which system is this ──
-  const ua = navigator.userAgent || ''
-  const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''
-
-  function system() {
-    // An iPad says it is a Mac; a Mac has no touch screen.
-    if (/Android|iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1)) return 'phone'
-    if (/Win/i.test(platform) || /Windows/i.test(ua)) return 'windows'
-    if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) return 'mac'
-    if (/Linux|X11|CrOS/i.test(platform) || /Linux|X11/i.test(ua)) return 'linux'
-    return ''
-  }
-
-  /** The file to offer first, by its `data-file` in the page, and what to call it. */
-  async function pick(os) {
-    if (os === 'windows') return { file: 'windows', words: 'Download for Windows' }
-    if (os === 'linux') {
-      if (/Ubuntu|Debian|Mint|Pop!_OS/i.test(ua)) return { file: 'linux-deb', words: 'Download for Linux (.deb)' }
-      if (/Fedora|Red Hat|CentOS|SUSE/i.test(ua)) return { file: 'linux-rpm', words: 'Download for Linux (.rpm)' }
-      return { file: 'linux-appimage', words: 'Download for Linux (AppImage)' }
-    }
-    if (os === 'mac') {
-      // Most Macs sold since 2020 are Apple Silicon, and no browser says "Intel" reliably:
-      // Apple Silicon is offered unless the browser says otherwise.
-      let intel = false
-      try {
-        const high = await navigator.userAgentData?.getHighEntropyValues?.(['architecture'])
-        intel = high?.architecture === 'x86'
-      } catch {
-        // not a browser that says
-      }
-      return intel ? { file: 'mac-intel', words: 'Download for Mac (Intel)' } : { file: 'mac-arm', words: 'Download for Mac (Apple Silicon)' }
-    }
-    return null
-  }
-
-  const ALL = '<a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads</a>'
-  const OTHERS = {
-    windows: `Free and open source. Also for <a href="#macos">macOS</a> and <a href="#linux">Linux</a>. ${ALL}`,
-    mac: `Free and open source. <a href="#macos">An Intel Mac?</a> Also for <a href="#windows">Windows</a> and <a href="#linux">Linux</a>. ${ALL}`,
-    'mac-intel': `Free and open source. <a href="#macos">Apple Silicon?</a> Also for <a href="#windows">Windows</a> and <a href="#linux">Linux</a>. ${ALL}`,
-    linux: `Free and open source. Also as <a href="#linux">.deb, .rpm and AppImage</a>, and for <a href="#windows">Windows</a> and <a href="#macos">macOS</a>. ${ALL}`,
-    phone: `It is a desktop app: free and open source, for <a href="#windows">Windows</a>, <a href="#macos">macOS</a> and <a href="#linux">Linux</a>. ${ALL}`
-  }
-
-  async function download() {
-    const os = system()
-    const button = document.getElementById('get')
-    const words = document.getElementById('get-words')
-    const also = document.getElementById('also')
-    if (!button || !words || !also) return
-    if (os === 'phone') {
-      words.textContent = 'See the downloads'
-      also.innerHTML = OTHERS.phone
-      return
-    }
-    const chosen = await pick(os)
-    const link = chosen && document.querySelector(`a[data-file="${chosen.file}"]`)
-    if (!link) return
-    button.href = link.href
-    words.textContent = chosen.words
-    link.classList.add('yours')
-    also.innerHTML = OTHERS[chosen.file === 'mac-intel' ? 'mac-intel' : os]
-  }
 
   // ── the app itself, where the picture of it is ──
 
@@ -156,9 +89,8 @@
     glass.append(app)
   }
 
-  // `?card` is the page as a link to it shows it (tools/site-shots.mjs): for no system in particular.
+  // `?card` is the page as a link to it shows it (tools/site-shots.mjs): the picture, not the app.
   if (new URLSearchParams(location.search).has('card')) return
-  download()
   if (document.readyState === 'complete') live()
   else window.addEventListener('load', live, { once: true })
 })()

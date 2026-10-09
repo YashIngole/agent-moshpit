@@ -22,6 +22,7 @@ pub type Sink = Box<dyn Fn(&[u8]) -> bool + Send>;
 
 /// How much of what a program printed is kept for a window opened later.
 const KEPT_BYTES: usize = 512 * 1024;
+const KEPT_LINES: usize = 500;
 
 pub struct Launch {
     pub program: String,
@@ -38,7 +39,7 @@ struct Screen {
     /// Each watcher, with the number it was given so it can be taken away again.
     sinks: Vec<(u64, Sink)>,
     pulse: Pulse,
-    /// A bounded live screen for startup-dialog observation; scrollback is unnecessary here.
+    /// Screen at its actual sizes, with bounded history for observation and saved snapshots.
     visible: vt100::Parser,
     /// Terminal state immediately before the retained bytes, so trimming keeps modes and colors.
     prior: vt100::Parser,
@@ -47,7 +48,7 @@ struct Screen {
 
 impl Default for Screen {
     fn default() -> Self {
-        Self { kept: VecDeque::new(), sinks: Vec::new(), pulse: Pulse::default(), visible: vt100::Parser::new(24, 80, 0), prior: vt100::Parser::new(24, 80, 0), trimmed: false }
+        Self { kept: VecDeque::new(), sinks: Vec::new(), pulse: Pulse::default(), visible: vt100::Parser::new(24, 80, KEPT_LINES), prior: vt100::Parser::new(24, 80, 0), trimmed: false }
     }
 }
 
@@ -239,18 +240,12 @@ impl Terminals {
         let all: Vec<_> = self.terms.lock().unwrap().iter().map(|(id, t)| (id.clone(), t.screen.clone(), t.size)).collect();
         all.into_iter()
             .map(|(id, screen, size)| {
-                let printed = {
-                    let screen = screen.lock().unwrap();
-                    if size.is_some() {
-                        screen.replay()
-                    } else {
-                        screen.kept.iter().copied().collect()
-                    }
-                };
+                let mut screen = screen.lock().unwrap();
                 let shown = match size {
-                    Some((cols, rows)) => drawn(&printed, cols, rows, history),
+                    // Each redraw was interpreted at its actual size, including earlier resizes.
+                    Some(_) => drawn_screen(screen.visible.screen_mut(), history),
                     // A screen kept from before is already drawn.
-                    None => printed,
+                    None => screen.kept.iter().copied().collect(),
                 };
                 (id, shown)
             })
@@ -326,27 +321,19 @@ impl Terminals {
     }
 
     pub fn resize(&self, id: &str, cols: u16, rows: u16) {
-        let screen = {
-            let mut terms = self.terms.lock().unwrap();
-            let Some(term) = terms.get_mut(id) else {
-                return;
-            };
-            let Some(live) = term.live.as_ref() else {
-                return;
-            };
-            let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
-            // The same size again changes nothing, and the program draws nothing.
-            if live.master.get_size().is_ok_and(|now| now.rows == size.rows && now.cols == size.cols) {
-                return;
-            }
-            let _ = live.master.resize(size);
-            term.size = Some((size.cols, size.rows));
-            term.screen.clone()
-        };
+        let mut terms = self.terms.lock().unwrap();
+        let Some(term) = terms.get_mut(id) else { return; };
+        let Some(live) = term.live.as_ref() else { return; };
+        let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
+        // The same size again changes nothing, and the program draws nothing.
+        if live.master.get_size().is_ok_and(|now| now.rows == size.rows && now.cols == size.cols) { return; }
+        // Keep the reader behind this lock until the resized screen is ready for its redraw.
+        let mut screen = term.screen.lock().unwrap();
+        if live.master.resize(size).is_err() { return; }
+        term.size = Some((size.cols, size.rows));
         // What it prints next is its screen drawn again at the new size.
-        let mut screen = screen.lock().unwrap();
         screen.pulse.resized(now_ms());
-        screen.visible.screen_mut().set_size(rows.max(2), cols.max(8));
+        resize_rendered(&mut screen.visible, size.rows, size.cols);
         screen.prior.screen_mut().set_size(rows.max(2), cols.max(8));
     }
 
@@ -403,13 +390,27 @@ impl Terminals {
 /// What a terminal of this size shows after these bytes, with up to `history` lines
 /// that scrolled off above it: each line as it is drawn, colours and all, one after
 /// another. Blank lines at the foot are left out.
+#[cfg(test)]
 fn drawn(printed: &[u8], cols: u16, rows: u16, history: usize) -> Vec<u8> {
     let mut parser = vt100::Parser::new(rows.max(2), cols.max(8), history);
     parser.process(printed);
-    let screen = parser.screen_mut();
+    drawn_screen(parser.screen_mut(), history)
+}
+
+/// A shorter viewport moves lines above the cursor into history instead of erasing them.
+fn resize_rendered(parser: &mut vt100::Parser, rows: u16, cols: u16) {
+    let overflow = parser.screen().cursor_position().0.saturating_sub(rows - 1);
+    if overflow > 0 && !parser.screen().alternate_screen() {
+        parser.process(format!("\x1b[{overflow}S").as_bytes());
+    }
+    parser.screen_mut().set_size(rows, cols);
+}
+
+fn drawn_screen(screen: &mut vt100::Screen, history: usize) -> Vec<u8> {
+    let (rows, _) = screen.size();
     // Each line on its own: the widest width keeps any line from being joined to the one before.
     let mut lines: Vec<(Vec<u8>, bool)> = Vec::new();
-    screen.set_scrollback(usize::MAX);
+    screen.set_scrollback(history);
     let mut above = screen.scrollback();
     while above > 0 {
         screen.set_scrollback(above);
@@ -582,6 +583,24 @@ mod tests {
         // A program started there wipes it.
         terms.start("a", echo("fresh-start")).unwrap();
         assert!(wait_for(&seen, "\x1bc"));
+    }
+
+    #[test]
+    fn saved_history_survives_shrinking_and_growing_redraws() {
+        let mut screen = Screen::default();
+        resize_rendered(&mut screen.visible, 8, 40);
+        screen.take(b"TASK: original\r\nYOU SAID: ping\r\nEDITED src/app.ts:42\r\nworking\r\nfive\r\nFINISHED\r\n", 1_000);
+        resize_rendered(&mut screen.visible, 4, 40);
+        screen.take(b"\x1b[H\x1b[Jworking\r\nfive\r\nFINISHED\r\n", 2_000);
+        resize_rendered(&mut screen.visible, 8, 40);
+        screen.take(b"\x1b[H\x1b[Jworking\r\nfive\r\nFINISHED\r\n", 3_000);
+        let shown = drawn_screen(screen.visible.screen_mut(), 500);
+        let text = String::from_utf8_lossy(&shown);
+        for line in ["TASK: original", "YOU SAID: ping", "EDITED src/app.ts:42", "working", "five", "FINISHED"] {
+            assert_eq!(text.matches(line).count(), 1, "{line}: {text:?}");
+        }
+        let old = drawn(&screen.replay(), 40, 8, 500);
+        assert!(!String::from_utf8_lossy(&old).contains("TASK: original"));
     }
 
     #[test]

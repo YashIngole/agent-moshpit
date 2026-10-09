@@ -88,6 +88,11 @@ export function closeWindow(pid) {
   ).trim()
 }
 
+/** Give a desktop fixture room using its real window, without a CDP viewport override. */
+export function sizeWindow(pid, width, height) {
+  execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(here, 'size-window.ps1'), '-ProcessId', String(pid), '-Width', String(width), '-Height', String(height)], { stdio: 'pipe' })
+}
+
 /**
  * Whether the office window exists. The app always owns a few invisible helper
  * windows (tray, single-instance), so this looks for the titled one.

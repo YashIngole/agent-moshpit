@@ -298,8 +298,8 @@ fn on_screen(app: &AppHandle, placement: &Placement) -> Option<(f64, f64)> {
 /// memory back; the engine, the terminals and the tray keep running without it.
 fn open_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW) {
-        let _ = window.unminimize();
-        let _ = window.show();
+        if window.is_minimized().unwrap_or(false) { let _ = window.unminimize(); }
+        if !window.is_visible().unwrap_or(false) { let _ = window.show(); }
         let _ = window.set_focus();
         return;
     }

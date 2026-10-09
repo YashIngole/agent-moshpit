@@ -24,7 +24,7 @@ import { createServer } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addressCommand, appPath, attach, forgetAddress, isRunning, killTree, launch, notices, openAddress, processes, sleep, windowTitle } from './lib.mjs'
+import { addressCommand, appPath, attach, forgetAddress, isRunning, killTree, launch, notices, openAddress, processes, sizeWindow, sleep, windowTitle } from './lib.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const instance = process.env.MOSHPIT_INSTANCE || 'e2e'
@@ -98,6 +98,9 @@ let { child, port } = launch({ port: 9241, env })
 let fakes = []
 try {
   let { browser, page } = await attach(port)
+  // Keep this fixture's complete history on screen across its pane resizes.
+  // The accessibility tree exposes visible rows, rather than all scrollback.
+  sizeWindow(child.pid, 1600, 1200)
   await page.waitForSelector('.floor')
 
   /** The text on a pane's terminal, read from what xterm keeps for screen readers. */
@@ -303,9 +306,11 @@ try {
   await page.keyboard.press('Control+Backquote')
   await until(async () => (await page.locator('.pane').count()) === 0)
   const id = await desk('Asks').getAttribute('data-desk')
+  const beforeAddress = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
   openAddress(`agent-moshpit-${instance}://desk/${id}`)
   check('opening a desk’s address opens that desk’s terminal in the running office', await until(async () => (await page.locator('.pane h2', { hasText: 'Asks' }).count()) === 1, 15000), (await page.locator('.pane h2').allTextContents()).join(' | '))
   check('beside the terminals that were open', (await page.locator('.pane').count()) >= 2)
+  check('opening a desk address preserves the existing window size', await until(async () => await page.evaluate(size => innerWidth === size.width && innerHeight === size.height, beforeAddress), 5000))
   check('and starts no second office', (await until(async () => processes(child.pid).filter(row => row.name.toLowerCase().includes('agent-moshpit')).length === 1, 6000)) && isRunning(child.pid))
 
   // ── a program that is not here yet: installed in a pane, then started ────
@@ -345,10 +350,16 @@ try {
 
   // ── the office quits and comes back: desks show where they left off ──────
   await until(async () => (await page.locator('.floor button.desk').evaluateAll(desks => desks.every(d => !/\b(working|starting|needs_you)\b/.test(d.className)))), 15000)
+  const finishing = page.locator('.pane', { hasText: 'First' })
+  if (await finishing.getByRole('button', { name: 'Give this terminal the room' }).count()) {
+    await finishing.getByRole('button', { name: 'Give this terminal the room' }).click()
+    await sleep(300)
+  }
   fakes = nodes(child.pid)
   await page.evaluate(() => void window.__TAURI_INTERNALS__.invoke('quit')).catch(() => {})
-  await browser.close().catch(() => {})
   check('Quit, with nobody busy, ends the office', await until(() => !isRunning(child.pid), 15000))
+  // Disconnecting CDP resets its viewport; let Quit save the screen before that reset.
+  await browser.close().catch(() => {})
   check('and its programs with it', await until(() => fakes.every(row => !isRunning(row.pid)), 8000))
   const kept = existsSync(path.join(data, 'screens')) ? readdirSync(path.join(data, 'screens')) : []
   check('each desk’s screen is kept for next time', kept.length >= 4, kept.join(', '))
@@ -370,7 +381,7 @@ try {
   if ((await page.locator('.pane').count()) > 1) await first.getByRole('button', { name: 'Give this terminal the room' }).click()
   // The accessibility tree contains visible rows, not the whole scrollback.
   // Give the held startup output enough height before checking its full replay.
-  await page.setViewportSize({ width: 1280, height: 1200 })
+  sizeWindow(child.pid, 1600, 1200)
   await until(async () => (await screen('First')).includes('TASK: say hello & goodbye'), 8000)
   check('an away desk shows what its terminal last showed', await shows('First', 'YOU SAID: ping', 8000), await screen('First').catch(e => String(e)))
   const lines = (await screen('First')).split('\n').map(text => text.trim()).filter(Boolean)

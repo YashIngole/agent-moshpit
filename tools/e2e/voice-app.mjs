@@ -84,12 +84,13 @@ try {
 
   await invoke('voice_start', { agent })
   await until(async () => (await view()).phase === 'listening')
+  const windowClosed = page.waitForEvent('close')
   closeWindow(child.pid)
-  await sleep(500)
+  await windowClosed
+  await browser.close()
   const reopened = launch({ port, env: { MOSHPIT_INSTANCE: instance, MOSHPIT_DATA_DIR: data, MOSHPIT_VOICE_WAV: path.join(fixtures, 'jfk.wav') } })
   const next = await attach(port)
   await next.page.waitForFunction(() => window.__TAURI_INTERNALS__?.invoke)
-  await browser.close()
   browser = next.browser
   const afterClose = await next.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('voice_view'))
   assert.equal(afterClose.phase, 'idle')

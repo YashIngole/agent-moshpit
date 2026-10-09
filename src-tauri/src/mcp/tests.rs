@@ -142,6 +142,28 @@ fn capabilities_are_revoked_and_corrupt_history_is_preserved() {
 }
 
 #[test]
+fn accepted_nonblocking_socket_waits_for_the_authenticated_request() {
+    let f = Fixture::new();
+    let token = f.hub.issue(&f.a).unwrap();
+    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let (server, _) = listener.accept().unwrap();
+    server.set_nonblocking(true).unwrap();
+    let hub = f.hub.clone();
+    let handle = f.handle.clone();
+    let (finished, completion) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || { finished.send(hub.connection(&handle, server)).unwrap(); });
+    assert!(matches!(completion.recv_timeout(Duration::from_millis(100)), Err(std::sync::mpsc::RecvTimeoutError::Timeout)), "The connection must wait for its request instead of closing on WouldBlock");
+    let mut reader = BufReader::new(client);
+    protocol::write_frame(reader.get_mut(), &json!({"token":token,"name":"get_context","arguments":{}})).unwrap();
+    let frame = protocol::read_frame(&mut reader, MAX_RESPONSE).unwrap().unwrap();
+    assert!(serde_json::from_slice::<Value>(&frame).unwrap().get("value").is_some());
+    completion.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+    worker.join().unwrap();
+}
+
+#[test]
 fn a_fast_child_result_is_not_overwritten_by_launch_completion() {
     let f = Fixture::new();
     let (task, _) = f.hub.reserve(&f.a, &f.b, &json!({"prompt":"Quick review","request_key":"fast"}), true).unwrap();

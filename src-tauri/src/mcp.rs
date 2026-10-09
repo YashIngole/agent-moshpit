@@ -135,6 +135,9 @@ impl Hub {
     }
 
     fn connection(&self, handle: &Handle, stream: TcpStream) -> io::Result<()> {
+        // BSD/macOS can inherit the listener's nonblocking mode on accept.
+        // This worker uses bounded blocking reads and writes, unlike the listener.
+        stream.set_nonblocking(false)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
         let mut reader = BufReader::new(stream);

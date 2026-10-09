@@ -745,11 +745,12 @@ fn rename(handle: State<'_, Handle>, agent: String, title: String) {
     handle.rename(&agent, &title);
 }
 
-/// Which desks have their terminal on screen right now.
+/// Terminals being read and uncovered panes available for an existing voice recording.
 #[tauri::command]
-fn watch(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agents: Vec<String>) {
-    voice.watch(&agents);
-    handle.watch(agents);
+fn watch(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agents: Vec<String>, visible: Option<Vec<String>>) {
+    let visible = visible.unwrap_or_else(|| agents.clone());
+    voice.watch(&visible);
+    handle.watch(agents, visible);
 }
 
 #[tauri::command]

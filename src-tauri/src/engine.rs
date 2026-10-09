@@ -82,8 +82,10 @@ struct Aside {
 
 struct State {
     office: Office,
-    /// Desks whose terminal is on screen in the window right now.
+    /// Selected terminals being read, for completion flags and notifications.
     watched: HashSet<String>,
+    /// Uncovered terminal panes, including the recording's original pane after a focus change.
+    visible: HashSet<String>,
     /// Whether the window is in front. A terminal behind another app is not being watched.
     focused: bool,
     installed: HashMap<String, Installed>,
@@ -161,6 +163,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
     let state = State {
         office: Office::restore(seated, now_ms()),
         watched: HashSet::new(),
+        visible: HashSet::new(),
         focused: false,
         installed: HashMap::new(),
         latest: HashMap::new(),
@@ -470,7 +473,7 @@ impl Handle {
 
     pub fn voice_target(&self, id: &str) -> Option<crate::voice::Target> {
         let state = self.inner.state.lock().unwrap();
-        if !state.watched.contains(id) || !state.office.get(id)?.running { return None; }
+        if !state.visible.contains(id) || !state.office.get(id)?.running { return None; }
         Some(crate::voice::Target { agent: id.into(), run: self.inner.terms.generation(id)? })
     }
 
@@ -482,7 +485,7 @@ impl Handle {
         let text = crate::voice::sanitize(std::str::from_utf8(data).map_err(|_| "The voice text was invalid and discarded.")?);
         if text.is_empty() || text.len() > 32 * 1024 { return Err("The voice text was empty or too long and discarded.".into()); }
         let mut state = self.inner.state.lock().unwrap();
-        if !state.watched.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
+        if !state.visible.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
             return Err("The recording's pane closed or its program stopped. Its text was discarded.".into());
         }
         self.inner.terms.write_generation(&target.agent, target.run, text.as_bytes())?;
@@ -584,11 +587,11 @@ impl Handle {
         }
     }
 
-    /// Which terminals are on screen. The window says so when the user opens,
-    /// closes or brings one back, so whatever had finished among them has been seen.
-    pub fn watch(&self, ids: Vec<String>) {
+    /// Which terminals are being read, and which panes remain visible for voice.
+    pub fn watch(&self, ids: Vec<String>, visible: Vec<String>) {
         let mut state = self.inner.state.lock().unwrap();
         state.watched = ids.into_iter().collect();
+        state.visible = visible.into_iter().collect();
         if state.focused {
             self.see(&mut state);
         }
@@ -600,6 +603,7 @@ impl Handle {
         state.focused = visible && focused;
         if !visible {
             state.watched.clear();
+            state.visible.clear();
         }
         if state.focused {
             self.see(&mut state);
@@ -1051,15 +1055,19 @@ mod tests {
         let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false, launch: Default::default() };
         let id = engine.new_agent(spec, 80, 24).unwrap();
         assert!(engine.voice_target(&id).is_none());
-        engine.watch(vec![id.clone()]);
+        engine.watch(vec![id.clone()], vec![id.clone()]);
         let target = engine.voice_target(&id).unwrap();
         assert!(engine.voice_live(&target));
+        // Selecting another pane must not move or discard this recording's target.
+        engine.watch(vec![], vec![id.clone()]);
+        assert!(engine.voice_live(&target));
+        assert!(engine.voice_write(&target, b"focus-change").is_ok());
         let invalid = crate::voice::Target { run: target.run + 100, ..target.clone() };
         assert!(engine.voice_write(&invalid, b"must-not-reach-the-terminal").is_err());
-        engine.watch(vec![]);
+        engine.watch(vec![], vec![]);
         assert!(!engine.voice_live(&target));
         assert!(engine.voice_write(&target, b"also-discarded").is_err());
-        engine.watch(vec![id.clone()]);
+        engine.watch(vec![id.clone()], vec![id.clone()]);
         assert!(engine.voice_write(&target, b"voice\r\ntext\x1b[31m\x03").is_ok());
         engine.restart(&id, 80, 24).unwrap();
         assert!(!engine.voice_live(&target));

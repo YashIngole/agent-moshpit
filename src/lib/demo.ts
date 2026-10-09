@@ -119,13 +119,14 @@ interface Seen {
   /** How many times the newer version was asked for. */
   updates: number
   watched: string[]
+  visible: string[]
   typed: { agent: string; data: string }[]
   opened: { agent: string | null; path: string; line: number | null; editor: string }[]
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], typed: [], opened: [] }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [] }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -339,9 +340,10 @@ export function demoBridge(): Bridge {
       agents = agents.map(a => (a.id === id ? { ...a, title: title.trim() || given.get(id) || a.title } : a))
       publish()
     },
-    watch: ids => {
+    watch: (ids, visible = ids) => {
       seen.watched = [...ids]
-      if (voice.agent && !ids.includes(voice.agent)) cancelVoice()
+      seen.visible = [...visible]
+      if (voice.agent && !visible.includes(voice.agent)) cancelVoice()
       if (agents.some(a => ids.includes(a.id) && a.unread)) {
         agents = agents.map(a => (ids.includes(a.id) ? { ...a, unread: false } : a))
         publish()

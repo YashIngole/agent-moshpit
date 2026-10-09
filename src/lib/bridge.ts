@@ -75,8 +75,8 @@ export interface Bridge {
   /** Take a desk away, ending its program. */
   dismiss(agent: string): void
   rename(agent: string, title: string): void
-  /** Which desks have their terminal on screen right now. */
-  watch(agents: string[]): void
+  /** Selected terminals being read, and all uncovered panes still available for voice. */
+  watch(agents: string[], visible?: string[]): void
   /** Open a web page in the browser, if it is one that may be. */
   openPage(url: string): void
   pickFolder(): Promise<string | null>
@@ -188,7 +188,7 @@ function tauriBridge(): Bridge {
     },
     dismiss: agent => void invoke('dismiss', { agent }),
     rename: (agent, title) => void invoke('rename', { agent, title }),
-    watch: agents => void invoke('watch', { agents }),
+    watch: (agents, visible = agents) => void invoke('watch', { agents, visible }),
     openPage: url => void invoke('open_page', { url }),
     pickFolder: () => invoke<string | null>('pick_folder'),
     quit: () => void invoke('quit'),

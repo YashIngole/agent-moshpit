@@ -635,8 +635,8 @@ class Office {
 
   /** Tell the core which terminals are in front of the user, so their flags come down. */
   #report() {
-    const attended = !this.panel && !this.menu && has(this.layout, this.focused) && (!this.zoomed || this.zoomed === this.focused) ? [this.focused] : []
-    bridge.watch(document.hidden ? [] : attended)
+    const visible = document.hidden || this.panel || this.menu ? [] : this.zoomed ? [this.zoomed] : ids(this.layout)
+    bridge.watch(visible.includes(this.focused) ? [this.focused] : [], visible)
   }
 
   reportWatched() {

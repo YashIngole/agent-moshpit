@@ -1,7 +1,7 @@
 {
   "name": "agent-moshpit",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "A small desktop office for coding agents: Claude Code, Codex and the rest, each in a terminal of its own",
   "license": "MIT",
   "type": "module",
@@ -14,6 +14,7 @@
     "test:tools": "node --test tools/*.test.mjs",
     "test:ui": "vite build && node tools/e2e/ui-demo.mjs",
     "test:app": "node tools/e2e/terminals.mjs && node tools/e2e/reliability.mjs",
+    "test:mcp": "node tools/e2e/mcp.mjs",
     "build:site": "vite build --base ./ --outDir site/demo --emptyOutDir",
     "tauri": "tauri"
   },

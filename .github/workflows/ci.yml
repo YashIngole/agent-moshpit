@@ -147,6 +147,12 @@ jobs:
           MOSHPIT_APP: ${{ github.workspace }}\src-tauri\target\debug\agent-moshpit.exe
         run: npm run test:app
 
+      - name: Internal MCP in the Windows desktop
+        if: runner.os == 'Windows'
+        env:
+          MOSHPIT_APP: ${{ github.workspace }}/src-tauri/target/debug/agent-moshpit.exe
+        run: node tools/e2e/mcp.mjs
+
       - name: Dependency advisories
         if: runner.os == 'Linux'
         working-directory: src-tauri

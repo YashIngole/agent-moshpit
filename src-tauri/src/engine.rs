@@ -119,6 +119,7 @@ struct Inner {
     state: Mutex<State>,
     home: PathBuf,
     stopping: AtomicBool,
+    mcp: Mutex<Option<Arc<crate::mcp::Hub>>>,
 }
 
 /// The engine, as the rest of the app holds it. Cheap to clone.
@@ -184,7 +185,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             }
         }
     });
-    let handle = Handle { inner: Arc::new(Inner { shell, out: Mutex::new(out), table, aside, terms, state: Mutex::new(state), home, stopping: AtomicBool::new(false) }) };
+    let handle = Handle { inner: Arc::new(Inner { shell, out: Mutex::new(out), table, aside, terms, state: Mutex::new(state), home, stopping: AtomicBool::new(false), mcp: Mutex::new(None) }) };
     *slot.lock().unwrap() = Some(handle.clone());
     handle.refresh_places();
 
@@ -221,6 +222,61 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
 }
 
 impl Handle {
+    pub(crate) fn enable_mcp(&self, path: PathBuf) -> Result<(), String> {
+        let mut slot = self.inner.mcp.lock().unwrap();
+        if slot.is_none() { *slot = Some(crate::mcp::Hub::start(self.clone(), path)?); }
+        Ok(())
+    }
+
+    fn mcp_launch(&self, harness: &Harness, id: &str, args: Vec<String>) -> Result<crate::mcp::PreparedLaunch, String> {
+        match self.inner.mcp.lock().unwrap().as_ref() {
+            Some(hub) => hub.prepare(&harness.id, id, args, harness.args.len()),
+            None => Ok((args, vec![])),
+        }
+    }
+
+    fn mcp_revoke(&self, id: &str) {
+        if let Some(hub) = self.inner.mcp.lock().unwrap().as_ref() { hub.revoke(id); }
+    }
+
+    pub(crate) fn title_locked(&self, id: &str) -> bool {
+        self.inner.state.lock().unwrap().office.get(id).is_none_or(|d| d.saved.title_locked)
+    }
+
+    pub(crate) fn agent_directory(&self, id: &str, directory: &Path) -> Result<(), String> {
+        let mut state = self.inner.state.lock().unwrap();
+        if state.office.get(id).is_none() { return Err("Your desk is gone.".into()); }
+        if state.office.agent_directory(id, directory.to_string_lossy().into_owned()) {
+            self.place(&mut state, id);
+            self.publish(&mut state);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn agent_rename(&self, id: &str, title: &str) -> Result<(), String> {
+        let mut state = self.inner.state.lock().unwrap();
+        let desk = state.office.get(id).ok_or("Your desk is gone.")?;
+        if desk.saved.title_locked { return Err("The user named this session. Their name is preserved.".into()); }
+        state.office.agent_title(id, title);
+        self.publish(&mut state);
+        Ok(())
+    }
+
+    pub(crate) fn agent_activity(&self, id: &str, activity: &str) -> Result<(), String> {
+        let mut state = self.inner.state.lock().unwrap();
+        if state.office.get(id).is_none() { return Err("Your desk is gone.".into()); }
+        state.office.agent_activity(id, activity);
+        self.publish(&mut state);
+        Ok(())
+    }
+
+    pub(crate) fn agent_attention(&self, id: &str, message: &str) -> Result<(), String> {
+        let state = self.inner.state.lock().unwrap();
+        let desk = state.office.get(id).ok_or("Your desk is gone.")?;
+        self.say(Out::Notify(format!("{} needs you", desk.saved.title), message.into(), id.into()));
+        Ok(())
+    }
+
     // ── what the window asks for ───────────────────────────────────────────
 
     pub fn snapshot(&self) -> Snapshot {
@@ -230,6 +286,11 @@ impl Handle {
 
     /// Seat a new agent and start its program. Returns the desk's id.
     pub fn new_agent(&self, spec: NewAgent, cols: u16, rows: u16) -> Result<String, String> {
+        self.new_agent_id(spec, cols, rows, new_id(), None)
+    }
+
+    pub(crate) fn new_agent_id(&self, spec: NewAgent, cols: u16, rows: u16, id: String, generated_title: Option<&str>) -> Result<String, String> {
+        if self.inner.stopping.load(Ordering::Relaxed) { return Err("The office is shutting down.".into()); }
         let kind = self.kind(&spec.harness)?.clone();
         let cwd = spec.cwd.trim().to_string();
         if cwd.is_empty() || !Path::new(&cwd).is_dir() {
@@ -244,17 +305,35 @@ impl Handle {
         let title = if named { harness::shorten(&spec.title, 60) } else { auto.clone() };
         let session = (kind.session == SessionFrom::Given).then(new_uuid);
         let args = harness::start_args(&kind, session.as_deref(), if named { &title } else { "" }, task, spec.worktree);
-        let (program, args) = harness::command_line(&found, &args)?;
-
-        let id = new_id();
+        if spec.worktree && kind.worktree.is_empty() { return Err("This program does not support worktrees.".into()); }
+        if generated_title.is_some() && found.through_shell {
+            return Err("This wrapper cannot receive MCP configuration safely. Use the native Claude Code or Codex executable for delegation.".into());
+        }
+        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, &id, args)? };
+        let (program, args) = match harness::command_line(&found, &args) {
+            Ok(command) => command,
+            Err(error) => { self.mcp_revoke(&id); return Err(error); }
+        };
         let desk = SavedDesk { id: id.clone(), harness: kind.id.clone(), title, title_locked: named, auto_title: auto, cwd: cwd.clone(), session_verified: session.is_some(), session, created_ms: now_ms() };
-        // Starting a program takes a moment; the lock is not held for it.
-        self.inner.terms.start(&id, Launch { program, args, cwd, cols, rows })?;
-        let mut state = self.inner.state.lock().unwrap();
-        state.office.add(desk, now_ms());
-        state.office.started(&id, !task.is_empty(), false, now_ms());
-        self.place(&mut state, &id);
-        self.publish(&mut state);
+        // Register the desk before spawning: a fast MCP startup or process exit
+        // must already be able to identify it. Never hold the state lock to spawn.
+        {
+            let mut state = self.inner.state.lock().unwrap();
+            state.office.add(desk, now_ms());
+            // Labels suggested by a requesting agent are set before the child
+            // starts, remain editable, and never acquire the user's name lock.
+            if let Some(title) = generated_title.filter(|s| !s.trim().is_empty()) { state.office.agent_title(&id, title); }
+            state.office.started(&id, !task.is_empty(), false, now_ms());
+            self.place(&mut state, &id);
+            self.publish(&mut state);
+        }
+        if let Err(error) = self.inner.terms.start(&id, Launch { program, args, cwd, cols, rows, env }) {
+            self.mcp_revoke(&id);
+            let mut state = self.inner.state.lock().unwrap();
+            state.office.remove(&id);
+            self.publish(&mut state);
+            return Err(error);
+        }
         Ok(id)
     }
 
@@ -282,9 +361,13 @@ impl Handle {
                 (harness::start_args(&kind, fresh.as_deref(), "", "", false), fresh)
             }
         };
-        let (program, args) = harness::command_line(&found, &args)?;
+        let (args, env) = if found.through_shell { (args, vec![]) } else { self.mcp_launch(&kind, id, args)? };
+        let (program, args) = match harness::command_line(&found, &args) {
+            Ok(command) => command,
+            Err(error) => { self.mcp_revoke(id); return Err(error); }
+        };
 
-        let outcome = self.inner.terms.start(id, Launch { program, args, cwd, cols, rows });
+        let outcome = self.inner.terms.start(id, Launch { program, args, cwd, cols, rows, env });
         let mut state = self.inner.state.lock().unwrap();
         let now = now_ms();
         let result = match outcome {
@@ -296,6 +379,7 @@ impl Handle {
                 Ok(())
             }
             Err(why) => {
+                self.mcp_revoke(id);
                 state.office.failed_to_start(id, &why, now);
                 Err(why)
             }
@@ -343,7 +427,7 @@ impl Handle {
         let (exe, args) = harness::command_line(&found, &words)?;
         let cwd = self.inner.home.to_string_lossy().into_owned();
         // A job that ran before under this id is replaced, terminal and all.
-        self.inner.terms.start(&id, Launch { program: exe, args, cwd, cols, rows })?;
+        self.inner.terms.start(&id, Launch { program: exe, args, cwd, cols, rows, env: vec![] })?;
         let mut state = self.inner.state.lock().unwrap();
         state.jobs.retain(|j| j.id != id);
         state.jobs.push(Job { id: id.clone(), harness: program.id.clone(), kind, running: true, ok: None });
@@ -421,6 +505,7 @@ impl Handle {
 
     /// End a desk's program. The desk stays, asleep.
     pub fn stop(&self, id: &str) {
+        self.mcp_revoke(id);
         {
             let mut state = self.inner.state.lock().unwrap();
             self.final_session(&mut state, id);
@@ -474,6 +559,7 @@ impl Handle {
 
     /// Take the desk away, ending its program. The conversation is the program's to keep.
     pub fn dismiss(&self, id: &str) {
+        self.mcp_revoke(id);
         self.inner.terms.remove(id);
         let mut state = self.inner.state.lock().unwrap();
         state.office.remove(id);
@@ -516,6 +602,7 @@ impl Handle {
     /// End every program. Called once, on the way out.
     pub fn shutdown(&self) {
         self.inner.stopping.store(true, Ordering::Relaxed);
+        if let Some(hub) = self.inner.mcp.lock().unwrap().as_ref() { hub.shutdown(); }
         self.inner.terms.stop_all();
         let mut state = self.inner.state.lock().unwrap();
         let ids: Vec<String> = state.office.desks().iter().map(|d| d.saved.id.clone()).collect();
@@ -538,6 +625,7 @@ impl Handle {
     // ── what happens by itself ─────────────────────────────────────────────
 
     fn exited(&self, id: &str, ok: bool) {
+        self.mcp_revoke(id);
         let mut state = self.inner.state.lock().unwrap();
         if let Some(job) = state.jobs.iter_mut().find(|j| j.id == id) {
             job.running = false;

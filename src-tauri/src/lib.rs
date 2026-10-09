@@ -9,6 +9,7 @@ mod editor;
 mod engine;
 mod harness;
 mod link;
+mod mcp;
 mod model;
 mod office;
 mod proctree;
@@ -19,6 +20,9 @@ mod storage;
 mod toast;
 mod update;
 mod voice;
+
+/// Run the lightweight MCP subprocess without opening a desktop or another office.
+pub fn run_mcp_stdio() -> Result<(), String> { mcp::run_stdio() }
 
 use engine::{Handle, Shell};
 use model::{NewAgent, Phase, Snapshot};
@@ -317,6 +321,15 @@ fn open_window(app: &AppHandle) {
             // The window shows this app and nothing else. A link in a terminal is opened
             // in the browser, never followed here; this is the second lock.
             .on_navigation(|url| is_own_page(url.scheme(), url.host_str()));
+        // WebView2 150 ignores environment browser flags in elevated hosts,
+        // including hosted Windows CI. Pass the isolated debug fixture's port
+        // through its API; release builds never enable this test hook.
+        #[cfg(all(windows, debug_assertions))]
+        if instance_name().is_some() && std::env::var_os("MOSHPIT_DATA_DIR").is_some() {
+            if let Some(port) = std::env::var("MOSHPIT_TEST_DEBUG_PORT").ok().and_then(|s| s.parse::<u16>().ok()).filter(|p| *p != 0) {
+                builder = builder.additional_browser_args(&format!("--remote-debugging-port={port}"));
+            }
+        }
         if let Some((x, y)) = remembered.as_ref().and_then(|p| on_screen(&app, p)) {
             builder = builder.position(x, y);
         }
@@ -1000,7 +1013,14 @@ pub fn run() {
             }
             app.manage(StartupProblems(Mutex::new(problems)));
             let shell = Arc::new(Desktop { app: app.handle().clone(), desks, screens, shown: Mutex::new(None) });
-            app.manage(engine::start(shell, table, saved, kept));
+            let handle = engine::start(shell, table, saved, kept);
+            if std::env::var_os("MOSHPIT_DISABLE_MCP").is_none() {
+                let path = dir.join("coordination.json");
+                if let Err(text) = handle.enable_mcp(path.clone()) {
+                    app.state::<StartupProblems>().0.lock().unwrap().push(harness::Problem { text, file: path.to_string_lossy().into_owned(), line: None });
+                }
+            }
+            app.manage(handle);
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
             app.manage(voice::Voice::new(dir.join("voice-models")));

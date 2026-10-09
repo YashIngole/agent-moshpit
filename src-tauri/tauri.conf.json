@@ -26,8 +26,13 @@
     "homepage": "https://agentmoshpit.com",
     "license": "MIT",
     "copyright": "Copyright (c) 2026 Agent Moshpit contributors",
+    "resources": {
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "infoPlist": "Info.plist",
+      "entitlements": "Entitlements.plist"
     },
     "icon": [
       "icons/32x32.png",

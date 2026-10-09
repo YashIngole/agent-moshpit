@@ -28,7 +28,7 @@ export function launch({ port = 9223, env = {}, args = [] } = {}) {
   const child = spawn(appPath(), args, {
     env: {
       ...process.env,
-      MOSHPIT_INSTANCE: 'e2e',
+      MOSHPIT_INSTANCE: process.env.MOSHPIT_INSTANCE || 'e2e',
       // Tests never ask npm for versions: no network, and no processes the test did not start.
       MOSHPIT_NO_UPDATE_CHECK: '1',
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,

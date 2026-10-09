@@ -19,6 +19,7 @@ A small desktop office for coding agents. Claude Code, Codex, Antigravity CLI an
 - **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
 - **Updates when you say.** When a newer version is out, the ⋯ menu offers it. One click fetches it, checks it against the app's own key and starts the office again.
 - **Private.** No account, no telemetry. See [what it sends](#what-it-sends).
+- **Local voice input.** Optional dictation into a selected live terminal. Download a model under **⋯ → Voice input**, then use the mic. Review the text and press Enter yourself; voice never sends it for you.
 
 ## Install
 
@@ -63,6 +64,8 @@ On macOS and Linux a few things are missing for now: a click on a notification d
 
 Nothing about you or your work. It asks two questions about versions, when it starts and every 12 hours: npm, for the newest version of each agent CLI you have installed, and GitHub, for the newest version of itself. Set `MOSHPIT_NO_UPDATE_CHECK` to turn both off. An update is only fetched when you choose it. The programs it runs talk to their own services as they always do.
 
+Voice is off by default. Explicit model downloads contact **Hugging Face and its download hosts**; the models are optional and outside the installer. Small Q5_1 is 190,085,487 bytes; Base Q5_1 is 59,707,625 bytes. Microphone audio and recognition stay on your computer, with no account, billing, cloud rewriting or telemetry. Voice keeps no recording or transcript files and does not use the clipboard. Terminals that receive voice text skip their saved-screen file for that app run to avoid retaining its echo. The agent program still owns its own conversation history. [Voice guide](docs/guide.md#voice-input) · [Measured sizes and validation](docs/reviews/voice-validation-2026-10-09.md).
+
 ## Documentation
 
 - [Guide](docs/guide.md): using the app, settings, and where its files are kept
@@ -74,7 +77,7 @@ Nothing about you or your work. It asks two questions about versions, when it st
 
 ## Building from source
 
-You need Node 22.12 or later, Rust 1.89 or later, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+You need Node 22.12 or later, Rust 1.89 or later, the [Tauri prerequisites](https://tauri.app/start/prerequisites/), CMake and a C++ toolchain. Windows and macOS also need libclang to generate target bindings for the pinned Whisper crate; Linux can use its packaged bindings. Linux microphone capture needs ALSA development headers. Details are in [development.md](docs/development.md).
 
 ```sh
 npm install
@@ -91,5 +94,7 @@ The Windows installers are not signed yet. The project is applying for free code
 ## Licence
 
 [MIT](LICENSE). Geist and Geist Mono are bundled under the SIL Open Font Licence.
+
+Voice uses whisper.cpp/ggml (MIT), whisper-rs (Unlicense) and CPAL (Apache-2.0). Optional Whisper model weights are MIT. See [third-party notices](THIRD_PARTY_NOTICES.md).
 
 Agent Moshpit is not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program it can run.

@@ -9,6 +9,10 @@
   import Programs from './components/Programs.svelte'
   import Toast from './components/Toast.svelte'
   import TopBar from './components/TopBar.svelte'
+  import VoicePanel from './components/VoicePanel.svelte'
+  import VoiceStatus from './components/VoiceStatus.svelte'
+  import { voice } from './lib/voice.svelte'
+  import { voiceKey } from './lib/voice'
   import { startBeat } from './lib/beat'
   import { bridge, type Drop } from './lib/bridge'
   import { FLOOR_WIDTH, office } from './lib/office.svelte'
@@ -18,11 +22,19 @@
     const stopOffice = office.start()
     const stopBeat = startBeat()
     const stopDrop = bridge.onDrop(onDrop)
+    const stopVoice = voice.start()
     return () => {
       stopOffice()
       stopBeat()
       stopDrop()
+      stopVoice()
     }
+  })
+
+  $effect(() => {
+    const target = voice.view.agent
+    if (target && (!office.open.has(target) || !office.agents.some(a => a.id === target && a.running))) voice.cancel()
+    voice.panel = office.panel?.kind === 'voice'
   })
 
   /** The pane at a place in the window, if there is one there. */
@@ -70,6 +82,10 @@
   function officeKey(event: KeyboardEvent): boolean {
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     const pane = office.focused && office.open.has(office.focused) ? office.focused : ''
+    if (voiceKey(event, voice.settings)) {
+      if (!event.repeat) void voice.toggle(pane)
+      return true
+    }
     // Back to the floor and back again. Not Escape: a program in a terminal uses that itself.
     if (ctrl && code === 'Backquote') office.toggleTerminals()
     else if (ctrl && shift && (code === 'BracketLeft' || code === 'BracketRight')) office.stepPane(code === 'BracketRight' ? 1 : -1)
@@ -145,6 +161,7 @@
 
 <div class="app" class:terminals={office.terminals} class:paneled={office.panel !== null} class:dragging>
   <TopBar />
+  <VoiceStatus />
   {#if office.problem}
     <p class="problem-strip" role="alert">
       <span>{office.problem}</span>
@@ -190,6 +207,8 @@
       <Programs />
     {:else if office.panel?.kind === 'keys'}
       <Keys />
+    {:else if office.panel?.kind === 'voice'}
+      <VoicePanel />
     {/if}
     <!-- Said over the floor, never over the foot of a terminal, where a program's prompt and choices are. -->
     {#if office.toast}

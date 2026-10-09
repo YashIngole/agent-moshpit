@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { voice } from '../lib/voice.svelte'
+  import { voiceKey } from '../lib/voice'
   // One program's terminal. The office draws none of what is in it: the bytes
   // come from the program and go to xterm.js, and the keys go back the other way.
   import { FitAddon } from '@xterm/addon-fit'
@@ -66,6 +68,7 @@
 
   /** Keys the office answers to, even in a terminal. Everything else is the program's. */
   function officeKey(event: KeyboardEvent): boolean {
+    if (voiceKey(event, voice.settings)) return true
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     if (ctrl && code === 'Backquote') return true
     if (ctrl && shift && ['BracketLeft', 'BracketRight', 'KeyW', 'KeyN', 'KeyQ', 'KeyF', 'Enter', 'Slash'].includes(code)) return true

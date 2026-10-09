@@ -7,7 +7,7 @@ import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, 
 import type { Agent, Editor, Harness, Job, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 
 /** The side panel, when there is one. Terminals are not a panel: they are the room. */
-export type Panel = { kind: 'new'; cwd: string; harness: string } | { kind: 'programs' } | { kind: 'keys' } | null
+export type Panel = { kind: 'new'; cwd: string; harness: string } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | null
 
 /** Whether a terminal is an install or an update rather than a desk's. */
 export const isJob = (id: string) => id.startsWith('job-')
@@ -709,6 +709,11 @@ class Office {
   openKeys() {
     this.#rememberFocus()
     this.panel = { kind: 'keys' }
+  }
+
+  openVoice() {
+    this.#rememberFocus()
+    this.panel = { kind: 'voice' }
   }
 
   // ── desks ──────────────────────────────────────────────────────────────

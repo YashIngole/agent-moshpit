@@ -44,6 +44,13 @@ const errors = []
 
 async function open(query, width = 1280, height = 800) {
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: 'light' })
+  // All demo clipboard effects stay in this context, never the system clipboard.
+  await context.addInitScript(() => {
+    navigator.clipboard.writeText = async () => {}
+    navigator.clipboard.write = async () => {}
+    navigator.clipboard.readText = async () => ''
+    navigator.clipboard.read = async () => []
+  })
   const page = await context.newPage()
   page.on('pageerror', error => errors.push(String(error)))
   page.on('console', message => {
@@ -640,6 +647,85 @@ try {
     })
   )
   check('with a button to the download page', (await page.locator('.toast').getByRole('button', { name: 'Open the page' }).count()) === 1)
+  await page.context().close()
+
+  // Local voice states use simulated audio and downloads, with terminal delivery
+  // observable through the existing demo bridge. No microphone is opened.
+  async function voiceOffice(extra = '', width = 1280) {
+    const p = await open(`demo=office&still${extra}`, width)
+    await p.getByRole('button', { name: 'More', exact: true }).click()
+    await p.getByRole('menuitem', { name: 'Voice input' }).click()
+    check('voice starts off', !(await p.getByLabel('Enable local voice').isChecked()))
+    await p.getByLabel('Enable local voice').check()
+    await p.getByRole('button', { name: 'Download base model' }).click()
+    check('voice shows explicit model download progress', await until(async () => await p.getByRole('progressbar', { name: 'Model download' }).count() === 1))
+    if (extra.includes('download-error')) return p
+    await p.getByRole('button', { name: 'Remove base model' }).waitFor()
+    await p.getByRole('radio', { name: /Base Q5_1/ }).check()
+    await p.getByLabel('Speech language').selectOption('english')
+    await p.getByRole('button', { name: 'Close', exact: true }).click()
+    await p.locator('[data-desk="demo-2"]').click()
+    await p.locator('.pane[data-pane="demo-2"] .xterm').waitFor()
+    return p
+  }
+  page = await voiceOffice()
+  check('voice reserves no terminal shortcut while off by default', await page.getByRole('button', { name: 'Start voice input' }).isEnabled())
+  await page.getByRole('button', { name: 'Start voice input' }).click()
+  check('voice visibly listens in blue', await until(async () => (await page.locator('.voice-status').innerText()).includes('Listening to Refactor auth middleware')) && await page.locator('.voice-status').evaluate(el => getComputedStyle(el).color === 'rgb(130, 170, 255)'))
+  await page.locator('[data-desk="demo-6"]').click({ modifiers: ['Control'] })
+  await page.getByRole('button', { name: 'Stop and insert' }).click()
+  check('voice shows transcribing with microphone stopped', await until(async () => (await page.locator('.voice-status').innerText()).includes('Microphone stopped')))
+  check('voice inserts into the original session without Enter after focus changes', await until(async () => await page.evaluate(() => window.__demo.typed.some(t => t.agent === 'demo-2' && t.data === 'Fix the checkout total'))))
+  check('voice never submits or leaves controls in its text', await page.evaluate(() => window.__demo.typed.every(t => !/[\r\n\x00-\x1f\x7f]/.test(t.data))))
+  await page.getByRole('button', { name: 'Dismiss voice notice' }).click()
+  await page.getByRole('button', { name: 'Start voice input' }).click()
+  await page.getByRole('button', { name: 'Cancel voice input' }).click()
+  const cancelled = await page.evaluate(() => window.__demo.typed.length)
+  await sleep(800)
+  check('cancelling voice inserts nothing', await page.evaluate(() => window.__demo.typed.length) === cancelled)
+  await page.getByRole('button', { name: 'Start voice input' }).click()
+  await page.getByRole('button', { name: 'Stop and insert' }).click()
+  await page.keyboard.press('Control+Shift+W')
+  await sleep(850)
+  check('closing a pane during transcription discards its stale result', await page.evaluate(() => window.__demo.typed.length) === cancelled)
+  await page.context().close()
+
+  for (const [scene, message] of [['mic-error', 'microphone could not start'], ['silence', 'No clear speech'], ['short', 'too short'], ['inference-error', 'transcription stopped']]) {
+    page = await voiceOffice(`&voice=${scene}`)
+    await page.getByRole('button', { name: 'Start voice input' }).click()
+    if (scene !== 'mic-error') await page.getByRole('button', { name: 'Stop and insert' }).click()
+    check(`voice ${scene} is helpful and inserts nothing`, await until(async () => ((await page.locator('.voice-status').textContent()) ?? '').includes(message)) && await page.evaluate(() => window.__demo.typed.length === 0))
+    await page.context().close()
+  }
+  page = await voiceOffice('&voice=download-error')
+  check('a failed model validation is visible and remains unavailable', await until(async () => (await page.getByRole('alert').textContent())?.includes('SHA-256')) && await page.getByRole('button', { name: 'Download base model' }).isEnabled())
+  await page.context().close()
+
+  page = await voiceOffice('', 420)
+  await page.keyboard.press('Control+Shift+Space')
+  check('configured shortcut starts voice from the terminal', await until(async () => await page.getByRole('button', { name: 'Stop and insert' }).count() === 1))
+  const shots = path.join(root, '.impeccable', 'review')
+  await (await import('node:fs/promises')).mkdir(shots, { recursive: true })
+  await page.screenshot({ path: path.join(shots, 'voice-narrow.png') })
+  check('voice fits a narrow window', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+  await page.getByRole('button', { name: 'Cancel voice input' }).click()
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Voice input' }).click()
+  await page.screenshot({ path: path.join(shots, 'voice-panel-narrow.png') })
+  await page.getByLabel('Start / stop shortcut').selectOption('none')
+  await page.getByLabel('Enable local voice').uncheck()
+  check('disabling voice removes the mic control', await until(async () => await page.locator('.mic').count() === 0))
+  await page.getByRole('button', { name: 'Remove base model' }).click()
+  check('downloaded models can be removed', await until(async () => await page.getByRole('button', { name: 'Download base model' }).count() === 1))
+  await page.context().close()
+
+  page = await voiceOffice()
+  await page.getByRole('button', { name: 'Start voice input' }).click()
+  await page.screenshot({ path: path.join(shots, 'voice-desktop.png') })
+  await page.getByRole('button', { name: 'Cancel voice input' }).click()
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Voice input' }).click()
+  await page.screenshot({ path: path.join(shots, 'voice-panel-desktop.png') })
   await page.context().close()
 
   check('nothing went wrong on the page', errors.length === 0, errors.join(' | '))

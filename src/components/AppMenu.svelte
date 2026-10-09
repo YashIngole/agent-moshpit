@@ -71,6 +71,10 @@
         Agent programs
         <span>{office.outdated.length > 0 ? `${office.outdated.length} update${office.outdated.length === 1 ? '' : 's'} out: ${office.outdated.map(h => h.name).join(', ')}` : 'Install, update, see versions'}</span>
       </button>
+      <button type="button" role="menuitem" onclick={() => { close(); office.openVoice() }}>
+        Voice input
+        <span>Local dictation, model downloads and language</span>
+      </button>
       {#if panes > 1}
         <button
           type="button"

@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
 import type { Editor, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
+import type { VoiceModel, VoiceSettings, VoiceView } from './voice'
 
 /**
  * What a terminal sends. `kept` is true for the first piece only: the screen as
@@ -91,6 +92,14 @@ export interface Bridge {
    * for the user when the update could not be had, and nothing was changed.
    */
   updateNow(): Promise<boolean>
+  voiceView(): Promise<VoiceView>
+  voiceConfig(settings: VoiceSettings): Promise<void>
+  voiceStart(agent: string): Promise<void>
+  voiceStop(): Promise<void>
+  voiceCancel(): Promise<void>
+  voiceDownload(model: VoiceModel): Promise<void>
+  voiceCancelDownload(): Promise<void>
+  voiceRemove(model: VoiceModel): Promise<void>
 }
 
 function subscribe<T>(name: string, fn: (payload: T) => void): () => void {
@@ -176,7 +185,15 @@ function tauriBridge(): Bridge {
     version: () => invoke<string>('app_version'),
     newer: () => invoke<Newer | null>('newer_version'),
     onNewer: fn => subscribe<Newer | null>('office:newer', fn),
-    updateNow: () => invoke<boolean>('update_now')
+    updateNow: () => invoke<boolean>('update_now'),
+    voiceView: () => invoke<VoiceView>('voice_view'),
+    voiceConfig: settings => invoke('voice_config', { settings }),
+    voiceStart: agent => invoke('voice_start', { agent }),
+    voiceStop: () => invoke('voice_stop'),
+    voiceCancel: () => invoke('voice_cancel'),
+    voiceDownload: model => invoke('voice_download', { model }),
+    voiceCancelDownload: () => invoke('voice_cancel_download'),
+    voiceRemove: model => invoke('voice_remove', { model })
   }
 }
 

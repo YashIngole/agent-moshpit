@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How to run multiple Claude Code agents at once</title>
+    <meta name="description" content="Five ways to run several Claude Code sessions in parallel: more terminals, git worktrees, agent view, tmux, and one window that shows which agent is waiting." />
+    <meta name="robots" content="max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/guides/run-multiple-claude-code-agents/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/site.css" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Agent Moshpit" />
+    <meta property="og:url" content="https://agentmoshpit.com/guides/run-multiple-claude-code-agents/" />
+    <meta property="og:title" content="How to run multiple Claude Code agents at once" />
+    <meta property="og:description" content="Five ways to run several Claude Code sessions in parallel, and how to tell which one is waiting for you." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "How to run multiple Claude Code agents at once",
+            "description": "Five ways to run several Claude Code sessions in parallel: more terminals, git worktrees, agent view, tmux, and one window that shows which agent is waiting.",
+            "url": "https://agentmoshpit.com/guides/run-multiple-claude-code-agents/",
+            "mainEntityOfPage": "https://agentmoshpit.com/guides/run-multiple-claude-code-agents/",
+            "datePublished": "2026-10-09",
+            "dateModified": "2026-10-09",
+            "inLanguage": "en",
+            "image": ["https://agentmoshpit.com/img/guide-new-agent.webp", "https://agentmoshpit.com/img/terminals.webp"],
+            "author": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
+            "publisher": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Agent Moshpit", "item": "https://agentmoshpit.com/" },
+              { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://agentmoshpit.com/guides/" },
+              { "@type": "ListItem", "position": 3, "name": "Run multiple Claude Code agents at once" }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Can I run multiple Claude Code instances at once?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every claude you start is a separate process with its own conversation. Open another terminal and run it again, or run claude agents and dispatch sessions from one screen." }
+              },
+              {
+                "@type": "Question",
+                "name": "How many Claude Code sessions can I run at once?",
+                "acceptedAnswer": { "@type": "Answer", "text": "As many as your plan's usage and your attention allow. Anthropic's notes on agent view say ten sessions in parallel use quota roughly ten times as fast as one." }
+              },
+              {
+                "@type": "Question",
+                "name": "Will parallel Claude Code sessions overwrite each other's changes?",
+                "acceptedAnswer": { "@type": "Answer", "text": "In the same checkout they can. Start each one in a git worktree of its own with claude --worktree and a name, or tick Work on a separate copy in Agent Moshpit." }
+              },
+              {
+                "@type": "Question",
+                "name": "Can two Claude Code sessions talk to each other?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Not by themselves. Anthropic documents agent teams, an experimental feature that is off by default, for sessions that share tasks and message each other. Agent Moshpit does not connect agents to each other; it shows them to you." }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I run multiple Claude Code agents on Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claude Code runs natively on Windows, and so does Agent Moshpit, which is used there every day. tmux is the exception: on Windows it needs WSL." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body class="guide">
+    <a class="skip" href="#main">Skip to the guide</a>
+
+    <header class="bar">
+      <a class="brand" href="/" aria-label="Agent Moshpit, home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="Site">
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="/#download">download</a>
+    </header>
+
+    <main id="main">
+      <article>
+        <header class="opening">
+          <p class="crumbs"><a href="/guides/">guides</a><span class="slash">/</span></p>
+          <h1>How to run multiple Claude Code agents at once</h1>
+          <p class="lede">
+            You can run as many Claude Code sessions as you like: every <code>claude</code> you start is a conversation of its own.
+            Two things get hard as the number grows. Their edits collide when they share a checkout, and you stop noticing which one has stopped to ask you something.
+            Here are five ways to do it, from nothing to install to a window made for the job.
+          </p>
+          <p class="checked"><span class="tag">checked 9 October 2026</span><span class="tag">Claude Code 2.1</span><span class="tag">Agent Moshpit 0.3.0</span></p>
+        </header>
+
+        <section class="room" aria-labelledby="short">
+          <p class="sign"><b>the short answer<span class="slash">/</span></b></p>
+          <div class="text">
+            <h2 id="short">Yes, and what runs out first is your attention</h2>
+            <ul>
+              <li>Each <code>claude</code> process is independent: its own conversation, its own permissions, its own folder.</li>
+              <li>Sessions on one plan share its usage. Anthropic says of background sessions that ten in parallel use quota roughly ten times as fast as one.</li>
+              <li>Two sessions writing in the same checkout can overwrite each other. Give each a git worktree.</li>
+              <li>None of that tells you which agent is waiting for an answer. The last two ways below do.</li>
+            </ul>
+          </div>
+          <div class="fits">
+            <table class="compare">
+              <thead>
+                <tr><th scope="col">Way</th><th scope="col">To install</th><th scope="col">Keeps edits apart</th><th scope="col">Shows who is waiting</th><th scope="col">Other CLIs</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">More terminal tabs</th><td>Nothing</td><td>Only if each has its own folder</td><td>No</td><td>Any</td></tr>
+                <tr><th scope="row"><code>claude --worktree</code></th><td>Nothing</td><td>Yes</td><td>No</td><td>Claude Code's own flag</td></tr>
+                <tr><th scope="row">Agent view, <code>claude agents</code></th><td>Nothing; a research preview</td><td>Yes, a worktree for each background session</td><td>Yes, a “Needs input” group</td><td>Claude Code only</td></tr>
+                <tr><th scope="row">tmux</th><td>tmux; on Windows, WSL too</td><td>No</td><td>Not unless you wire it up</td><td>Any</td></tr>
+                <tr><th scope="row">Agent Moshpit</th><td>The app</td><td>Yes, when you tick “Work on a separate copy”</td><td>Yes: a raised hand, a band naming the agent, a notification</td><td>Fourteen, and your own</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="by-hand">
+          <p class="sign"><b>by hand<span class="slash">/</span></b><span>nothing to install</span></p>
+          <div class="text">
+            <h2 id="by-hand">Open more terminals, and give each agent its own worktree</h2>
+            <p>
+              The plain way needs nothing new. Open a terminal tab for each task, go to the project and run <code>claude</code>.
+              For two agents in two different projects that is all there is to it.
+            </p>
+            <p>
+              For two agents in the <em>same</em> project, start each in a worktree of its own, so that one cannot overwrite what the other is writing.
+              Claude Code has a flag for it:
+            </p>
+            <pre class="code"><code>claude --worktree fix-checkout
+claude --worktree type-orders-api     # in a second terminal</code></pre>
+            <p>
+              A git worktree is a second checkout of the same repository, on a branch of its own. Claude Code makes it and starts the session inside it, so the two agents never touch the same files on disk.
+              The repository needs at least one commit. Anthropic's pages on
+              <a href="https://code.claude.com/docs/en/common-workflows#run-parallel-sessions-with-worktrees">parallel sessions</a> and
+              <a href="https://code.claude.com/docs/en/worktrees">worktrees</a> cover cleaning up afterwards and copying files such as <code>.env</code> into a new one.
+            </p>
+            <p>
+              Where this stops working: past three or four tabs they all look alike. One of them printed a permission prompt ten minutes ago and has been sitting there since.
+              You find out when you happen to click it.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="agent-view">
+          <p class="sign"><b>built in<span class="slash">/</span></b><span>research preview</span></p>
+          <div class="text">
+            <h2 id="agent-view">Claude Code's own agent view</h2>
+            <p>
+              Claude Code now has a screen for exactly this. Run <code>claude agents</code> and you get one list of your background sessions, grouped under Needs input, Working and Completed.
+              Type a task to start a new session, press <kbd>Space</kbd> on a row to peek at it and reply, and press <kbd>Enter</kbd> to step into the full conversation.
+              A session dispatched from here moves into a worktree of its own before it edits a file.
+            </p>
+            <pre class="code"><code>claude agents</code></pre>
+            <p>If Claude Code is the only agent you run, start here: it is already installed. Its limits, as <a href="https://code.claude.com/docs/en/agent-view">Anthropic's page</a> gives them:</p>
+            <ul>
+              <li>It is a research preview, and its interface and keys may change.</li>
+              <li>It lists background sessions. A <code>claude</code> you have open in another tab does not appear until you send it to the background.</li>
+              <li>It is for Claude Code. A Codex or Gemini session has no row in it.</li>
+            </ul>
+            <p>
+              The <a href="https://code.claude.com/docs/en/desktop">Claude desktop app</a> does a similar job in an interface of its own: its Code tab keeps a sidebar of sessions, shows two side by side, and sends a notification when one finishes.
+              There you work in Claude's chat view, not in the terminal program.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="tmux">
+          <p class="sign"><b>tmux<span class="slash">/</span></b><span>macOS, Linux, WSL</span></p>
+          <div class="text">
+            <h2 id="tmux">tmux, or another terminal multiplexer</h2>
+            <p>
+              tmux gives every agent a pane in one terminal and keeps them all running when you close it. Plenty of people run a wall of Claude Code panes this way. Two things to know before you do.
+            </p>
+            <p>
+              Inside tmux, Claude Code's notifications never reach your terminal unless you let them through. Anthropic's
+              <a href="https://code.claude.com/docs/en/terminal-config#configure-tmux">terminal guide</a> gives the lines:
+            </p>
+            <p class="where">~/.tmux.conf</p>
+            <pre class="code"><code>set -g allow-passthrough on
+set -s extended-keys on
+set -as terminal-features 'xterm*:extkeys'</code></pre>
+            <p>
+              And tmux does not run on Windows outside WSL. If that is where you work, see
+              <a href="/guides/coding-agents-on-windows/">several coding agents on Windows, without tmux or WSL</a>.
+            </p>
+            <p>
+              A multiplexer shows you every pane. It does not say which of them wants you: you watch for it, or you set up a bell.
+              <a href="/guides/which-agent-is-waiting/">How to get told when Claude Code or Codex is waiting</a> goes through the ways.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="one-window">
+          <p class="sign"><b>one window<span class="slash">/</span></b><span>Agent Moshpit</span></p>
+          <div class="text">
+            <h2 id="one-window">One window that shows who needs you</h2>
+            <p>
+              Agent Moshpit is a free desktop app made for this. It starts the <code>claude</code> you already have, as many times as you ask, and gives each one a terminal pane inside a single window.
+              What it adds is the floor: every agent is drawn as a person at a desk, with a word beside them saying whether they are working, done, idle, or waiting for you.
+            </p>
+            <ol>
+              <li><a href="#get">Install it</a> and open it. It finds the agent CLIs on your computer.</li>
+              <li>Press <b>+ new agent</b>, or <kbd>n</kbd>. Pick Claude Code, choose the project's folder, and type the task if you like.</li>
+              <li>If several agents will change the same project, tick <b>Work on a separate copy</b>. Claude Code is then started with its own <code>--worktree</code> flag and makes a worktree for that agent.</li>
+              <li>Press <kbd>Ctrl+Enter</kbd> to start. Do the same for the next agent: the program and the tick box are remembered, because people start several alike.</li>
+              <li>Click a desk to see that agent's terminal. Hold <kbd>Ctrl</kbd> and click another to open it beside the first; more of them make a grid.</li>
+              <li>When a hand goes up, a band across the top names the agent. Press <b>open their terminal</b> and answer there.</li>
+            </ol>
+          </div>
+          <figure class="shot">
+            <img src="/img/guide-new-agent.webp" width="2480" height="1600" loading="lazy" decoding="async" alt="The New agent panel beside the floor. It asks who should take the task, with Claude Code chosen among Codex, Antigravity CLI, Hermes and Gemini CLI, then what they should do, which folder, and a tick box, Work on a separate copy, that says Claude Code makes a git worktree on a new branch." />
+            <figcaption><span class="tag">demo data</span> A new agent: which program, what to do, in which folder, and whether to work on a separate copy.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="/img/terminals.webp" width="2480" height="1600" loading="lazy" decoding="async" alt="The Agent Moshpit window with the floor on the left and three terminals in a grid beside it, each headed by its agent's name, status and program. An amber band across the top names the one agent who needs an answer." />
+            <figcaption><span class="tag">demo data</span> Three agents' terminals beside the floor. Everything under a pane's header is the program's own screen.</figcaption>
+          </figure>
+          <div class="text">
+            <p>
+              The terminal is the real thing: Claude Code's own prompt, slash commands and approvals, with your sign-in and your settings. The app draws none of the conversation and keeps no API key.
+              Close the window and the agents keep working from the tray.
+            </p>
+            <h3>What it does not do</h3>
+            <ul>
+              <li>It shows the agents you start from it. A <code>claude</code> running in some other terminal does not appear.</li>
+              <li>A desk says that an agent is working, not what on.</li>
+              <li>It merges nothing and shows no diffs. That stays with git and with the CLI.</li>
+              <li>“Work on a separate copy” hands the program its own flag. It has not yet been run end to end by hand.</li>
+              <li>It is used by hand on Windows 11 only. The macOS and Linux builds pass the automated checks and are otherwise untried.</li>
+            </ul>
+            <p>Every known gap is in the <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">list of limits</a>, and the <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/guide.md">guide to the app</a> has every key.</p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="asked">
+          <p class="sign"><b>asked<span class="slash">/</span></b></p>
+          <div class="text"><h2 id="asked">Questions people ask</h2></div>
+          <dl class="asked">
+            <dt>Can I run multiple Claude Code instances at once?</dt>
+            <dd>Yes. Every <code>claude</code> you start is a separate process with its own conversation. Open another terminal and run it again, or run <code>claude agents</code> and dispatch sessions from one screen.</dd>
+            <dt>How many Claude Code sessions can I run at once?</dt>
+            <dd>As many as your plan's usage and your attention allow. Anthropic's notes on agent view say ten sessions in parallel use quota roughly ten times as fast as one.</dd>
+            <dt>Will parallel Claude Code sessions overwrite each other's changes?</dt>
+            <dd>In the same checkout they can. Start each one in a git worktree of its own with <code>claude --worktree</code> and a name, or tick <b>Work on a separate copy</b> in Agent Moshpit.</dd>
+            <dt>Can two Claude Code sessions talk to each other?</dt>
+            <dd>Not by themselves. Anthropic documents <a href="https://code.claude.com/docs/en/agent-teams">agent teams</a>, an experimental feature that is off by default, for sessions that share tasks and message each other. Agent Moshpit does not connect agents to each other; it shows them to you.</dd>
+            <dt>Can I run multiple Claude Code agents on Windows?</dt>
+            <dd>Yes. Claude Code runs natively on Windows, and so does Agent Moshpit, which is used there every day. tmux is the exception: on Windows it needs WSL. <a href="/guides/coding-agents-on-windows/">More on Windows</a>.</dd>
+          </dl>
+        </section>
+
+        <section class="room" aria-labelledby="more">
+          <p class="sign"><b>guides<span class="slash">/</span></b><span>read next</span></p>
+          <div class="text"><h2 id="more">Read next</h2></div>
+          <ul class="guides">
+            <li><a href="/guides/which-agent-is-waiting/"><b>Get told when Claude Code or Codex is waiting for you</b><span>The bell, the hooks and the settings, on Windows, macOS and Linux.</span></a></li>
+            <li><a href="/guides/claude-code-and-codex-side-by-side/"><b>Claude Code and Codex side by side in one window</b><span>Both at once in the same project, without stepping on each other.</span></a></li>
+            <li><a href="/guides/coding-agents-on-windows/"><b>Several coding agents on Windows, without tmux or WSL</b><span>What runs natively, what needs WSL, and what to use instead.</span></a></li>
+          </ul>
+        </section>
+
+        <section class="room" id="get" aria-labelledby="get-h">
+          <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+          <div class="text">
+            <h2 id="get-h">Get Agent Moshpit</h2>
+            <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
+          </div>
+          <ul class="files across">
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+            <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+          </ul>
+          <p class="after">
+            Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
+            <a href="/#download">Every download, and what each system asks the first time</a>.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="/">home</a>
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program named here; their names are theirs.
+        This page sets no cookies. It counts visits with Cloudflare Web Analytics, which uses none and does not follow you anywhere else; nothing more is loaded from outside. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+  </body>
+</html>

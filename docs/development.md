@@ -85,9 +85,11 @@ Every test of the real app runs it as its own named office with its own data fol
 
 ## The site
 
-`site/` is [agentmoshpit.com](https://agentmoshpit.com): one static page, with no build step of its own. Its opening is the app's own window running with the demo data, which `npm run build:site` builds into `site/demo` (not kept in git). The pictures are taken from that same window by `node tools/site-shots.mjs`; run it again when the window's look changes. `node tools/site-shots.mjs --serve` serves the folder on `http://localhost:4175` to look at it.
+`site/` is [agentmoshpit.com](https://agentmoshpit.com): the home page and the guides under `site/guides`, all static, with no build step of their own. Its opening is the app's own window running with the demo data, which `npm run build:site` builds into `site/demo` (not kept in git). The pictures are taken from that same window by `node tools/site-shots.mjs`; run it again when the window's look changes. `node tools/site-shots.mjs --serve` serves the folder on `http://localhost:4175` to look at it.
 
-The download buttons link to `https://github.com/YashIngole/agent-moshpit/releases/latest/download/<file>`. The release workflow names the files without a version, so those addresses always lead to the newest release and the site does not change when one is made.
+The download buttons link to `https://github.com/YashIngole/agent-moshpit/releases/latest/download/<file>`. The release workflow names the files without a version, so those addresses always lead to the newest release. One line of the site does name a version: `softwareVersion` in the home page's structured data. Change it when a release is published.
+
+For search engines there are `site/robots.txt` and `site/sitemap.xml`; a new page goes into the sitemap by hand, and a changed one gets a new `lastmod`. Each guide says at its top when it was last checked against the programs it describes. When Claude Code, Codex or the app changes what a guide says, check it again and change that date and the two in its structured data. The guides' pictures are the `guide-*.webp` that `node tools/site-shots.mjs --guides` takes.
 
 It is hosted on Cloudflare as static files. With a Cloudflare login (`npx wrangler login`):
 

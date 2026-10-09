@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Get notified when Claude Code or Codex is waiting for input</title>
+    <meta name="description" content="Every way to be told when Claude Code or Codex stops for an answer: the terminal bell, hooks, Codex's notify settings, and a window that names who is waiting." />
+    <meta name="robots" content="max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/guides/which-agent-is-waiting/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/site.css" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Agent Moshpit" />
+    <meta property="og:url" content="https://agentmoshpit.com/guides/which-agent-is-waiting/" />
+    <meta property="og:title" content="Get notified when Claude Code or Codex is waiting for input" />
+    <meta property="og:description" content="The terminal bell, hooks and Codex's notify settings, on Windows, macOS and Linux, and what to do when several agents are running at once." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "Get told when Claude Code or Codex is waiting for you",
+            "description": "Every way to be told when Claude Code or Codex stops for an answer: the terminal bell, hooks, Codex's notify settings, and a window that names who is waiting.",
+            "url": "https://agentmoshpit.com/guides/which-agent-is-waiting/",
+            "mainEntityOfPage": "https://agentmoshpit.com/guides/which-agent-is-waiting/",
+            "datePublished": "2026-10-09",
+            "dateModified": "2026-10-09",
+            "inLanguage": "en",
+            "image": ["https://agentmoshpit.com/img/guide-needs-you.webp", "https://agentmoshpit.com/img/guide-strip.webp"],
+            "author": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
+            "publisher": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Agent Moshpit", "item": "https://agentmoshpit.com/" },
+              { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://agentmoshpit.com/guides/" },
+              { "@type": "ListItem", "position": 3, "name": "Get told when Claude Code or Codex is waiting" }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Does Claude Code notify me when it needs input?",
+                "acceptedAnswer": { "@type": "Answer", "text": "By default only in Ghostty, Kitty and iTerm2, where it sends a desktop notification. In any other terminal, set preferredNotifChannel to terminal_bell or add a Notification hook." }
+              },
+              {
+                "@type": "Question",
+                "name": "How do I get Claude Code notifications on Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Turn on the terminal bell in Claude Code's settings and set bellStyle to all in Windows Terminal so the taskbar button flashes, or add a Notification hook that runs a PowerShell command. Or run the agents in Agent Moshpit, which sends a Windows notification that names the agent." }
+              },
+              {
+                "@type": "Question",
+                "name": "How can I make Codex play a sound when it is done?",
+                "acceptedAnswer": { "@type": "Answer", "text": "In ~/.codex/config.toml, under [tui], set notifications = true and notification_method = \"bel\", and let your terminal sound its bell. For a sound of your own, point notify at a script." }
+              },
+              {
+                "@type": "Question",
+                "name": "Why do I get no notifications from Claude Code inside tmux?",
+                "acceptedAnswer": { "@type": "Answer", "text": "tmux holds them back unless allow-passthrough is on. Add set -g allow-passthrough on to ~/.tmux.conf and reload it." }
+              },
+              {
+                "@type": "Question",
+                "name": "How do I know which Claude Code session is waiting?",
+                "acceptedAnswer": { "@type": "Answer", "text": "From Claude Code itself, run claude agents: it lists background sessions under Needs input. Across Claude Code, Codex and other CLIs, the band at the top of Agent Moshpit names whoever has waited longest and opens their terminal." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body class="guide">
+    <a class="skip" href="#main">Skip to the guide</a>
+
+    <header class="bar">
+      <a class="brand" href="/" aria-label="Agent Moshpit, home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="Site">
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="/#download">download</a>
+    </header>
+
+    <main id="main">
+      <article>
+        <header class="opening">
+          <p class="crumbs"><a href="/guides/">guides</a><span class="slash">/</span></p>
+          <h1>Get told when Claude Code or Codex is waiting for you</h1>
+          <p class="lede">
+            An agent that stops on a question prints it and waits. With one terminal in front of you, you see it.
+            With four of them behind an editor, you find out twenty minutes later.
+            Here is every way to be told, for Claude Code and for Codex, on Windows, macOS and Linux, and what changes when several agents run at once.
+          </p>
+          <p class="checked"><span class="tag">checked 9 October 2026</span><span class="tag">Claude Code 2.1</span><span class="tag">Codex CLI</span><span class="tag">Agent Moshpit 0.3.0</span></p>
+        </header>
+
+        <section class="room" aria-labelledby="short">
+          <p class="sign"><b>the short answer<span class="slash">/</span></b></p>
+          <div class="text">
+            <h2 id="short">Three reasons an agent stops, five ways to hear about it</h2>
+            <p>
+              An agent stops because it needs permission to run something, because it asked you a question, or because it finished and is waiting for the next prompt.
+              Both programs can announce all three. Neither does so in every terminal until you set it up.
+            </p>
+          </div>
+          <div class="fits">
+            <table class="compare">
+              <thead>
+                <tr><th scope="col">Way</th><th scope="col">Works for</th><th scope="col">Says which session</th><th scope="col">Setup</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Terminal bell</th><td>Claude Code, Codex</td><td>No</td><td>One setting in each program</td></tr>
+                <tr><th scope="row">Notification hook</th><td>Claude Code</td><td>Only if your command says so</td><td>A block in <code>settings.json</code></td></tr>
+                <tr><th scope="row"><code>notify</code> program</th><td>Codex, when a turn completes</td><td>Only if your script says so</td><td>A line in <code>config.toml</code> and a script</td></tr>
+                <tr><th scope="row">Agent view</th><td>Claude Code</td><td>Yes</td><td>None; a research preview</td></tr>
+                <tr><th scope="row">Agent Moshpit</th><td>Claude Code, Codex and twelve more CLIs</td><td>Yes, by name</td><td>Install the app</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="claude">
+          <p class="sign"><b>claude code<span class="slash">/</span></b><span>settings.json</span></p>
+          <div class="text">
+            <h2 id="claude">Claude Code: the bell, a hook, or agent view</h2>
+            <p>
+              Out of the box, Claude Code sends a desktop notification in three terminals only: Ghostty, Kitty and iTerm2.
+              Anywhere else, Windows Terminal included, nothing happens until you choose one of these.
+            </p>
+
+            <h3>Ring the terminal's bell</h3>
+            <p class="where">~/.claude/settings.json</p>
+            <pre class="code"><code>{
+  "preferredNotifChannel": "terminal_bell"
+}</code></pre>
+            <p>
+              What a bell does is up to the terminal. In Windows Terminal it is a sound by default. Set <code>"bellStyle": "all"</code> on a profile and the taskbar button flashes too, which is the part you notice from another window.
+              Microsoft lists the choices under <a href="https://learn.microsoft.com/windows/terminal/customize-settings/profile-advanced#bell-notification-style">bell notification style</a>.
+            </p>
+
+            <h3>Run a command with a Notification hook</h3>
+            <p>
+              A hook runs any command you like when Claude Code wants you. This one beeps on Windows:
+            </p>
+            <p class="where">~/.claude/settings.json</p>
+            <pre class="code"><code>{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -Command \"[console]::beep(880, 300)\""
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+            <p>Swap the command for your system:</p>
+            <ul>
+              <li><b>macOS:</b> <code>osascript -e 'display notification "Claude Code is waiting" with title "Claude Code"'</code></li>
+              <li><b>Linux:</b> <code>notify-send "Claude Code" "Waiting for you"</code>, which needs a notification daemon running.</li>
+            </ul>
+            <p>
+              Inside the JSON, the double quotes in those commands need a backslash before them.
+              Anthropic's <a href="https://code.claude.com/docs/en/hooks-guide#get-notified-when-claude-needs-input">hooks guide</a> has a version for each system; its Windows one opens a dialog box, which the guide warns can come up behind your terminal.
+            </p>
+            <p>
+              Two timings worth knowing, from the <a href="https://code.claude.com/docs/en/hooks#notification">hooks reference</a>. The hook for a permission prompt runs once the prompt has waited about six seconds.
+              The one for an idle prompt runs about a minute after Claude finished, if you have not typed since. An empty <code>matcher</code> runs the hook for every kind; name a kind, such as <code>permission_prompt</code>, to narrow it.
+            </p>
+
+            <h3>Or let Claude Code keep the list</h3>
+            <p>
+              <code>claude agents</code> opens agent view, which groups your background sessions under Needs input, Working and Completed, and puts the count of those waiting in the tab's title.
+              It is a research preview and covers Claude Code only. <a href="/guides/run-multiple-claude-code-agents/#agent-view">More about agent view</a>.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="codex">
+          <p class="sign"><b>codex<span class="slash">/</span></b><span>config.toml</span></p>
+          <div class="text">
+            <h2 id="codex">Codex: the settings under [tui], and notify</h2>
+            <p>Codex has switches of its own.</p>
+            <p class="where">~/.codex/config.toml</p>
+            <pre class="code"><code>[tui]
+notifications = true
+notification_method = "bel"</code></pre>
+            <ul>
+              <li><code>notifications</code> turns Codex's terminal notices on. It can also be limited to the kinds you name; OpenAI's page gives <code>agent-turn-complete</code> and <code>approval-requested</code> as examples.</li>
+              <li><code>notification_method</code> is <code>auto</code>, <code>osc9</code> or <code>bel</code>. <code>auto</code> prefers a desktop notification where the terminal seems to support one, and falls back to the bell.</li>
+              <li><code>notification_condition</code> says whether they come only when the terminal is not in front, or always.</li>
+            </ul>
+            <p>For anything those cannot do there is <code>notify</code>, which runs a program of yours and hands it one argument, a description of the event in JSON:</p>
+            <pre class="code"><code>notify = ["python3", "/home/you/bin/codex-done.py"]</code></pre>
+            <p>
+              As <a href="https://developers.openai.com/codex/config-advanced#notifications">OpenAI's page</a> stands today, <code>notify</code> is run when a turn completes and not when Codex asks for approval.
+              For approvals, use the notices under <code>[tui]</code>.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="several">
+          <p class="sign"><b>several at once<span class="slash">/</span></b></p>
+          <div class="text">
+            <h2 id="several">With several agents, a bell is not enough</h2>
+            <p>
+              Every way above answers “did something stop?”. None of them answers “which one?”.
+              A bell is a bell. A notification that says an agent needs your attention does not say which of five tabs to open, unless you write the script that puts the folder's name in it.
+              And two agents that stop a minute apart give you one notification you dismiss and one you never see.
+            </p>
+            <p>
+              With several agents you want a list that is kept for you: who is waiting, for how long, and a way to go straight there.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="one-window">
+          <p class="sign"><b>one window<span class="slash">/</span></b><span>Agent Moshpit</span></p>
+          <div class="text">
+            <h2 id="one-window">A raised hand and a name: what Agent Moshpit does</h2>
+            <p>
+              Agent Moshpit is a free desktop app that runs each agent's real CLI in a terminal pane inside one window, and keeps that list in front of you.
+              Each agent is drawn as a person at a desk. When one stops on a question:
+            </p>
+          </div>
+          <figure class="shot">
+            <img src="/img/guide-needs-you.webp" width="2480" height="918" loading="lazy" decoding="async" alt="The top of the Agent Moshpit window. An amber band reads: needs you, 48 seconds, Fix the checkout total, claude is waiting for your answer, with a button, open their terminal. Below it, in the room called shop, the first of three agents has a hand up and an amber screen, the second is typing, and the third is asleep." />
+            <figcaption><span class="tag">demo data</span> One agent has stopped on a question. The band names them and says how long they have waited.</figcaption>
+          </figure>
+          <div class="text">
+            <ul>
+              <li><b>A hand goes up at their desk</b>, with an amber tag and, when the app knows, a line saying what for.</li>
+              <li><b>A band across the top names whoever has waited longest</b> and has one button, which opens their terminal. Anyone else waiting is listed on the band.</li>
+              <li><b>The top bar counts them</b>, the window's title becomes <code>Agent Moshpit (2 need you)</code>, the taskbar button flashes if the window is behind others, and the tray icon changes.</li>
+              <li><b>You get a notification</b>, unless that terminal is already in front of you. On Windows a click on it opens that agent's desk.</li>
+              <li><b>The hand stays up until the question is answered</b> in their terminal. Looking somewhere else does not lower it.</li>
+            </ul>
+            <p>
+              You answer where the program asks. The app draws no approval button of its own: everything under a pane's header is Claude Code's or Codex's own screen.
+              Close the window and the agents keep working from the tray, which goes on showing when one needs you.
+            </p>
+          </div>
+          <figure class="shot">
+            <img src="/img/guide-strip.webp" width="2480" height="1600" loading="lazy" decoding="async" alt="The Agent Moshpit window with the floor narrowed to a strip on the left. At its top a group called waiting lists three agents: one that needs you, one in trouble and one that is done. To the right are three terminals in a grid, and the amber band across the top names the agent who needs an answer." />
+            <figcaption><span class="tag">demo data</span> Kept narrow, the floor becomes a strip, with whoever needs you, is in trouble or is done gathered on top.</figcaption>
+          </figure>
+          <div class="text">
+            <h3>How it knows, without reading the screen</h3>
+            <ul>
+              <li><b>Claude Code says so itself.</b> It keeps a small file about each running session, and the app reads from it whether Claude is busy, idle or waiting.</li>
+              <li><b>Every other program is read from how its terminal behaves.</b> One that keeps printing is working. One that goes quiet is idle, or done if it had been working. One that rings the bell or sends a terminal notice wants you. Codex is started with its notices turned on for this.</li>
+              <li><b>A folder nobody has trusted yet.</b> Claude Code and Codex first ask whether to trust a folder that is new to them. The app reads their own settings before starting one, and shows “needs you” until you answer.</li>
+            </ul>
+            <h3>What is not certain</h3>
+            <ul>
+              <li>For every program but Claude Code, the status is a reading of the terminal and not a report. A program that asks a question without ringing its terminal looks idle or done.</li>
+              <li>Two things have not been tried by hand yet: a real click on a Windows notification, and the flash of the taskbar button. A test checks that the notification carries the desk's address and that the address opens the desk.</li>
+              <li>On macOS and Linux, a click on a notification does not open that agent's desk yet, and neither build has been used by hand.</li>
+              <li>The app makes no sound of its own.</li>
+            </ul>
+            <p>The <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">list of limits</a> has the rest, and the <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/guide.md#when-someone-needs-you">guide to the app</a> describes all of this at length.</p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="asked">
+          <p class="sign"><b>asked<span class="slash">/</span></b></p>
+          <div class="text"><h2 id="asked">Questions people ask</h2></div>
+          <dl class="asked">
+            <dt>Does Claude Code notify me when it needs input?</dt>
+            <dd>By default only in Ghostty, Kitty and iTerm2, where it sends a desktop notification. In any other terminal, set <code>preferredNotifChannel</code> to <code>terminal_bell</code> or add a Notification hook.</dd>
+            <dt>How do I get Claude Code notifications on Windows?</dt>
+            <dd>Turn on the terminal bell in Claude Code's settings and set <code>bellStyle</code> to <code>all</code> in Windows Terminal so the taskbar button flashes, or add a Notification hook that runs a PowerShell command. Or run the agents in Agent Moshpit, which sends a Windows notification that names the agent.</dd>
+            <dt>How can I make Codex play a sound when it is done?</dt>
+            <dd>In <code>~/.codex/config.toml</code>, under <code>[tui]</code>, set <code>notifications = true</code> and <code>notification_method = "bel"</code>, and let your terminal sound its bell. For a sound of your own, point <code>notify</code> at a script.</dd>
+            <dt>Why do I get no notifications from Claude Code inside tmux?</dt>
+            <dd>tmux holds them back unless <code>allow-passthrough</code> is on. Add <code>set -g allow-passthrough on</code> to <code>~/.tmux.conf</code> and reload it. Anthropic's <a href="https://code.claude.com/docs/en/terminal-config#configure-tmux">terminal guide</a> has the full lines.</dd>
+            <dt>How do I know which Claude Code session is waiting?</dt>
+            <dd>From Claude Code itself, run <code>claude agents</code>: it lists background sessions under Needs input. Across Claude Code, Codex and other CLIs, the band at the top of Agent Moshpit names whoever has waited longest and opens their terminal.</dd>
+          </dl>
+        </section>
+
+        <section class="room" aria-labelledby="more">
+          <p class="sign"><b>guides<span class="slash">/</span></b><span>read next</span></p>
+          <div class="text"><h2 id="more">Read next</h2></div>
+          <ul class="guides">
+            <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways, from more terminal tabs to one window made for it.</span></a></li>
+            <li><a href="/guides/claude-code-and-codex-side-by-side/"><b>Claude Code and Codex side by side in one window</b><span>Both at once in the same project, without stepping on each other.</span></a></li>
+            <li><a href="/guides/coding-agents-on-windows/"><b>Several coding agents on Windows, without tmux or WSL</b><span>What runs natively, what needs WSL, and what to use instead.</span></a></li>
+          </ul>
+        </section>
+
+        <section class="room" id="get" aria-labelledby="get-h">
+          <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+          <div class="text">
+            <h2 id="get-h">Get Agent Moshpit</h2>
+            <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
+          </div>
+          <ul class="files across">
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+            <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+          </ul>
+          <p class="after">
+            Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
+            <a href="/#download">Every download, and what each system asks the first time</a>.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="/">home</a>
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program named here; their names are theirs.
+        This page sets no cookies. It counts visits with Cloudflare Web Analytics, which uses none and does not follow you anywhere else; nothing more is loaded from outside. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+  </body>
+</html>

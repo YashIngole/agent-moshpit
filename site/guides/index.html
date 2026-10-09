@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Guides: running several coding agents at once | Agent Moshpit</title>
+    <meta name="description" content="Plain guides to running Claude Code, Codex and other agent CLIs in parallel: keeping their edits apart, knowing which one is waiting, and doing it on Windows." />
+    <meta name="robots" content="max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/guides/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Agent Moshpit" />
+    <meta property="og:url" content="https://agentmoshpit.com/guides/" />
+    <meta property="og:title" content="Guides: running several coding agents at once" />
+    <meta property="og:description" content="Keeping parallel agents' edits apart, knowing which one is waiting, and doing it on Windows." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "CollectionPage",
+            "name": "Guides: running several coding agents at once",
+            "url": "https://agentmoshpit.com/guides/",
+            "inLanguage": "en",
+            "isPartOf": { "@type": "WebSite", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
+            "mainEntity": {
+              "@type": "ItemList",
+              "itemListElement": [
+                { "@type": "ListItem", "position": 1, "name": "How to run multiple Claude Code agents at once", "url": "https://agentmoshpit.com/guides/run-multiple-claude-code-agents/" },
+                { "@type": "ListItem", "position": 2, "name": "Get told when Claude Code or Codex is waiting for you", "url": "https://agentmoshpit.com/guides/which-agent-is-waiting/" },
+                { "@type": "ListItem", "position": 3, "name": "Run Claude Code and Codex side by side in one window", "url": "https://agentmoshpit.com/guides/claude-code-and-codex-side-by-side/" },
+                { "@type": "ListItem", "position": 4, "name": "Several coding agents on Windows, without tmux or WSL", "url": "https://agentmoshpit.com/guides/coding-agents-on-windows/" }
+              ]
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Agent Moshpit", "item": "https://agentmoshpit.com/" },
+              { "@type": "ListItem", "position": 2, "name": "Guides" }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body class="guide">
+    <a class="skip" href="#main">Skip to the guides</a>
+
+    <header class="bar">
+      <a class="brand" href="/" aria-label="Agent Moshpit, home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="Site">
+        <a href="/guides/" aria-current="page">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="/#download">download</a>
+    </header>
+
+    <main id="main">
+      <header class="opening">
+        <h1>Guides</h1>
+        <p class="lede">
+          How to run several coding agents at once and keep track of them.
+          Each page starts with what Claude Code and Codex can do by themselves, with nothing to install, and says plainly where Agent Moshpit helps and where it does not.
+        </p>
+      </header>
+
+      <section class="room" aria-labelledby="all">
+        <p class="sign"><b>guides<span class="slash">/</span></b><span>4 pages</span></p>
+        <div class="text"><h2 id="all">Running agents in parallel</h2></div>
+        <ul class="guides">
+          <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways: more terminal tabs, git worktrees, Claude Code's own agent view, tmux, and one window made for it.</span></a></li>
+          <li><a href="/guides/which-agent-is-waiting/"><b>Get told when Claude Code or Codex is waiting for you</b><span>The terminal bell, hooks and Codex's notify settings, on Windows, macOS and Linux, and what changes with several agents.</span></a></li>
+          <li><a href="/guides/claude-code-and-codex-side-by-side/"><b>Run Claude Code and Codex side by side in one window</b><span>One instructions file for both, a worktree each, and the two terminals next to each other.</span></a></li>
+          <li><a href="/guides/coding-agents-on-windows/"><b>Several coding agents on Windows, without tmux or WSL</b><span>If you were looking for cmux, Conductor or Claude Squad on Windows: what runs there, and what to use instead.</span></a></li>
+        </ul>
+      </section>
+
+      <section class="room" aria-labelledby="app">
+        <p class="sign"><b>the app<span class="slash">/</span></b><span>on GitHub</span></p>
+        <div class="text">
+          <h2 id="app">Using Agent Moshpit itself</h2>
+          <p>The app's own documentation is kept with its source.</p>
+          <ul>
+            <li><a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/guide.md">The guide</a>: the floor, terminals, notifications, every key, and where its files are kept.</li>
+            <li><a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/programs.md">Programs</a>: the fourteen CLIs it knows, and adding your own.</li>
+            <li><a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">Known limits</a>: what has not been built, and what has not been tried.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="room" id="get" aria-labelledby="get-h">
+        <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+        <div class="text">
+          <h2 id="get-h">Get Agent Moshpit</h2>
+          <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
+        </div>
+        <ul class="files across">
+          <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+          <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
+          <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+        </ul>
+        <p class="after">
+          Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
+          <a href="/#download">Every download, and what each system asks the first time</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="/">home</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program named here; their names are theirs.
+        This page sets no cookies. It counts visits with Cloudflare Web Analytics, which uses none and does not follow you anywhere else; nothing more is loaded from outside. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+  </body>
+</html>

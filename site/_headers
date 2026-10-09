@@ -25,6 +25,16 @@
 # The install scripts are read as text, by a shell and by a person.
 /install.sh
   Content-Type: text/plain; charset=utf-8
+  X-Robots-Tag: noindex
 
 /install.ps1
   Content-Type: text/plain; charset=utf-8
+  X-Robots-Tag: noindex
+
+# Not pages for a search engine to list: the app's own window with its demo data, and
+# the scripts above. A crawler may still fetch the window to draw the home page.
+/demo/*
+  X-Robots-Tag: noindex
+
+/404.html
+  X-Robots-Tag: noindex

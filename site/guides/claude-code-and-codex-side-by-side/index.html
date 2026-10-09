@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run Claude Code and Codex side by side in one window</title>
+    <meta name="description" content="How to run Claude Code and Codex at the same time in one project: shared instructions, a worktree each, and both terminals side by side in one window." />
+    <meta name="robots" content="max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/guides/claude-code-and-codex-side-by-side/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/site.css" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Agent Moshpit" />
+    <meta property="og:url" content="https://agentmoshpit.com/guides/claude-code-and-codex-side-by-side/" />
+    <meta property="og:title" content="Run Claude Code and Codex side by side in one window" />
+    <meta property="og:description" content="Both at once in the same project: shared instructions, a worktree each, and the two terminals next to each other." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "Run Claude Code and Codex side by side in one window",
+            "description": "How to run Claude Code and Codex at the same time in one project: shared instructions, a worktree each, and both terminals side by side in one window.",
+            "url": "https://agentmoshpit.com/guides/claude-code-and-codex-side-by-side/",
+            "mainEntityOfPage": "https://agentmoshpit.com/guides/claude-code-and-codex-side-by-side/",
+            "datePublished": "2026-10-09",
+            "dateModified": "2026-10-09",
+            "inLanguage": "en",
+            "image": ["https://agentmoshpit.com/img/guide-side-by-side.webp"],
+            "author": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
+            "publisher": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Agent Moshpit", "item": "https://agentmoshpit.com/" },
+              { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://agentmoshpit.com/guides/" },
+              { "@type": "ListItem", "position": 3, "name": "Claude Code and Codex side by side" }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Can I use Codex and Claude Code at the same time?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. They are separate programs with separate sign-ins, and nothing stops you running both. Give each a terminal, and a git worktree of its own if both will change the same project." }
+              },
+              {
+                "@type": "Question",
+                "name": "Is Codex the same as Claude Code?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Codex is OpenAI's coding agent and Claude Code is Anthropic's. Each has its own command, its own sign-in and plan, and its own settings." }
+              },
+              {
+                "@type": "Question",
+                "name": "How do I get Claude Code and Codex to talk to each other?",
+                "acceptedAnswer": { "@type": "Answer", "text": "That is a different job from running them side by side. OpenAI publishes a Codex plugin for Claude Code that lets Claude hand a review or a task to Codex. Agent Moshpit does not connect agents to each other; it shows both to you." }
+              },
+              {
+                "@type": "Question",
+                "name": "Can Claude Code and Codex share one instructions file?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. Codex reads AGENTS.md. Claude Code reads AGENTS.md too when the project has no CLAUDE.md; if it has one, import AGENTS.md from it." }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need two subscriptions?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Each program needs its own sign-in, set up the way its maker describes. Agent Moshpit adds no account, no API key and no charge of its own." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body class="guide">
+    <a class="skip" href="#main">Skip to the guide</a>
+
+    <header class="bar">
+      <a class="brand" href="/" aria-label="Agent Moshpit, home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="Site">
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="/#download">download</a>
+    </header>
+
+    <main id="main">
+      <article>
+        <header class="opening">
+          <p class="crumbs"><a href="/guides/">guides</a><span class="slash">/</span></p>
+          <h1>Run Claude Code and Codex side by side in one window</h1>
+          <p class="lede">
+            They are two programs with two sign-ins, and nothing stops you running both at once.
+            People do it to have one check the other's work, to give each the jobs it is better at, or to keep going when one runs into its limit.
+            This page is about the mechanics: both on screen, in the same project, without stepping on each other.
+          </p>
+          <p class="checked"><span class="tag">checked 9 October 2026</span><span class="tag">Claude Code 2.1</span><span class="tag">Codex CLI</span><span class="tag">Agent Moshpit 0.3.0</span></p>
+        </header>
+
+        <section class="room" aria-labelledby="short">
+          <p class="sign"><b>the short answer<span class="slash">/</span></b></p>
+          <div class="text">
+            <h2 id="short">Three things to settle</h2>
+            <ol>
+              <li><b>One set of instructions.</b> Keep the project's rules in <code>AGENTS.md</code>, so both programs read the same thing.</li>
+              <li><b>A checkout each.</b> If both will edit the same repository, give each a git worktree, or one will write over the other.</li>
+              <li><b>Both in view.</b> Two terminals next to each other, and some way to tell which one has stopped to ask you something.</li>
+            </ol>
+            <p>
+              If what you want is for one program to <em>call</em> the other, that is a different job. OpenAI publishes a
+              <a href="https://github.com/openai/codex-plugin-cc">Codex plugin for Claude Code</a> that lets Claude hand a review or a task to Codex. Nothing on this page needs it.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="instructions">
+          <p class="sign"><b>instructions<span class="slash">/</span></b><span>AGENTS.md</span></p>
+          <div class="text">
+            <h2 id="instructions">One instructions file for both</h2>
+            <p>
+              Codex reads <code>AGENTS.md</code> before it does any work. Claude Code's own file is <code>CLAUDE.md</code>, and since version 2.1.277 it also reads <code>AGENTS.md</code> when the project has no <code>CLAUDE.md</code>.
+              So the simplest arrangement is one <code>AGENTS.md</code> at the root of the repository and nothing else.
+            </p>
+            <p>
+              If the project already has a <code>CLAUDE.md</code>, Claude Code reads that and leaves <code>AGENTS.md</code> alone. Keep the shared rules in <code>AGENTS.md</code> and pull them in with one line:
+            </p>
+            <p class="where">CLAUDE.md</p>
+            <pre class="code"><code>@AGENTS.md
+
+Anything below this line is for Claude Code alone.</code></pre>
+            <p>
+              The two makers describe the details: <a href="https://code.claude.com/docs/en/memory#agents-md">Anthropic on AGENTS.md</a> and
+              <a href="https://developers.openai.com/codex/guides/agents-md">OpenAI on AGENTS.md</a>.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="apart">
+          <p class="sign"><b>apart<span class="slash">/</span></b><span>git worktree</span></p>
+          <div class="text">
+            <h2 id="apart">Keep their edits apart</h2>
+            <p>
+              Two agents in one folder share one set of files. If Claude Code is halfway through a refactor when Codex runs the tests, Codex tests a half-made change, and each can save over the other.
+              A git worktree gives each its own checkout of the same repository on its own branch:
+            </p>
+            <pre class="code"><code>git worktree add ../shop-claude -b claude/checkout-total
+git worktree add ../shop-codex  -b codex/auth-middleware</code></pre>
+            <p>
+              Then start <code>claude</code> in the first folder and <code>codex</code> in the second. When a piece of work is good, merge its branch as you would anyone's.
+              Claude Code can also make its own with <code>claude --worktree</code> and a name.
+            </p>
+            <p>
+              Sharing a folder is fine when only one of them writes. A common pairing is one agent making the change and the other reading the diff and saying what it thinks.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="one-window">
+          <p class="sign"><b>one window<span class="slash">/</span></b><span>Agent Moshpit</span></p>
+          <div class="text">
+            <h2 id="one-window">Both terminals in one window</h2>
+            <p>
+              Two terminal tabs do the job. What they do not do is tell you, while you are reading one, that the other has been waiting four minutes for a yes.
+              Agent Moshpit is a free desktop app that runs the <code>claude</code> and the <code>codex</code> you already have in terminal panes inside one window, and shows each as a person at a desk with a status beside them.
+            </p>
+          </div>
+          <figure class="shot">
+            <img src="/img/guide-side-by-side.webp" width="2480" height="1600" loading="lazy" decoding="async" alt="The Agent Moshpit window with two terminals side by side. The left one is Claude Code, marked needs you, stopped on a prompt asking whether to run a build command, with three choices. The right one is Codex, marked working, part way through editing a file. On the left of the window is the floor, where each agent's desk is tagged claude, codex, antigravity or hermes." />
+            <figcaption><span class="tag">demo data</span> Claude Code, stopped on a permission prompt, beside Codex at work. Each desk on the floor is tagged with its program.</figcaption>
+          </figure>
+          <div class="text">
+            <ol>
+              <li><a href="#get">Install it</a>. It finds the CLIs on your computer; both must already be signed in the way their makers describe.</li>
+              <li>Press <b>+ new agent</b>, or <kbd>n</kbd>. Choose <b>Claude Code</b>, the folder, and a task if you like. Tick <b>Work on a separate copy</b> if both will edit the same repository.</li>
+              <li>Do it again and choose <b>Codex</b>.</li>
+              <li>Click the first desk to open its terminal. Hold <kbd>Ctrl</kbd> and click the second to open it beside the first.</li>
+              <li>Drag the edge between the panes to give one more room, or press <kbd>Ctrl+Shift+Enter</kbd> to give one pane the whole space for a while.</li>
+            </ol>
+            <p>
+              Both panes are the real programs: Claude Code's prompt and slash commands in one, Codex's in the other, each with its own sign-in, model and settings. The app keeps no API key and draws none of either conversation.
+              Each pane's header carries the agent's name, its status, the project and branch, and which program it is.
+            </p>
+            <p>
+              The same goes for the other CLIs it knows: Antigravity CLI, Hermes, Gemini CLI, OpenCode and eight more can sit at the next desk, and you can add your own with a few lines of JSON.
+            </p>
+            <h3>What to expect</h3>
+            <ul>
+              <li><b>Status is read differently for each.</b> Claude Code reports whether it is busy, idle or waiting. Codex is read from how its terminal behaves, with its notices turned on, so a question it asks without a notice can look idle. <a href="/guides/which-agent-is-waiting/">How the app knows who is waiting</a>.</li>
+              <li><b>After a restart</b> every desk is back, asleep, and nothing starts until you ask. <b>Carry on</b> resumes Claude Code's conversation, and Codex's once the app has read which session it began.</li>
+              <li><b>“Work on a separate copy”</b> asks the program to make its own worktree, where the program can. It has not been run end to end by hand yet. Making the worktrees yourself, as above, always works.</li>
+              <li><b>The app does not pass messages</b> between the two, compare their answers or merge their branches.</li>
+              <li>It is used by hand on Windows 11 only. The macOS and Linux builds pass the automated checks and are otherwise untried.</li>
+            </ul>
+            <p>The <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">list of limits</a> has the rest.</p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="asked">
+          <p class="sign"><b>asked<span class="slash">/</span></b></p>
+          <div class="text"><h2 id="asked">Questions people ask</h2></div>
+          <dl class="asked">
+            <dt>Can I use Codex and Claude Code at the same time?</dt>
+            <dd>Yes. They are separate programs with separate sign-ins, and nothing stops you running both. Give each a terminal, and a git worktree of its own if both will change the same project.</dd>
+            <dt>Is Codex the same as Claude Code?</dt>
+            <dd>No. Codex is OpenAI's coding agent and Claude Code is Anthropic's. Each has its own command, its own sign-in and plan, and its own settings.</dd>
+            <dt>How do I get Claude Code and Codex to talk to each other?</dt>
+            <dd>That is a different job from running them side by side. OpenAI publishes a <a href="https://github.com/openai/codex-plugin-cc">Codex plugin for Claude Code</a> that lets Claude hand a review or a task to Codex. Agent Moshpit does not connect agents to each other; it shows both to you.</dd>
+            <dt>Can Claude Code and Codex share one instructions file?</dt>
+            <dd>Yes. Codex reads <code>AGENTS.md</code>. Claude Code reads <code>AGENTS.md</code> too when the project has no <code>CLAUDE.md</code>; if it has one, import <code>AGENTS.md</code> from it.</dd>
+            <dt>Do I need two subscriptions?</dt>
+            <dd>Each program needs its own sign-in, set up the way its maker describes. Agent Moshpit adds no account, no API key and no charge of its own.</dd>
+          </dl>
+        </section>
+
+        <section class="room" aria-labelledby="more">
+          <p class="sign"><b>guides<span class="slash">/</span></b><span>read next</span></p>
+          <div class="text"><h2 id="more">Read next</h2></div>
+          <ul class="guides">
+            <li><a href="/guides/which-agent-is-waiting/"><b>Get told when Claude Code or Codex is waiting for you</b><span>The bell, the hooks and the settings, on Windows, macOS and Linux.</span></a></li>
+            <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways, from more terminal tabs to one window made for it.</span></a></li>
+            <li><a href="/guides/coding-agents-on-windows/"><b>Several coding agents on Windows, without tmux or WSL</b><span>What runs natively, what needs WSL, and what to use instead.</span></a></li>
+          </ul>
+        </section>
+
+        <section class="room" id="get" aria-labelledby="get-h">
+          <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+          <div class="text">
+            <h2 id="get-h">Get Agent Moshpit</h2>
+            <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
+          </div>
+          <ul class="files across">
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+            <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+          </ul>
+          <p class="after">
+            Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
+            <a href="/#download">Every download, and what each system asks the first time</a>.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="/">home</a>
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Nous Research or the makers of any other program named here; their names are theirs.
+        This page sets no cookies. It counts visits with Cloudflare Web Analytics, which uses none and does not follow you anywhere else; nothing more is loaded from outside. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+  </body>
+</html>

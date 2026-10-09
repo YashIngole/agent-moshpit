@@ -7,10 +7,12 @@
 //   office.webp                             the floor by itself
 //   pose-<status>.webp                      one person for each status, as the app draws them
 //   card.png                                what a link to the site shows
+//   guide-<what>.webp                       the same window looked at more closely, for site/guides
 // The window is drawn at twice its size, so the pictures stay sharp on a dense screen.
 // Run it again when the window's look changes. Uses the Edge or Chrome already installed.
 //
 //   node tools/site-shots.mjs --serve     only serve site/ on http://localhost:4175, to look at it
+//   node tools/site-shots.mjs --guides    take only the guides' pictures, and leave the others as they are
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -23,7 +25,7 @@ const site = path.join(root, 'site')
 const PORT = 4175
 const base = `http://localhost:${PORT}/`
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' }
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.xml': 'application/xml', '.txt': 'text/plain; charset=utf-8', '.ico': 'image/x-icon' }
 
 /** site/ as a web server would hand it out: nothing clever, and nothing outside the folder. */
 const server = createServer((request, response) => {
@@ -75,7 +77,7 @@ if (process.argv.includes('--serve')) {
   }
 
   const browser = await launch()
-  try {
+  shots: try {
     /** The demo office in a window of this size, drawn at twice the size. */
     const office = async (width, height) => {
       const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, colorScheme: 'dark' })
@@ -89,13 +91,66 @@ if (process.argv.includes('--serve')) {
       return page
     }
     const desk = (page, n) => page.locator(`.floor button[data-desk="demo-${n}"]`)
-    const save = async (page, name, said) => {
-      await writeFile(path.join(out, name), await webp(page, await page.screenshot()))
+    const save = async (page, name, said, clip) => {
+      await writeFile(path.join(out, name), await webp(page, await page.screenshot(clip ? { clip } : undefined)))
       console.log(`${name.padEnd(24)} ${said}`)
     }
 
-    // Two agents at work and one idle, side by side with the floor: the page's opening.
+    // The guides' pictures. Someone needs you: the band, and the first room with the hand up.
     let page = await office(1240, 800)
+    const room = await page.locator('.room').first().boundingBox()
+    const low = Math.ceil(room.y + room.height + 14)
+    await save(page, 'guide-needs-you.webp', `1240x${low} at 2x`, { x: 0, y: 0, width: 1240, height: low })
+    // A new agent: the program, the task, the folder and the separate copy.
+    await page.getByRole('button', { name: 'New agent' }).first().click()
+    const form = page.locator('aside.panel[aria-label="New agent"]')
+    await form.waitFor()
+    await form.locator('textarea').first().fill('Fix the checkout total and test it')
+    await page.waitForTimeout(500)
+    await save(page, 'guide-new-agent.webp', '1240x800 at 2x')
+    await page.context().close()
+
+    // Claude Code and Codex in one window: one waiting for an answer, one at work.
+    page = await office(1240, 800)
+    await desk(page, 1).click()
+    await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+    await page.waitForFunction(() => document.querySelectorAll('.pane').length === 2)
+    await page.waitForTimeout(600)
+    await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
+    await page.waitForTimeout(600)
+    await save(page, 'guide-side-by-side.webp', '1240x800 at 2x')
+    await page.context().close()
+
+    // The floor as a strip beside three terminals, with whoever is waiting gathered on top.
+    page = await office(1240, 800)
+    await desk(page, 2).click()
+    await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
+    await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
+    await page.waitForFunction(() => document.querySelectorAll('.pane').length === 3)
+    await page.locator('.grip').dblclick()
+    await page.locator('.seat.listed').first().waitFor()
+    await page.waitForTimeout(800)
+    await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
+    await page.waitForTimeout(400)
+    await save(page, 'guide-strip.webp', '1240x800 at 2x')
+    await page.context().close()
+
+    // Four terminals in a grid, with someone outside it still waiting.
+    page = await office(1240, 800)
+    await desk(page, 2).click()
+    for (const n of [4, 5, 6]) await desk(page, n).click({ modifiers: ['ControlOrMeta'] })
+    await page.waitForFunction(() => document.querySelectorAll('.pane').length === 4)
+    await page.waitForTimeout(600)
+    await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
+    await page.waitForTimeout(600)
+    await save(page, 'guide-grid.webp', '1240x800 at 2x')
+    await page.context().close()
+
+    // `--guides` stops here, and leaves the page's own pictures as they are.
+    if (process.argv.includes('--guides')) break shots
+
+    // Two agents at work and one idle, side by side with the floor: the page's opening.
+    page = await office(1240, 800)
     await desk(page, 2).click()
     await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
     await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })

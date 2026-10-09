@@ -800,3 +800,274 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── guides: the pages under /guides ────────────────────────────────────────
+ * One column, the width of a page of writing. The same rooms and signs; a
+ * section's heading is inside its room, and the sign above it is only a label.
+ */
+
+body.guide {
+  --wide: 920px;
+}
+body.guide .room {
+  width: calc(100% - 2 * var(--edge));
+  margin: clamp(16px, 2.4vw, 24px) auto 0;
+}
+body.guide .opening + .room {
+  margin-top: clamp(36px, 5vw, 56px);
+}
+
+.crumbs {
+  margin-bottom: clamp(16px, 2.4vw, 28px);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+.crumbs a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.crumbs a:hover {
+  color: var(--ink);
+}
+
+body.guide h1 {
+  max-width: 20ch;
+  font-size: clamp(2rem, 1.3rem + 3vw, 3.25rem);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+.checked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: clamp(18px, 2.4vw, 28px);
+}
+
+.sign b {
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.text {
+  max-width: 68ch;
+}
+.text > * + * {
+  margin-top: 14px;
+}
+.text h2 {
+  font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.text h3 {
+  margin-top: 28px;
+  font-size: 1.125rem;
+  letter-spacing: -0.012em;
+}
+.text p,
+.text li {
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.text ul,
+.text ol {
+  padding-left: 1.3em;
+  list-style: revert;
+}
+.text li + li {
+  margin-top: 6px;
+}
+.text li::marker {
+  color: var(--ink-3);
+}
+.text a,
+.asked a,
+.compare a {
+  color: var(--ink);
+}
+.text b,
+.text strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.text code,
+.asked code,
+.compare code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--inset);
+  color: var(--ink);
+}
+kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--wall);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8125em;
+  white-space: nowrap;
+}
+
+/* Something to type or to put in a file. */
+pre.code {
+  max-width: 100%;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--wall);
+  border-radius: var(--r-1);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  tab-size: 2;
+}
+pre.code code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+.where {
+  margin-top: 16px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.where + pre.code {
+  margin-top: 6px;
+}
+
+body.guide .shot,
+body.guide .shot + .text {
+  margin-top: clamp(20px, 3vw, 32px);
+}
+body.guide .text + .line {
+  margin-top: 14px;
+}
+body.guide .line + .text,
+body.guide .fits + .text {
+  margin-top: 16px;
+}
+
+/* A table that says which way does what. It scrolls sideways before it squeezes. */
+.fits {
+  margin-top: clamp(16px, 2.4vw, 24px);
+  overflow-x: auto;
+}
+.compare {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+.compare th,
+.compare td {
+  padding: 11px 16px 11px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-weight: 400;
+  text-align: left;
+  vertical-align: top;
+}
+.compare th:last-child,
+.compare td:last-child {
+  padding-right: 0;
+}
+.compare thead th {
+  padding-top: 0;
+  border-top: 0;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.compare tbody th {
+  color: var(--ink);
+  font-weight: 600;
+}
+.compare tbody th code {
+  white-space: nowrap;
+}
+
+.text + .asked,
+.text + .guides {
+  margin-top: clamp(18px, 2.4vw, 26px);
+}
+
+/* Questions people ask, as they ask them. */
+.asked dt {
+  margin-top: 22px;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+.asked dt:first-child {
+  margin-top: 0;
+}
+.asked dd {
+  max-width: 68ch;
+  margin-top: 6px;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+/* The way to the other guides. */
+.guides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.guides a {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--wall);
+  border-radius: var(--r-1);
+  background: var(--panel);
+  text-decoration: none;
+  transition:
+    background var(--quick) var(--ease),
+    border-color var(--quick) var(--ease);
+}
+.guides a:hover {
+  border-color: var(--ink-3);
+  background: var(--inset);
+}
+.guides b {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+.guides span {
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* The three usual files in a row, where a guide ends. */
+.files.across {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: clamp(16px, 2.4vw, 24px);
+}
+
+@media (max-width: 620px) {
+  .guides,
+  .files.across {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

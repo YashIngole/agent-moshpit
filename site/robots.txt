@@ -1,0 +1,6 @@
+# agentmoshpit.com: everything here is for reading. The app's own window, shown
+# inside the home page, is kept out of search results by a header instead (site/_headers).
+User-agent: *
+Allow: /
+
+Sitemap: https://agentmoshpit.com/sitemap.xml

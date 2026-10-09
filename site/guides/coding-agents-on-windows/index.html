@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Running several coding agents on Windows, without tmux or WSL</title>
+    <meta name="description" content="Looking for cmux, Conductor or Claude Squad on Windows? What runs natively, what needs WSL, and how to run Claude Code and Codex agents in one window." />
+    <meta name="robots" content="max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d0f12" />
+    <link rel="canonical" href="https://agentmoshpit.com/guides/coding-agents-on-windows/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/site.css" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Agent Moshpit" />
+    <meta property="og:url" content="https://agentmoshpit.com/guides/coding-agents-on-windows/" />
+    <meta property="og:title" content="Running several coding agents on Windows, without tmux or WSL" />
+    <meta property="og:description" content="What runs natively on Windows, what needs WSL, and how to run several Claude Code and Codex agents in one window." />
+    <meta property="og:image" content="https://agentmoshpit.com/img/card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Agent Moshpit window: agents drawn as people at desks, with their terminals beside them." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "Several coding agents on Windows, without tmux or WSL",
+            "description": "Looking for cmux, Conductor or Claude Squad on Windows? What runs natively, what needs WSL, and how to run Claude Code and Codex agents in one window.",
+            "url": "https://agentmoshpit.com/guides/coding-agents-on-windows/",
+            "mainEntityOfPage": "https://agentmoshpit.com/guides/coding-agents-on-windows/",
+            "datePublished": "2026-10-09",
+            "dateModified": "2026-10-09",
+            "inLanguage": "en",
+            "image": ["https://agentmoshpit.com/img/guide-grid.webp"],
+            "author": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
+            "publisher": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Agent Moshpit", "item": "https://agentmoshpit.com/" },
+              { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://agentmoshpit.com/guides/" },
+              { "@type": "ListItem", "position": 3, "name": "Several coding agents on Windows" }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is there a cmux for Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. cmux's own README says it is macOS only for now. On Windows, other tools give each agent a terminal and tell you when one is waiting; Agent Moshpit is one of them and is free." }
+              },
+              {
+                "@type": "Question",
+                "name": "Does Conductor run on Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Conductor's install page says it is not available for Windows or Linux yet." }
+              },
+              {
+                "@type": "Question",
+                "name": "Does Claude Squad work on Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Claude Squad needs tmux, and tmux runs on Windows only inside WSL. So it works from a WSL terminal, with your projects and your agent CLIs installed there." }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need WSL to run Claude Code or Codex on Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Anthropic documents a native Windows install of Claude Code, and OpenAI lists the Codex CLI among the ways to use Codex on Windows. Both run in PowerShell." }
+              },
+              {
+                "@type": "Question",
+                "name": "Is there something like tmux for Windows?",
+                "acceptedAnswer": { "@type": "Answer", "text": "tmux itself runs only inside WSL. Windows Terminal has tabs and split panes of its own. For agent CLIs in particular, Agent Moshpit gives each one a pane in one window and shows which is waiting for you." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body class="guide">
+    <a class="skip" href="#main">Skip to the guide</a>
+
+    <header class="bar">
+      <a class="brand" href="/" aria-label="Agent Moshpit, home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
+          <rect x="14" y="30" width="26" height="22" rx="9" fill="#3a4049" />
+          <path d="M19 30c2 5 14 5 16 0" fill="none" stroke="#272b33" stroke-width="3" />
+          <circle cx="27" cy="22" r="9" fill="#d09a6c" />
+          <path d="M18 22a9 9 0 0 1 18 0c-3-4-6-5.5-9-5.5S21 18 18 22z" fill="#17171c" />
+          <rect x="37" y="23" width="20" height="15" rx="2.5" fill="#0b0d10" />
+          <path d="M41 28h6M41 32h10" stroke="#82aaff" stroke-width="2.2" stroke-linecap="round" />
+          <rect x="8" y="46" width="48" height="8" rx="3" fill="#2a2f36" />
+        </svg>
+        <span>agent moshpit</span>
+      </a>
+      <nav class="ways" aria-label="Site">
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">github</a>
+      </nav>
+      <a class="button" href="/#download">download</a>
+    </header>
+
+    <main id="main">
+      <article>
+        <header class="opening">
+          <p class="crumbs"><a href="/guides/">guides</a><span class="slash">/</span></p>
+          <h1>Several coding agents on Windows, without tmux or WSL</h1>
+          <p class="lede">
+            Many of the tools for running Claude Code and Codex in parallel were made on a Mac, and a good share of the rest lean on tmux, which Windows has only inside WSL.
+            If you searched for cmux, Conductor or Claude Squad on Windows, here is what runs there, what needs WSL and what is not there at all, each from its maker's own page.
+          </p>
+          <p class="checked"><span class="tag">checked 9 October 2026</span><span class="tag">Windows 11</span><span class="tag">Agent Moshpit 0.3.0</span></p>
+        </header>
+
+        <section class="room" aria-labelledby="short">
+          <p class="sign"><b>the short answer<span class="slash">/</span></b><span>read 9 October 2026</span></p>
+          <div class="text">
+            <h2 id="short">What runs on Windows, and how</h2>
+            <p>
+              Claude Code and Codex themselves both run on Windows without WSL. It is the tools around them that vary.
+            </p>
+          </div>
+          <div class="fits">
+            <table class="compare">
+              <thead>
+                <tr><th scope="col">Tool</th><th scope="col">On Windows</th><th scope="col">What it is</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row"><a href="https://github.com/manaflow-ai/cmux">cmux</a></th><td>No. Its README says macOS only, for now.</td><td>A native Mac terminal for agents</td></tr>
+                <tr><th scope="row"><a href="https://www.conductor.build/docs/installation">Conductor</a></th><td>No. Its install page says not for Windows or Linux yet.</td><td>A Mac app for running several coding agents</td></tr>
+                <tr><th scope="row"><a href="https://github.com/smtg-ai/claude-squad">Claude Squad</a></th><td>Needs tmux, so on Windows it means WSL</td><td>A terminal app built on tmux</td></tr>
+                <tr><th scope="row"><a href="https://github.com/agent-of-empires/agent-of-empires">Agent of Empires</a></th><td>Only through WSL2, says its README</td><td>A session manager built on tmux</td></tr>
+                <tr><th scope="row"><a href="https://github.com/asheshgoplani/agent-deck">Agent Deck</a></th><td>Through WSL</td><td>A session manager built on tmux</td></tr>
+                <tr><th scope="row"><a href="https://learn.microsoft.com/windows/terminal/panes">Windows Terminal</a></th><td>Yes, it is part of Windows 11</td><td>Tabs and split panes. It knows nothing about agents.</td></tr>
+                <tr><th scope="row"><a href="https://code.claude.com/docs/en/desktop">Claude desktop app</a></th><td>Yes</td><td>Anthropic's own app, for Claude sessions</td></tr>
+                <tr><th scope="row"><a href="https://developers.openai.com/codex/windows">ChatGPT desktop app</a></th><td>Yes</td><td>OpenAI's own app, for Codex</td></tr>
+                <tr><th scope="row">Agent Moshpit</th><td>Yes. Used every day on Windows 11.</td><td>One window of real CLI terminals, with a floor that shows who is waiting</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="text">
+            <p>
+              Agent Moshpit is not the only third-party choice on Windows. <a href="https://github.com/herdrdev/herdr">herdr</a>, <a href="https://github.com/stablyai/orca">Orca</a> and <a href="https://github.com/greenfield-inc/Pane">Pane</a> all publish Windows builds, by their own pages.
+              This table is a reading of those pages, not a review: none of them was installed for it.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="native">
+          <p class="sign"><b>windows itself<span class="slash">/</span></b><span>nothing to install</span></p>
+          <div class="text">
+            <h2 id="native">What Windows already gives you</h2>
+            <p>
+              Anthropic documents a <a href="https://code.claude.com/docs/en/setup#set-up-on-windows">native Windows install</a> of Claude Code, for Windows 10 version 1809 or later, with Git for Windows optional.
+              OpenAI lists the Codex CLI among the <a href="https://developers.openai.com/codex/windows">ways to use Codex on Windows</a>. Neither needs WSL.
+            </p>
+            <p>
+              Windows Terminal will hold several of them. <kbd>Alt+Shift++</kbd> splits the pane you are in to the right and <kbd>Alt+Shift+-</kbd> splits it downwards; run <code>claude</code> in one and <code>codex</code> in the next.
+              To hear from a pane you are not looking at, turn on each program's terminal bell and set <code>"bellStyle": "all"</code> in the Terminal profile, so the taskbar button flashes.
+              <a href="/guides/which-agent-is-waiting/">The settings for both programs are here</a>.
+            </p>
+            <p>
+              That gets you a wall of panes. It does not tell you which pane rang, and two agents in the same folder will still write over each other; for that, see
+              <a href="/guides/run-multiple-claude-code-agents/#by-hand">a worktree for each agent</a>.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="one-window">
+          <p class="sign"><b>one window<span class="slash">/</span></b><span>Agent Moshpit</span></p>
+          <div class="text">
+            <h2 id="one-window">Agent Moshpit on Windows</h2>
+            <p>
+              Agent Moshpit is a free, open-source desktop app, and Windows 11 is where it is used every day.
+              It starts the <code>claude</code>, <code>codex</code> or other agent CLI you already have, each in a pseudo-terminal of its own under the app, and shows them in panes inside one window.
+              There is no tmux in it and nothing to set up in WSL.
+            </p>
+          </div>
+          <figure class="shot">
+            <img src="/img/guide-grid.webp" width="2480" height="1600" loading="lazy" decoding="async" alt="The Agent Moshpit window with four terminals in a two by two grid beside the floor: two Codex agents, one Antigravity CLI agent and one Hermes agent. An amber band across the top names a fifth agent, a Claude Code session that needs an answer, and offers to open its terminal." />
+            <figcaption><span class="tag">demo data</span> Four agents' terminals in a grid. A fifth, outside the grid, has stopped to ask something, and the band says so.</figcaption>
+          </figure>
+          <div class="text">
+            <ul>
+              <li><b>One button in the taskbar.</b> No CLI opens a window of its own. Each is a process under the app.</li>
+              <li><b>When an agent needs you</b>, a hand goes up at its desk, a band names it, the taskbar button flashes if the window is behind, the tray icon changes, and Windows shows a notification. A click on the notification opens that agent's terminal.</li>
+              <li><b>Close the window and they keep working.</b> The app stays in the tray. Quitting it ends the agents, and asks first if any is busy.</li>
+              <li><b>The keys you know from Windows Terminal.</b> <kbd>Ctrl+C</kbd> copies when text is selected, <kbd>Ctrl+V</kbd> pastes, files dropped on a pane paste their paths, and <kbd>Ctrl</kbd> with a click on a path such as <code>src/app.ts:42</code> opens it in your editor at that line.</li>
+              <li><b>Fourteen CLIs</b>, Claude Code and Codex among them, and your own with a few lines of JSON.</li>
+            </ul>
+            <h3>Installing it</h3>
+            <p>
+              Download the <a href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe">installer</a>. The app is not code-signed yet, so the first time Windows says it protected your PC: choose <i>More info</i>, then <i>Run anyway</i>.
+              Or paste this into PowerShell, which asks nothing:
+            </p>
+          </div>
+          <div class="line"><code>irm https://agentmoshpit.com/install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" hidden>copy</button></div>
+          <div class="text">
+            <p>The <a href="/install.ps1">script</a> is short, if you want to read it first. Windows 10 is untried.</p>
+            <h3>What it is not</h3>
+            <ul>
+              <li><b>Not a terminal for everything.</b> cmux is a terminal you live in. Agent Moshpit is built around agent CLIs and sits beside the terminal and editor you already use.</li>
+              <li><b>Not a worktree or diff manager.</b> It makes no branches, shows no diffs and merges nothing. Its “Work on a separate copy” box only passes the CLI its own worktree flag, and has not been run end to end by hand yet.</li>
+              <li><b>Not tmux.</b> You cannot detach and come back from another machine. Closing the window keeps the agents; quitting the app ends them.</li>
+              <li><b>Not a place for sessions started elsewhere.</b> It shows the agents you start from it.</li>
+            </ul>
+            <p>
+              Two Windows details are in the <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">list of limits</a> with the rest: a real click on a notification and the taskbar flash have not been tried by hand, and updating a CLI while agents are running it can fail until they stop.
+            </p>
+          </div>
+        </section>
+
+        <section class="room" aria-labelledby="asked">
+          <p class="sign"><b>asked<span class="slash">/</span></b></p>
+          <div class="text"><h2 id="asked">Questions people ask</h2></div>
+          <dl class="asked">
+            <dt>Is there a cmux for Windows?</dt>
+            <dd>No. cmux's own README says it is macOS only for now. On Windows, other tools give each agent a terminal and tell you when one is waiting; Agent Moshpit is one of them and is free.</dd>
+            <dt>Does Conductor run on Windows?</dt>
+            <dd>No. Conductor's install page says it is not available for Windows or Linux yet.</dd>
+            <dt>Does Claude Squad work on Windows?</dt>
+            <dd>Claude Squad needs tmux, and tmux runs on Windows only inside WSL. So it works from a WSL terminal, with your projects and your agent CLIs installed there.</dd>
+            <dt>Do I need WSL to run Claude Code or Codex on Windows?</dt>
+            <dd>No. Anthropic documents a native Windows install of Claude Code, and OpenAI lists the Codex CLI among the ways to use Codex on Windows. Both run in PowerShell.</dd>
+            <dt>Is there something like tmux for Windows?</dt>
+            <dd>tmux itself runs only inside WSL. Windows Terminal has tabs and split panes of its own. For agent CLIs in particular, Agent Moshpit gives each one a pane in one window and shows which is waiting for you.</dd>
+          </dl>
+        </section>
+
+        <section class="room" aria-labelledby="more">
+          <p class="sign"><b>guides<span class="slash">/</span></b><span>read next</span></p>
+          <div class="text"><h2 id="more">Read next</h2></div>
+          <ul class="guides">
+            <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways, from more terminal tabs to one window made for it.</span></a></li>
+            <li><a href="/guides/which-agent-is-waiting/"><b>Get told when Claude Code or Codex is waiting for you</b><span>The bell, the hooks and the settings, on Windows, macOS and Linux.</span></a></li>
+            <li><a href="/guides/claude-code-and-codex-side-by-side/"><b>Claude Code and Codex side by side in one window</b><span>Both at once in the same project, without stepping on each other.</span></a></li>
+          </ul>
+        </section>
+
+        <section class="room" id="get" aria-labelledby="get-h">
+          <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+          <div class="text">
+            <h2 id="get-h">Get Agent Moshpit</h2>
+            <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
+          </div>
+          <ul class="files across">
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+            <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
+            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+          </ul>
+          <p class="after">
+            Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
+            <a href="/#download">Every download, and what each system asks the first time</a>.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <p>
+        <span class="who">agent moshpit</span>
+        <a href="/">home</a>
+        <a href="/guides/">guides</a>
+        <a href="https://github.com/YashIngole/agent-moshpit">source</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/blob/main/LICENSE">MIT licence</a>
+        <a href="https://github.com/YashIngole/agent-moshpit/issues">report a problem</a>
+      </p>
+      <p class="fine">
+        Not affiliated with Anthropic, OpenAI, Google, Microsoft, Nous Research or the makers of any other program named here; their names are theirs.
+        What this page says of other tools was read from their own pages on 9 October 2026. If one has changed, <a href="https://github.com/YashIngole/agent-moshpit/issues">say so</a> and it will be corrected.
+        This page sets no cookies. It counts visits with Cloudflare Web Analytics, which uses none and does not follow you anywhere else; nothing more is loaded from outside. Geist and Geist Mono are used under the SIL Open Font Licence.
+      </p>
+    </footer>
+
+    <script src="/site.js" defer></script>
+  </body>
+</html>

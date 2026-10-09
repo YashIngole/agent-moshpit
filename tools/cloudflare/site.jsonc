@@ -9,7 +9,9 @@
   "name": "agentmoshpit",
   "compatibility_date": "2026-10-01",
   "assets": {
-    "directory": "../../site"
+    "directory": "../../site",
+    // An address that is not there gets site/404.html, with the status 404.
+    "not_found_handling": "404-page"
   },
   "routes": [{ "pattern": "agentmoshpit.com", "custom_domain": true }]
 }

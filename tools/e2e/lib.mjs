@@ -108,7 +108,7 @@ export function windowTitle(pid) {
  */
 const addressKey = instance => `HKCU\\Software\\Classes\\agent-moshpit-${instance}`
 
-export function addressCommand(instance = 'e2e') {
+export function addressCommand(instance = process.env.MOSHPIT_INSTANCE || 'e2e') {
   try {
     return execFileSync('reg', ['query', `${addressKey(instance)}\\shell\\open\\command`, '/ve'], { encoding: 'utf8' })
   } catch {
@@ -116,7 +116,7 @@ export function addressCommand(instance = 'e2e') {
   }
 }
 
-export function forgetAddress(instance = 'e2e') {
+export function forgetAddress(instance = process.env.MOSHPIT_INSTANCE || 'e2e') {
   try {
     execFileSync('reg', ['delete', addressKey(instance), '/f'], { stdio: 'ignore' })
   } catch {
@@ -133,7 +133,7 @@ const UNINSTALLED = String.raw`{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPow
  * under its address as its group, so only the test's own go, and none is left to be
  * clicked after its address is gone.
  */
-export function forgetNotices(instance = 'e2e') {
+export function forgetNotices(instance = process.env.MOSHPIT_INSTANCE || 'e2e') {
   const script = [
     '[void][Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]',
     `[Windows.UI.Notifications.ToastNotificationManager]::History.RemoveGroup('agent-moshpit-${instance}', '${UNINSTALLED}')`
@@ -146,7 +146,7 @@ export function forgetNotices(instance = 'e2e') {
 }
 
 /** What a named office's notifications in the notification centre say, each as Windows was given it. */
-export function notices(instance = 'e2e') {
+export function notices(instance = process.env.MOSHPIT_INSTANCE || 'e2e') {
   const script = [
     '[void][Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]',
     `@([Windows.UI.Notifications.ToastNotificationManager]::History.GetHistory('${UNINSTALLED}') | Where-Object { $_.Group -eq 'agent-moshpit-${instance}' } | ForEach-Object { $_.Content.GetXml() }) -join [char]10`

@@ -213,7 +213,7 @@ try {
   check('and a notification that opens their desk when it is clicked', await until(() => told().some(xml => xml.includes(`launch="agent-moshpit-${instance}://desk/${firstId}" activationType="protocol"`)), 10000), notices(instance).join(' | '))
   check('one for the desk, not one for every time', told().length === 1, String(told().length))
   // CDP can send keys to a background webview; reading requires native window focus.
-  openAddress('agent-moshpit-e2e://open')
+  openAddress(`agent-moshpit-${instance}://open`)
   await until(() => page.evaluate(() => document.hasFocus()), 5000)
   await page.keyboard.press('Control+Backquote')
   check('and again brings the terminals back', await until(async () => (await page.locator('.pane').count()) === 2))

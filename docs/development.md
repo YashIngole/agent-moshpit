@@ -10,7 +10,7 @@ Local voice adds **CMake and a C++ toolchain** for pinned `whisper-rs = 0.16.0` 
 - **Linux:** add `libasound2-dev` and `cmake` to Tauri's build packages. `WHISPER_DONT_GENERATE_BINDINGS=1` uses the packaged bindings on 64-bit Linux and avoids libclang. Runtime capture requires working ALSA libraries/default input (PipeWire/PulseAudio systems commonly expose an ALSA route).
 - **macOS:** CMake, Xcode command-line tools and libclang for target bindings. Native capture uses CoreAudio. `src-tauri/Info.plist` supplies the microphone usage description and `Entitlements.plist` the audio-input entitlement. The CI/release workflow retains both ARM and Intel Mac targets; permission behavior requires a bundled app smoke test.
 
-CI uses the runner's existing LLVM on Windows/macOS and packaged Linux bindings. New voice platform compilation has not yet run on remote CI in this local-only session. Model weights are never bundled or fetched during a build.
+CI uses the runner's existing LLVM on Windows/macOS and packaged Linux bindings. The release workflow requires the cross-platform checks before building installers. Model weights are never bundled or fetched during a build. See the [voice validation record](reviews/voice-validation-2026-10-09.md) for actual platform results and outstanding microphone checks.
 
 ## Build and run
 

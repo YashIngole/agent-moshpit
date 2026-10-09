@@ -81,7 +81,7 @@ Decided while building the CLI office (2026-10-08 and 09), also the builder's de
 - Closing the window leaves the office in the tray. A setting makes it quit instead, added after the owner asked in the first review how to close the whole office.
 - The × on a pane puts the pane away and leaves the program running. Ending a program is Stop, and taking a desk away is Remove, which can be undone for a few seconds instead of asking first, unless the agent is busy.
 - Opening the desk of an agent that is not running shows where they left off and starts nothing.
-- The office asks npm for newer versions of the installed programs, and GitHub for a newer version of itself, unless told not to. It sends nothing else anywhere.
+- The office asks npm for newer versions of the installed programs, and GitHub for a newer version of itself, unless told not to. Optional voice models download from Hugging Face only when the user chooses; microphone audio and transcription stay local.
 
 No longer true: connecting models from inside the app (asked for by the owner on 2026-10-06 and built for the Hermes client) went with that client. Each program is signed in and set up its own way.
 

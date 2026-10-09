@@ -75,7 +75,7 @@ export function main() {
   gh('api', '-X', 'POST', '-H', 'Content-Type: application/json', `https://uploads.github.com/repos/${repo}/releases/${release}/assets?name=latest.json`, '--input', 'latest.json')
 
   console.log(`latest.json for ${manifest.version}:`)
-  for (const [name, entry] of Object.entries(platforms)) console.log(`  ${name.padEnd(24)} ${entry.url.split('/').pop()}`)
+  for (const [name, entry] of Object.entries(manifest.platforms)) console.log(`  ${name.padEnd(24)} ${entry.url.split('/').pop()}`)
 
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

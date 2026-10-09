@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { appPath, attach, closeWindow, forgetAddress, killTree, launch, sleep } from './lib.mjs'
+import { appPath, attach, closeWindow, forgetAddress, isRunning, killTree, launch, sleep } from './lib.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixtures = process.env.MOSHPIT_VOICE_FIXTURES
@@ -36,6 +36,7 @@ try {
   const attached = await attach(port)
   browser = attached.browser
   const page = attached.page
+  await page.waitForFunction(() => window.__TAURI_INTERNALS__?.invoke)
   const invoke = (command, args = {}) => page.evaluate(({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args })
   const view = () => invoke('voice_view')
   await until(async () => !(await view()).verifying)
@@ -62,7 +63,9 @@ try {
   const agent = await page.locator('.pane').getAttribute('data-pane')
   await until(async () => (await invoke('snapshot')).agents.find(a => a.id === agent)?.running)
   const settings = { enabled: true, model: 'base', language: 'english', shortcut: 'space' }
-  await invoke('voice_config', { settings })
+  for (const model of models) {
+  await invoke('voice_config', { settings: { ...settings, model: model.id } })
+  const before = await page.locator('.xterm-accessibility-tree').innerText()
   // Direct IPC allows deterministic recorded audio tests without any OS mic request.
   await invoke('voice_start', { agent })
   await until(async () => (await view()).phase === 'listening')
@@ -73,9 +76,11 @@ try {
   assert.equal(finished.phase, 'idle', finished.message)
   const text = await page.locator('.xterm-accessibility-tree').innerText()
   assert.match(text.replace(/\s+/g, ' '), /ask not/i)
+  assert(text.length > before.length, 'This inference must insert new text')
   assert(!text.includes('YOU SAID:'), 'The fake program must not receive Enter')
   assert(!existsSync(path.join(data, 'screens', `${agent}.screen`)))
-  console.log(`ok Base JFK WAV inserted without Enter; stop-to-result ${Date.now() - started}ms (one fixture, not a benchmark)`)
+  console.log(`ok ${model.id} JFK WAV inserted without Enter; stop-to-result ${Date.now() - started}ms (one fixture, not a benchmark)`)
+  }
 
   await invoke('voice_start', { agent })
   await until(async () => (await view()).phase === 'listening')
@@ -83,6 +88,7 @@ try {
   await sleep(500)
   const reopened = launch({ port, env: { MOSHPIT_INSTANCE: instance, MOSHPIT_DATA_DIR: data, MOSHPIT_VOICE_WAV: path.join(fixtures, 'jfk.wav') } })
   const next = await attach(port)
+  await next.page.waitForFunction(() => window.__TAURI_INTERNALS__?.invoke)
   await browser.close()
   browser = next.browser
   const afterClose = await next.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('voice_view'))
@@ -91,8 +97,9 @@ try {
   console.log('ok window close into tray cancels fixture capture')
   if (reopened.child.pid !== child.pid) killTree(reopened.child.pid)
   await next.page.evaluate(agent => window.__TAURI_INTERNALS__.invoke('stop', { agent }), agent)
+  await until(async () => !(await next.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('snapshot'))).agents.find(a => a.id === agent)?.running)
   await next.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('quit')).catch(() => {})
-  await sleep(600)
+  await until(() => !isRunning(child.pid))
   assert(!existsSync(path.join(data, 'screens', `${agent}.screen`)), 'Voice echo must not be persisted on quit')
   const kept = Object.keys(JSON.parse(readFileSync(path.join(data, 'settings.json'), 'utf8')))
   assert(kept.includes('voice'))

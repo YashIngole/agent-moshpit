@@ -9,16 +9,11 @@ import { chromium } from 'playwright-core'
 const origin = new URL(process.argv[2] || 'https://agentmoshpit.com').origin
 const canonicalOrigin = 'https://agentmoshpit.com'
 const version = JSON.parse(await readFile(new URL('../package.json', import.meta.url))).version
-const response = await fetch(`${origin}/sitemap.xml`)
-assert.equal(response.status, 200, 'sitemap status')
-const sitemap = await response.text()
-const pages = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => new URL(match[1]))
-assert.ok(pages.length >= 6, 'home, guide index and four guides in sitemap')
-assert.equal(new Set(pages.map(url => url.href)).size, pages.length, 'unique sitemap URLs')
-for (const url of pages) assert.equal(url.origin, canonicalOrigin, 'sitemap uses canonical host')
-const robots = await fetch(`${origin}/robots.txt`)
-assert.equal(robots.status, 200, 'robots status')
-assert.match(await robots.text(), /Sitemap: https:\/\/agentmoshpit\.com\/sitemap\.xml/)
+// Honor an explicit network proxy for a remote audit; local previews stay local.
+const proxyAddress = !['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname)
+  && (process.env.HTTPS_PROXY || process.env.HTTP_PROXY)
+const proxyUrl = proxyAddress ? new URL(proxyAddress) : undefined
+const proxy = proxyUrl ? { server: proxyUrl.origin, username: decodeURIComponent(proxyUrl.username), password: decodeURIComponent(proxyUrl.password) } : undefined
 
 let browser
 for (const channel of ['msedge', 'chrome', undefined]) {
@@ -31,7 +26,17 @@ const titles = new Set()
 const descriptions = new Set()
 try {
   // Searchable text and navigation must work with scripting disabled.
-  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 900 } })
+  const context = await browser.newContext({ proxy, javaScriptEnabled: false, viewport: { width: 1280, height: 900 } })
+  const response = await context.request.get(`${origin}/sitemap.xml`)
+  assert.equal(response.status(), 200, 'sitemap status')
+  const sitemap = await response.text()
+  const pages = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => new URL(match[1]))
+  assert.ok(pages.length >= 6, 'home, guide index and four guides in sitemap')
+  assert.equal(new Set(pages.map(url => url.href)).size, pages.length, 'unique sitemap URLs')
+  for (const url of pages) assert.equal(url.origin, canonicalOrigin, 'sitemap uses canonical host')
+  const robots = await context.request.get(`${origin}/robots.txt`)
+  assert.equal(robots.status(), 200, 'robots status')
+  assert.match(await robots.text(), /Sitemap: https:\/\/agentmoshpit\.com\/sitemap\.xml/)
   const page = await context.newPage()
   for (const url of pages) {
     const target = new URL(url.pathname, origin).href
@@ -123,15 +128,25 @@ try {
   assert.equal(missing.status(), 404, 'missing URL returns a real 404')
   assert.match(await missing.text(), /Nobody sits at this desk/, 'custom 404 page')
   await context.close()
-  const scripted = await browser.newPage()
+  const scripted = await browser.newPage({ proxy })
   const errors = []
+  const hosts = new Set()
+  const cspErrors = []
   scripted.on('pageerror', error => errors.push(error.message))
+  scripted.on('request', request => hosts.add(new URL(request.url()).hostname))
+  scripted.on('console', message => {
+    if (message.type() === 'error' && /content security policy/i.test(message.text())) cspErrors.push(message.text())
+  })
   await scripted.goto(origin)
   await scripted.waitForTimeout(1500)
   assert.equal(await scripted.locator('script[type="application/ld+json"]').count(), 1)
   assert.ok(await scripted.locator('button.copy:not([hidden])').count() >= 2, 'install command copy buttons work')
   assert.deepEqual(errors, [], 'no JavaScript errors')
+  assert.deepEqual(cspErrors, [], 'structured data and scripts respect the content security policy')
+  const allowedHosts = new Set([new URL(origin).hostname, 'static.cloudflareinsights.com', 'cloudflareinsights.com'])
+  for (const host of hosts) assert.ok(allowedHosts.has(host), `unexpected resource host: ${host}`)
   console.log(`PASS indexing headers, install scripts, 404 and JavaScript. ${checkedLinks.size} internal links; ${checkedAssets.size} assets.`)
+  console.log(`Resource hosts: ${[...hosts].join(', ')}`)
 } finally {
   await browser.close()
 }

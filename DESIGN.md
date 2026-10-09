@@ -415,7 +415,7 @@ Drawings are built from rounded rectangles, circles and strokes with round ends,
 ### Chips
 - **Status:** a 7px dot and its word, lowercase, in Geist Mono. The word is `ink-2`, except "needs you" in amber at weight 600 and "trouble" in `trouble-ink`. Idle is a grey dot; away and starting are a hollow ring.
 - **State:** the dot beside "working" dims to 45% on every other beat, and holds still when the window does.
-- **Program tag:** which program this person is, as a word in a 1px `wall` edge with 5px corners, Geist Mono at 11px, lowercase: claude, codex, gemini, hermes. It gives way before the status does when there is no room.
+- **Program tag:** which program this person is, as a word in a 1px `wall` edge with 5px corners, Geist Mono at 11px, lowercase: claude, codex, antigravity, hermes. It gives way before the status does when there is no room.
 - **Pills:** "demo data" in the bar, a folder used before in the New agent form, "+2" in the header of a pane that has the room, and the names of others waiting on the band.
 - **News:** a 7px dot of ink before a desk's name when its terminal has printed something since it was last looked at; a 6px one on the bar's menu button when an update is out.
 

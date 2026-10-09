@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/YashIngole/agent-moshpit)](https://github.com/YashIngole/agent-moshpit/releases/latest)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-A small desktop office for coding agents. Claude Code, Codex, Gemini CLI and the rest run as the real command-line programs, each in a terminal inside one window, and each is drawn as a person at a desk. One look tells you who is working, who is done, and who needs you.
+A small desktop office for coding agents. Claude Code, Codex, Antigravity CLI and the rest run as the real command-line programs, each in a terminal inside one window, and each is drawn as a person at a desk. One look tells you who is working, who is done, and who needs you.
 
 ![The Agent Moshpit window: agents at their desks on the left, three of their terminals in a grid beside them, and an amber band across the top naming the agent who needs you](docs/terminals.png)
 
@@ -12,11 +12,11 @@ A small desktop office for coding agents. Claude Code, Codex, Gemini CLI and the
 
 ## Features
 
-- **Real terminals.** Each agent is the `claude`, `codex` or `gemini` you already have, with your own sign-in and settings. The app draws none of the conversation and keeps no API key.
+- **Real terminals.** Each agent is the `claude`, `codex` or `agy` you already have, with your own sign-in and settings. The app draws none of the conversation and keeps no API key.
 - **Who needs you.** When an agent stops on a question, a hand goes up at its desk, an amber band names it, the tray icon changes and you get a notification.
 - **Side by side.** Open terminals in a grid beside the floor. Resize, rearrange and zoom them. [Every shortcut](docs/guide.md#keys) is listed in the app.
-- **Stays out of the way.** Close the window and the agents keep working from the tray. After a restart every desk is back with its last screen, and Claude Code, Codex and Hermes carry on their conversations.
-- **Thirteen CLIs, and yours.** Claude Code, Codex, Gemini CLI, Hermes, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
+- **Stays out of the way.** Close the window and the agents keep working from the tray. After a restart every desk is back with its last screen, and Claude Code, Codex, Antigravity CLI and Hermes carry on their conversations.
+- **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
 - **Private.** No account, no telemetry. See [what it sends](#what-it-sends).
 
 ## Install

@@ -6,12 +6,17 @@ The office knows very little about each program, on purpose: what it is called, 
 | --- | --- | --- | --- | --- | --- |
 | Claude Code | `claude` | yes | yes (`--resume`) | yes | npm `@anthropic-ai/claude-code`; `claude update` |
 | Codex | `codex` | yes | yes (`codex resume`), once its session is known | yes | npm `@openai/codex`; `codex update` |
-| Gemini CLI | `gemini` | yes (`--prompt-interactive`) | no | no | npm `@google/gemini-cli` |
+| Antigravity CLI | `agy` | yes (`--prompt-interactive`) | yes (`--continue`: its latest conversation in that folder) | no | not installed by the office; `agy update` |
 | Hermes | `hermes` | no | yes (`--continue`: its latest conversation, whichever desk that was) | yes | not installed by the office; `hermes update` |
+| Gemini CLI | `gemini` | yes (`--prompt-interactive`) | no | no | npm `@google/gemini-cli` |
 | OpenCode, Copilot CLI, Amp, Qwen Code, Crush | `opencode`, `copilot`, `amp`, `qwen`, `crush` | no | no | no | npm (`opencode-ai`, `@github/copilot`, `@sourcegraph/amp`, `@qwen-code/qwen-code`, `@charmland/crush`) |
 | Cursor CLI, Aider, Goose, Droid | `cursor-agent`, `aider`, `goose`, `droid` | no | no | no | no: install them their own way and they are offered |
 
-The first four rows were written from each program's own `--help` on 8 October 2026 (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2). The rest are known by name only: they start in their folder and you type the task in their terminal, which is right for any program whatever its flags are.
+Claude Code, Codex, Hermes and Gemini CLI were written from each program's own `--help` on 8 October 2026 (Claude Code 2.1.290, Codex 0.160.0, Hermes 0.21.2, Gemini CLI 0.2.1).
+
+Antigravity CLI is Google's replacement for Gemini CLI, which stopped serving personal Google accounts on 18 June 2026 and now works only with a paid API key or an enterprise licence. Its row was written from [Google's documentation](https://antigravity.google/docs/cli/install) on 9 October 2026, not from the program itself, and has not been run by the makers; it installs with Google's own script (`agy` lands in `~/.local/bin`, or `%LOCALAPPDATA%gyin` on Windows), not from npm.
+
+The rest are known by name only: they start in their folder and you type the task in their terminal, which is right for any program whatever its flags are.
 
 ## Adding a program of your own
 

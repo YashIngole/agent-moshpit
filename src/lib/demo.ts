@@ -28,8 +28,9 @@ const program = (over: Partial<Harness> & Pick<Harness, 'id' | 'name' | 'tag'>):
 const HARNESSES: Harness[] = [
   program({ id: 'claude', name: 'Claude Code', tag: 'Claude', version: '2.1.290', latest: '2.1.294', outdated: true, takes_task: true, worktree: true, install_line: 'npm install -g @anthropic-ai/claude-code', update_line: 'claude update' }),
   program({ id: 'codex', name: 'Codex', tag: 'Codex', version: '0.161.0', latest: '0.161.0', takes_task: true, worktree: true, install_line: 'npm install -g @openai/codex', update_line: 'codex update' }),
-  program({ id: 'gemini', name: 'Gemini CLI', tag: 'Gemini', version: '0.2.1', latest: '0.63.0', outdated: true, takes_task: true, install_line: 'npm install -g @google/gemini-cli', update_line: 'npm install -g @google/gemini-cli@latest' }),
+  program({ id: 'antigravity', name: 'Antigravity CLI', tag: 'Antigravity', version: '1.2.4', takes_task: true, update_line: 'agy update' }),
   program({ id: 'hermes', name: 'Hermes', tag: 'Hermes', version: '0.21.2', worktree: true, update_line: 'hermes update' }),
+  program({ id: 'gemini', name: 'Gemini CLI', tag: 'Gemini', version: '0.2.1', latest: '0.63.0', outdated: true, takes_task: true, install_line: 'npm install -g @google/gemini-cli', update_line: 'npm install -g @google/gemini-cli@latest' }),
   program({ id: 'opencode', name: 'OpenCode', tag: 'OpenCode', installed: false, install_line: 'npm install -g opencode-ai', update_line: 'npm install -g opencode-ai@latest' }),
   program({ id: 'qwen', name: 'Qwen Code', tag: 'Qwen', installed: false, install_line: 'npm install -g @qwen-code/qwen-code', update_line: 'npm install -g @qwen-code/qwen-code@latest' }),
   program({ id: 'cursor', name: 'Cursor CLI', tag: 'Cursor', installed: false })
@@ -63,7 +64,7 @@ function scene(name: string): Agent[] {
     agent(2, 'Refactor auth middleware', 'codex', 'shop', 'refactor/auth', 'working', 12 * MIN),
     agent(3, 'Flaky test hunt', 'claude', 'shop', 'main', 'asleep', 26 * 60 * MIN),
     agent(4, 'Type the orders API', 'codex', 'api', 'types/orders', 'done', 3 * MIN),
-    agent(5, 'Docs pass for the API', 'gemini', 'api', 'main', 'working', 9 * MIN),
+    agent(5, 'Docs pass for the API', 'antigravity', 'api', 'main', 'working', 9 * MIN),
     agent(6, 'Bump dependencies', 'hermes', 'api', 'main', 'idle', 4 * MIN),
     agent(7, 'Seed the staging data', 'claude', 'infra', 'main', 'failed', 2 * MIN, 'It stopped with an error as soon as it started. Open the desk to see what it said.')
   ]

@@ -139,10 +139,14 @@ fn words(list: &[&str]) -> Vec<String> {
 
 /// The programs the office knows without being told.
 ///
-/// The first four were read from each program's own `--help` on 2026-10-08
-/// (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2). The
-/// rest are only known by name: they start in their folder and the task is typed
-/// in their terminal, which is right for any program whatever its flags are.
+/// Claude Code, Codex, Hermes and Gemini CLI were read from each program's own
+/// `--help` on 2026-10-08 (Claude Code 2.1.290, Codex 0.160.0, Hermes 0.21.2,
+/// Gemini CLI 0.2.1). Antigravity CLI, which took Gemini CLI's place for personal
+/// Google accounts on 2026-06-18, was read from Google's documentation on
+/// 2026-10-09 (antigravity.google/docs/cli) and has not been run by the office's
+/// makers. The rest are only known by name: they start in their folder and the
+/// task is typed in their terminal, which is right for any program whatever its
+/// flags are.
 ///
 /// The npm packages were each looked up on the registry the same day. A program
 /// that is installed some other way (a script piped to a shell, pip, a download)
@@ -176,14 +180,23 @@ pub fn built_in() -> Vec<Harness> {
         },
         Harness {
             task: TaskArg::Flag("--prompt-interactive".into()),
-            package: "@google/gemini-cli".into(),
-            ..row("gemini", "Gemini CLI", "Gemini", "gemini")
+            // Its latest conversation in this folder: it keeps them by folder.
+            resume: words(&["--continue"]),
+            // Installed by a script from Google, not from npm, so the office does not install it.
+            update: words(&["update"]),
+            ..row("antigravity", "Antigravity CLI", "Antigravity", "agy")
         },
         Harness {
             resume: words(&["--continue"]),
             worktree: words(&["--worktree"]),
             update: words(&["update"]),
             ..row("hermes", "Hermes", "Hermes", "hermes")
+        },
+        // Still there for those it still serves: a paid API key, or an enterprise licence.
+        Harness {
+            task: TaskArg::Flag("--prompt-interactive".into()),
+            package: "@google/gemini-cli".into(),
+            ..row("gemini", "Gemini CLI", "Gemini", "gemini")
         },
         Harness { package: "opencode-ai".into(), ..row("opencode", "OpenCode", "OpenCode", "opencode") },
         row("cursor", "Cursor CLI", "Cursor", "cursor-agent"),
@@ -433,7 +446,7 @@ fn folders() -> &'static [PathBuf] {
                 add(home.join(rest));
             }
             #[cfg(windows)]
-            for rest in ["AppData/Roaming/npm", "AppData/Local/hermes/bin", "AppData/Local/Programs/hermes/bin", "scoop/shims"] {
+            for rest in ["AppData/Roaming/npm", "AppData/Local/agy/bin", "AppData/Local/hermes/bin", "AppData/Local/Programs/hermes/bin", "scoop/shims"] {
                 add(home.join(rest));
             }
         }
@@ -655,6 +668,7 @@ mod tests {
     #[test]
     fn each_program_takes_its_task_its_own_way() {
         assert_eq!(start_args(&known("codex"), None, "Ignored", "Type the API", false), ["-c", "tui.notifications=true", "Type the API"]);
+        assert_eq!(start_args(&known("antigravity"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         assert_eq!(start_args(&known("gemini"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         // A program known only by name is never handed words it may not understand.
         assert!(start_args(&known("opencode"), Some("x"), "A name", "A task", true).is_empty());
@@ -667,6 +681,8 @@ mod tests {
         assert_eq!(resume_args(&known("codex"), Some("abc")).unwrap(), ["-c", "tui.notifications=true", "resume", "abc"]);
         // Hermes carries on its latest conversation without being told which.
         assert_eq!(resume_args(&known("hermes"), None).unwrap(), ["--continue"]);
+        // So does Antigravity CLI, which keeps its conversations by folder.
+        assert_eq!(resume_args(&known("antigravity"), None).unwrap(), ["--continue"]);
         assert_eq!(resume_args(&known("gemini"), Some("abc")), None);
         assert!(can_resume(&known("hermes"), None) && !can_resume(&known("opencode"), Some("abc")));
     }
@@ -719,6 +735,9 @@ mod tests {
         assert_eq!(update_runner(&known("gemini")), Some(Runner::Npm(words(&["install", "-g", "@google/gemini-cli@latest"]))));
         // Hermes updates itself but is not installed from npm; Cursor is neither.
         assert_eq!((install_runner(&known("hermes")), update_runner(&known("hermes")).is_some()), (None, true));
+        // Antigravity CLI is the same as Hermes in this: `agy update`, and no package to install it from.
+        assert_eq!((install_runner(&known("antigravity")), update_runner(&known("antigravity"))), (None, Some(Runner::Itself(words(&["update"])))));
+        assert_eq!(known("antigravity").program, "agy");
         assert_eq!((install_runner(&known("cursor")), update_runner(&known("cursor"))), (None, None));
         // A scoped name is a plain word, so it can go through cmd.exe.
         assert!(plain_word("@openai/codex@latest"));

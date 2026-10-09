@@ -12,7 +12,7 @@ Tauri 2: a Rust core plus the operating system's own webview, with the interface
 
 ## Users
 
-Developers who run several coding-agent CLIs at once on their own computer: Claude Code and Codex first, and others such as Gemini CLI and Hermes. The agents mostly work in different repositories or git worktrees. The user is busy in an editor or in one agent's terminal and looks over to see who is working, who needs an answer, and who has finished. Agent Moshpit is open source, not a private tool: it was published on 2026-10-09 at github.com/YashIngole/agent-moshpit, with a download page at agentmoshpit.com.
+Developers who run several coding-agent CLIs at once on their own computer: Claude Code and Codex first, and others such as Antigravity CLI and Hermes. The agents mostly work in different repositories or git worktrees. The user is busy in an editor or in one agent's terminal and looks over to see who is working, who needs an answer, and who has finished. Agent Moshpit is open source, not a private tool: it was published on 2026-10-09 at github.com/YashIngole/agent-moshpit, with a download page at agentmoshpit.com.
 
 ## Product Purpose
 
@@ -37,7 +37,7 @@ Neighbours, as looked at in the two reviews of 2026-10-08 and 2026-10-09 (source
 
 ## Operating Context
 
-- The user's own installed CLIs, with their own sign-ins, settings and models. The office knows thirteen by name and four in detail: Claude Code, Codex, Gemini CLI and Hermes, read from each program's `--help` on 2026-10-08 (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2). A user can add a program, or replace a row, in `harnesses.json`.
+- The user's own installed CLIs, with their own sign-ins, settings and models. The office knows fourteen by name and five in detail: Claude Code, Codex, Antigravity CLI, Hermes and Gemini CLI. Four were read from each program's `--help` on 2026-10-08 (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2); Antigravity CLI, which replaced Gemini CLI for personal Google accounts, was read from Google's documentation on 2026-10-09 and has not been run. A user can add a program, or replace a row, in `harnesses.json`.
 - What the office shows but does not own: the conversation, approvals, slash commands, models, accounts, worktrees and history. All of that is the program's and is seen through its terminal.
 - What the office does own: the desks (which program, its name, its folder, the id of its conversation when known), how the panes are laid out, the reading of each agent's status, and getting the user's attention (the band, the tray, notifications, the window's title).
 - The desktop: a tray icon, system notifications, and a window that may be small and kept at the side of the screen, or closed entirely.

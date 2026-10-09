@@ -27,7 +27,7 @@ Agent Moshpit starts the agent programs you already have, each in a pseudo-termi
 Press **+ new agent** (`n` on the floor, `Ctrl+Shift+N` anywhere, or **New agent…** in the tray menu). An empty desk in a room, or the **+** on a room's sign, opens the same form on that room's folder.
 
 - **Who should take it?** The programs found on this computer. Ones the office can install sit behind **+N to install**. Choosing one shows the exact command, and the button becomes **Install … and start**: the install runs in a pane where you can watch it, and the agent then starts in that pane.
-- **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Gemini CLI). Leave it empty and say it in their terminal. Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
+- **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Antigravity CLI, Gemini CLI). Leave it empty and say it in their terminal. Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
 - **Folder.** Type it, browse for it, or pick one used before.
 - **Work on a separate copy**, where the program can (Claude Code, Codex, Hermes). The program is asked to make a git worktree of its own (`--worktree`), so several agents can change one project without colliding.
 - **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2".

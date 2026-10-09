@@ -9,7 +9,7 @@ related_targets: []
 
 Scope: the main window of Agent Moshpit (`src/App.svelte` and everything it draws). Visitor mode: Operate.
 
-Audience and job: a developer running several coding-agent CLIs at once (Claude Code and Codex first, others such as Gemini CLI and Hermes), busy in an editor or in one agent's terminal, who looks over for a second. They must see who is working, who needs them and who is done, and be in that agent's own terminal in one click.
+Audience and job: a developer running several coding-agent CLIs at once (Claude Code and Codex first, others such as Antigravity CLI and Hermes), busy in an editor or in one agent's terminal, who looks over for a second. They must see who is working, who needs them and who is done, and be in that agent's own terminal in one click.
 
 Content it carries: the desks the office keeps (which program, the agent's name, its folder and branch), the status the office reads for each (needs you, working, done, idle, trouble, starting, away) and how long it has been so, and the programs' own terminals. The office cannot say what an agent is working on, only that it is. Two to eight agents is typical; twenty must still work.
 

@@ -19,6 +19,8 @@ A release is made by pushing a tag: `.github/workflows/release.yml` builds the i
 
 The same run signs what an installed office updates itself from, with the app's own update key (the repository secret `TAURI_SIGNING_PRIVATE_KEY`; its public half is in `tauri.conf.json`), and writes `latest.json`, which a running office reads to learn that a newer version is out. That signing is asked for by `src-tauri/tauri.release.conf.json`, which only the release run uses, so a build on your own computer needs no key. The key has nothing to do with Windows or Apple code signing.
 
+To change a draft's text after it is made, use `gh release edit <tag> --draft --notes-file docs/releases/<tag>.md`, and look at the draft's tag before publishing: a draft changed without naming its tag was once published under a made-up one (`untagged-…`), which breaks the addresses in `latest.json`.
+
 Before a draft is published, `node tools/e2e/update-fetch.mjs <tag>` tries its signed Windows installer against the key built into the app: the real app, told only to fetch, must accept the real file and refuse it with one byte changed. Nothing is installed.
 
 Start the app with `--hidden` to go straight to the tray, for example from a start-up entry.

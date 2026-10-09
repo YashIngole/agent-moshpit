@@ -101,7 +101,7 @@ office, replaces both native CLIs with stand-ins, and consumes the real launch
 configuration to run the shipped MCP subprocess. It verifies new-session
 delegation, the same directory, inbox follow-ups, result handoff, protected names
 and reconnection after stopping a desk, without making model calls.
-CI runs that desktop test against the Windows release executable after building it.
+CI runs that desktop test against the Windows debug executable after building it.
 
 ```powershell
 npm ci

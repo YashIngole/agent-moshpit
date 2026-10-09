@@ -90,6 +90,34 @@ jobs:
       - name: Desktop build
         run: npx tauri build --debug --no-bundle
 
+      # Edge Stable on the hosted image is not the WebView2 Runtime. Raw app
+      # tests do not run an installer, so provision their required runtime here.
+      - name: Windows WebView2 Runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runtimeKeys = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          )
+          function RuntimeVersion {
+            foreach ($key in $runtimeKeys) {
+              $version = (Get-ItemProperty -LiteralPath $key -Name pv -ErrorAction SilentlyContinue).pv
+              if ($version -and [version]$version -gt [version]'0.0.0.0') { return $version }
+            }
+          }
+          $version = RuntimeVersion
+          if (-not $version) {
+            Write-Host 'WebView2 Runtime is absent; installing it on the disposable CI runner.'
+            $bootstrapper = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $bootstrapper
+            $installer = Start-Process -FilePath $bootstrapper -ArgumentList '/silent','/install' -WindowStyle Hidden -Wait -PassThru
+            $version = RuntimeVersion
+            if (-not $version) { throw "WebView2 Runtime install failed (exit $($installer.ExitCode))." }
+          }
+          Write-Host "WebView2 Runtime $version"
+
       - name: Windows desktop terminals and persistence
         if: runner.os == 'Windows'
         env:

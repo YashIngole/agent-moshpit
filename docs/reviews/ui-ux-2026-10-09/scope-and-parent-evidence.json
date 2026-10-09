@@ -1,0 +1,49 @@
+{
+  "reviewed_commit": "8f08ff6",
+  "original_target": "src/App.svelte",
+  "reviewed_date": "2026-10-09",
+  "review_type": "read-only UI/UX review",
+  "startup_warning": {
+    "before": 1,
+    "after": 0,
+    "action": "Open Refactor auth middleware desk; no Dismiss or file repair"
+  },
+  "covered_attention": {
+    "viewport": {
+      "width": 640,
+      "height": 700
+    },
+    "watched": [
+      "demo-2",
+      "demo-1"
+    ],
+    "needs_region_present": false,
+    "new_agent_panel_present": true,
+    "interpretation": "Waiting demo-1 remains watched while panel covers terminal; notification suppression inferred from engine.rs, not native-tested"
+  },
+  "overwritten_undo": {
+    "first": "Flaky test hunt",
+    "second": "Type the orders API",
+    "visible_undo_buttons": 1,
+    "both_desks_removed": true,
+    "after_undo": {
+      "first_present": false,
+      "second_present": true
+    },
+    "interval": "within 8-second undo window"
+  },
+  "validation": {
+    "existing_demo_suite_checks": 156,
+    "passed": 156,
+    "port": 17429,
+    "note": "Existing suite temporary copy changed port only after transient preview ERR_CONNECTION_REFUSED; temporary script removed"
+  },
+  "limits": [
+    "Native Tauri/WebView/tray/notifications not exercised",
+    "Real CLI resume/status fidelity not exercised",
+    "Screen reader session and 200% zoom not exercised",
+    "Touch not exercised",
+    "CPU/memory performance not profiled",
+    "Concurrent launch-settings edits excluded"
+  ]
+}

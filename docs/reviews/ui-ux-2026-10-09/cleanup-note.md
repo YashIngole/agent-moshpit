@@ -1,0 +1,3 @@
+The review-owned Playwright browsers, detector server (PID 48888 / port 28430), and Vite servers (PIDs 47396 and 59124 / ports 1420 and 17430) were closed or stopped.
+
+The temporary regression runner and critique body were removed. Automatic approval review rejected deletion of the temporary preview snapshot with “blocked by policy” and no further reason. The snapshot remains at C:/Users/Yash/AppData/Local/Temp/agent-moshpit-ui-ux-review-20261009-8f08ff6. It contains a node_modules junction to the workspace; any eventual cleanup must unlink that junction without recursively traversing it before removing the snapshot.

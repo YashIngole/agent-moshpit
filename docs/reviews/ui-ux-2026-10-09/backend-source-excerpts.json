@@ -1,0 +1,63 @@
+{
+  "commit": "8f08ff6",
+  "excerpts": {
+    "src-tauri/src/status.rs": [
+      {
+        "start_line": 25,
+        "end_line": 40,
+        "text": "    Quiet,\n    /// It wants the user. The text says what for, when it said.\n    Asked(String),\n    /// It announced that it has finished.\n    Finished,\n}\n\n/// A program printing this recently is at work.\nconst BUSY_FOR_MS: Millis = 2_500;\n/// Printing this soon after a key was pressed is the key being shown, not work.\nconst ECHO_MS: Millis = 450;\n/// After the terminal changes size, the screen is drawn again: printing is the redraw until\n/// it pauses this long. Some programs (Codex) draw in bursts, or a moment after the resize.\nconst REDRAW_PAUSE_MS: Millis = 300;\n/// The longest a redraw is taken to last, so work that starts at once is not hidden for long.\nconst REDRAW_MOST_MS: Millis = 3_000;"
+      },
+      {
+        "start_line": 149,
+        "end_line": 160,
+        "text": "    pub fn signal(&self, now: Millis) -> Signal {\n        if self.first_output_ms == 0 {\n            return Signal::Silent;\n        }\n        if let Some(text) = &self.notice {\n            return if wants_an_answer(text) { Signal::Asked(text.clone()) } else { Signal::Finished };\n        }\n        if self.last_output_ms > 0 && now.saturating_sub(self.last_output_ms) < BUSY_FOR_MS {\n            Signal::Working\n        } else {\n            Signal::Quiet\n        }"
+      }
+    ],
+    "src-tauri/src/office.rs": [
+      {
+        "start_line": 128,
+        "end_line": 131,
+        "text": "    /// Whoever is busy enough that quitting should be asked about.\n    pub fn busy(&self) -> usize {\n        self.desks.iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::NeedsYou | Phase::Starting)).count()\n    }"
+      },
+      {
+        "start_line": 264,
+        "end_line": 300,
+        "text": "        match signal {\n            Signal::Silent => None,\n            // Its opening screen, drawn in fits and starts (Codex takes eight seconds over\n            // its own, with pauses): still not work, and its end is nothing to flag.\n            Signal::Working if desk.drawing_its_opening(now) => None,\n            Signal::Working => {\n                desk.worked = true;\n                desk.activity.clear();\n                desk.turn(Phase::Working, now)\n            }\n            Signal::Asked(what) => {\n                desk.worked = true;\n                desk.activity = what.clone();\n                desk.turn(Phase::NeedsYou, now)\n            }\n            Signal::Quiet | Signal::Finished => {\n                // Handed a task, it went quiet at once and nobody has typed: it is asking\n                // something before it starts, and stays that way until someone answers.\n                if matches!(signal, Signal::Quiet) && desk.tasked && !desk.typed && (desk.asked_at_start || (!desk.rested && desk.paused_at_start(now))) {\n                    desk.asked_at_start = true;\n                    desk.activity = \"Asked something before starting\".into();\n                    return desk.turn(Phase::NeedsYou, now);\n                }\n                desk.rested = true;\n                // Someone who has only just sat down, or was already resting, has finished nothing.\n                let finished = desk.worked && matches!(desk.phase, Phase::Working | Phase::NeedsYou);\n                if desk.phase == Phase::Done && !watched {\n                    return None;\n                }\n                desk.activity.clear();\n                if finished && !watched {\n                    desk.turn(Phase::Done, now)\n                } else {\n                    desk.worked = false;\n                    desk.turn(Phase::Idle, now)\n                }\n            }"
+      },
+      {
+        "start_line": 418,
+        "end_line": 423,
+        "text": "                    resumable: kind.is_some_and(|h| harness::can_resume(h, d.saved.resume_session(h))),\n                    resume_note: if kind.is_some_and(|h| h.session == harness::SessionFrom::CodexRollouts) && d.saved.session.is_some() && !d.saved.session_verified {\n                        \"This desk's saved Codex conversation could not be verified. Start Codex, then use /resume to choose it; its saved conversations are unchanged.\".into()\n                    } else {\n                        String::new()\n                    },"
+      }
+    ],
+    "src-tauri/src/harness.rs": [
+      {
+        "start_line": 181,
+        "end_line": 193,
+        "text": "        Harness {\n            task: TaskArg::Flag(\"--prompt-interactive\".into()),\n            // Its latest conversation in this folder: it keeps them by folder.\n            resume: words(&[\"--continue\"]),\n            // Installed by a script from Google, not from npm, so the office does not install it.\n            update: words(&[\"update\"]),\n            ..row(\"antigravity\", \"Antigravity CLI\", \"Antigravity\", \"agy\")\n        },\n        Harness {\n            resume: words(&[\"--continue\"]),\n            worktree: words(&[\"--worktree\"]),\n            update: words(&[\"update\"]),\n            ..row(\"hermes\", \"Hermes\", \"Hermes\", \"hermes\")"
+      },
+      {
+        "start_line": 397,
+        "end_line": 416,
+        "text": "/// The words that carry on an earlier conversation, or `None` when this program\n/// cannot, or needs an id that is not known.\npub fn resume_args(h: &Harness, session: Option<&str>) -> Option<Vec<String>> {\n    if h.resume.is_empty() {\n        return None;\n    }\n    let needs_id = h.resume.iter().any(|w| w.contains(\"{session}\"));\n    let id = session.filter(|s| !s.is_empty());\n    if needs_id && id.is_none() {\n        return None;\n    }\n    // Codex takes its settings before the word `resume`; every other word order is the same.\n    let mut args = h.args.clone();\n    args.extend(h.resume.iter().map(|w| w.replace(\"{session}\", id.unwrap_or(\"\"))));\n    Some(args)\n}\n\n/// Whether a stopped desk of this kind carries on, given what is known about it.\npub fn can_resume(h: &Harness, session: Option<&str>) -> bool {\n    resume_args(h, session).is_some()"
+      }
+    ],
+    "src-tauri/src/engine.rs": [
+      {
+        "start_line": 417,
+        "end_line": 435,
+        "text": "    pub fn quit_words(&self) -> Option<String> {\n        let state = self.inner.state.lock().unwrap();\n        let n = state.office.busy();\n        let jobs: Vec<_> = state.jobs.iter().filter(|j| j.running).map(|j| format!(\"{} {}\", self.kind(&j.harness).map_or(j.harness.as_str(), |h| h.name.as_str()), j.kind.word())).collect();\n        let job_warning = if jobs.is_empty() { String::new() } else { format!(\"Still running: {}. Quitting interrupts these installations or updates; you may need to run them again.\", jobs.join(\", \")) };\n        if n == 0 {\n            return (!jobs.is_empty()).then_some(job_warning);\n        }\n        let busy: Vec<_> = state.office.desks().iter().filter(|d| d.running && matches!(d.phase, Phase::Working | Phase::NeedsYou | Phase::Starting)).collect();\n        let afresh: Vec<String> = busy.iter().filter(|d| !self.kind(&d.saved.harness).is_ok_and(|h| harness::can_resume(h, d.saved.resume_session(h)))).map(|d| d.saved.title.clone()).collect();\n        let head = if n == 1 { \"1 agent is still busy. Quitting ends its program.\".to_string() } else { format!(\"{n} agents are still busy. Quitting ends their programs.\") };\n        let tail = match (afresh.len(), n) {\n            (0, 1) => \" Its conversation is kept: Carry on, on its desk, picks it up again.\".to_string(),\n            (0, _) => \" Their conversations are kept: Carry on, on each desk, picks them up again.\".to_string(),\n            (1, 1) => \" Its program cannot carry on a conversation, so it starts afresh next time.\".to_string(),\n            (a, b) if a == b => \" Their programs cannot carry on a conversation, so they start afresh next time.\".to_string(),\n            _ => format!(\" {} will start afresh next time; the others carry on where they left off.\", afresh.join(\", \")),\n        };\n        Some(format!(\"{head}{tail}{}\", if job_warning.is_empty() { String::new() } else { format!(\" {job_warning}\") }))"
+      },
+      {
+        "start_line": 543,
+        "end_line": 549,
+        "text": "            if kind.status == StatusFrom::ClaudeSessions {\n                if let Some(session) = status::read_claude_session(&self.inner.home, pid) {\n                    // What Claude says of itself is better than what its terminal suggests,\n                    // except before it has drawn anything.\n                    if signal != Signal::Silent {\n                        signal = status::claude_signal(&session).unwrap_or(signal);\n                    }"
+      },
+      {
+        "start_line": 593,
+        "end_line": 607,
+        "text": "    /// Tell the user about a change they would want to hear of while looking elsewhere.\n    fn tell(&self, state: &State, change: Option<Transition>) {\n        let Some(change) = change else { return };\n        if state.focused && state.watched.contains(&change.id) {\n            return;\n        }\n        match change.to {\n            Phase::NeedsYou => {\n                let body = if change.note.is_empty() { \"Is waiting for you in their terminal.\" } else { change.note.as_str() };\n                self.say(Out::Notify(format!(\"{} needs you\", change.title), body.to_string(), change.id.clone()));\n            }\n            Phase::Done => self.say(Out::Notify(format!(\"{} is done\", change.title), \"Open their terminal to see what they did.\".to_string(), change.id.clone())),\n            Phase::Failed => {\n                let body = if change.note.is_empty() { \"Something went wrong.\" } else { change.note.as_str() };\n                self.say(Out::Notify(format!(\"{} hit a problem\", change.title), body.to_string(), change.id.clone()));"
+      }
+    ]
+  }
+}

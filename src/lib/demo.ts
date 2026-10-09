@@ -8,6 +8,7 @@
 //
 // The terminals here are typed by hand: they show what a program might print and
 // echo what is typed into them. Nothing is started and nothing is sent anywhere.
+import { version as appVersion } from '../../package.json'
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
@@ -57,6 +58,7 @@ function agent(n: number, title: string, harness: string, repo: string, branch: 
     look: n * 7919 + 13,
     running: phase !== 'asleep' && phase !== 'failed',
     resumable: harness !== 'gemini',
+    resume_scope: harness === 'gemini' ? 'none' : harness === 'antigravity' ? 'folder' : harness === 'hermes' ? 'latest' : 'desk',
     resume_note: '',
     // Busy and out of sight: something new in their terminal.
     unread: phase === 'working' && n % 2 === 1
@@ -118,13 +120,14 @@ interface Seen {
   /** How many times the newer version was asked for. */
   updates: number
   watched: string[]
+  visible: string[]
   typed: { agent: string; data: string }[]
   opened: { agent: string | null; path: string; line: number | null; editor: string }[]
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], typed: [], opened: [] }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [] }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -338,9 +341,10 @@ export function demoBridge(): Bridge {
       agents = agents.map(a => (a.id === id ? { ...a, title: title.trim() || given.get(id) || a.title } : a))
       publish()
     },
-    watch: ids => {
+    watch: (ids, visible = ids) => {
       seen.watched = [...ids]
-      if (voice.agent && !ids.includes(voice.agent)) cancelVoice()
+      seen.visible = [...visible]
+      if (voice.agent && !visible.includes(voice.agent)) cancelVoice()
       if (agents.some(a => ids.includes(a.id) && a.unread)) {
         agents = agents.map(a => (ids.includes(a.id) ? { ...a, unread: false } : a))
         publish()
@@ -353,8 +357,8 @@ export function demoBridge(): Bridge {
     quit: () => {},
     settings: async () => ({ close_quits: closeQuits, voice: { ...voiceSettings } }),
     setCloseQuits: on => void (closeQuits = on),
-    version: async () => '0.3.0',
-    newer: async () => (params.has('update') ? { version: '0.3.1' } : null),
+    version: async () => appVersion,
+    newer: async () => (params.has('update') ? { version: '99.0.0' } : null),
     onNewer: () => () => {},
     // Nothing is fetched in a pretend office: it says so the way a failure would, or is asked for and noted.
     voiceView: async () => structuredClone(voice),

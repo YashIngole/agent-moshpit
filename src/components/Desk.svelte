@@ -330,7 +330,7 @@
   }
   :global(.floor.dense) .tag {
     padding: 0 4px;
-    font-size: 10.5px;
+    font-size: var(--t-xs);
     line-height: 1.5;
   }
 
@@ -371,7 +371,7 @@
   /* Which program, on every row of the list, as a terminal's tab would say it. */
   .listed .tag {
     padding: 0 4px;
-    font-size: 10.5px;
+    font-size: var(--t-xs);
     line-height: 1.5;
   }
   .listed .remove {

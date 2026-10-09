@@ -80,11 +80,12 @@
   onMount(() => {
     if (!host) return
     const css = getComputedStyle(host)
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
     const made = new Terminal({
       fontFamily: css.getPropertyValue('--mono').trim() || 'monospace',
       fontSize: office.fontSize,
       lineHeight: 1.2,
-      cursorBlink: true,
+      cursorBlink: !reducedMotion.matches,
       scrollback: 5000,
       allowProposedApi: true,
       macOptionIsMeta: true,
@@ -122,6 +123,8 @@
     })
     made.open(host)
     term = made
+    const onMotionChange = () => (made.options.cursorBlink = !reducedMotion.matches)
+    reducedMotion.addEventListener('change', onMotionChange)
     // Drawing on the graphics card when there is one; the plain way otherwise.
     void import('@xterm/addon-webgl').then(
       ({ WebglAddon }) => {
@@ -354,6 +357,7 @@
       unfollow?.()
       watcher.disconnect()
       scheme.removeEventListener('change', recolour)
+      reducedMotion.removeEventListener('change', onMotionChange)
       host?.removeEventListener('paste', onPaste, true)
       host?.removeEventListener('contextmenu', onContextMenu)
       terms.delete(id)

@@ -15,6 +15,7 @@
     if (need > 0) parts.push({ phase: 'needs_you', text: `${need} need${need === 1 ? 's' : ''} you` })
     // Someone still starting up is not at work yet: counted when they are.
     if (count('working') > 0) parts.push({ phase: 'working', text: `${count('working')} working` })
+    if (count('quiet') > 0) parts.push({ phase: 'quiet', text: `${count('quiet')} quiet` })
     if (count('done') > 0) parts.push({ phase: 'done', text: `${count('done')} done` })
     if (count('failed') > 0) parts.push({ phase: 'failed', text: `${count('failed')} in trouble` })
     return parts
@@ -22,7 +23,12 @@
   const summary = $derived(counts.length > 0 ? counts.map(c => c.text).join(', ') : office.agents.length === 0 ? '' : 'All quiet')
 
   /** Which states a count in the bar stands for: a click on it finds the next desk in one of them. */
-  const PHASES: Record<string, Phase[]> = { needs_you: ['needs_you'], working: ['working'], done: ['done'], failed: ['failed'] }
+  const PHASES: Record<string, Phase[]> = { needs_you: ['needs_you'], working: ['working'], quiet: ['quiet'], done: ['done'], failed: ['failed'] }
+  const compact = $derived(counts.filter(c => c.phase === 'needs_you' || c.phase === 'failed'))
+  function showStatuses(event: MouseEvent) {
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    office.openMenu({ x: box.left, y: box.bottom + 6, items: counts.map(part => ({ label: part.text, hint: 'Show the next agent', run: () => office.findPhase(PHASES[part.phase] ?? []) })) })
+  }
 
   /** Terminals that were put away can be brought back; open ones can be put away. */
   const away = $derived(!office.terminals && office.stowed.rows.length > 0)
@@ -36,13 +42,20 @@
   <p class="summary" aria-live="polite">
     <span class="aloud">{summary}</span>
     {#each counts as part (part.phase)}
-      <button type="button" class="count" tabindex="-1" aria-hidden="true" title="Show the next desk that is {part.text.replace(/^\d+ /, '')}" onclick={() => office.findPhase(PHASES[part.phase] ?? [])}>
+      <button type="button" class="count" aria-label="Show the next agent: {part.text}" title="Show the next desk that is {part.text.replace(/^\d+ /, '')}" onclick={() => office.findPhase(PHASES[part.phase] ?? [])}>
         <i class="dot {part.phase}"></i>{part.text}
       </button>
     {:else}
       {#if summary}<span class="count" aria-hidden="true">{summary.toLowerCase()}</span>{/if}
     {/each}
   </p>
+  {#if counts.length > 0}
+    <button type="button" class="compact" aria-label="{summary}. Show agent statuses" aria-haspopup="menu" onclick={showStatuses}>
+      {#each compact.length > 0 ? compact : counts.slice(0, 1) as part (part.phase)}
+        <span><i class="dot {part.phase}"></i>{part.text}</span>
+      {/each}
+    </button>
+  {/if}
   {#if bridge.demo}<span class="demo">demo data</span>{/if}
   {#if office.terminals || away}
     <button type="button" class="button quiet between" title={office.terminals ? 'Back to the floor (Ctrl+`)' : 'The terminals (Ctrl+`)'} onclick={() => office.toggleTerminals()}>
@@ -87,13 +100,13 @@
     gap: var(--s-4);
     min-width: 0;
     margin-left: var(--s-2);
-    overflow: hidden;
     font-family: var(--mono);
     font-size: var(--t-xs);
     color: var(--ink-2);
     white-space: nowrap;
   }
-  .count {
+  .count,
+  .compact {
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -105,10 +118,19 @@
     color: inherit;
     font: inherit;
   }
-  .count:hover {
+  .count:hover,
+  .compact:hover {
     background: var(--inset);
     color: var(--ink);
   }
+  .compact {
+    display: none;
+    margin-right: auto;
+    font-family: var(--mono);
+    font-size: var(--t-xs);
+    color: var(--ink-2);
+  }
+  .compact span { display: inline-flex; align-items: center; gap: 5px; }
   .short {
     display: none;
   }
@@ -131,11 +153,16 @@
   .button kbd {
     margin-left: 2px;
   }
+  .new { margin-left: auto; }
 
   @media (max-width: 860px) {
     .button kbd {
       display: none;
     }
+  }
+  @media (max-width: 1180px) {
+    .summary, .demo { display: none; }
+    .compact { display: inline-flex; }
   }
   @media (max-width: 620px) {
     .bar {
@@ -148,13 +175,14 @@
       display: none;
     }
     .brand {
-      flex: 1;
+      flex: none;
       flex-shrink: 1;
       min-width: 0;
     }
   }
   /* A window kept narrow at the side of the screen: short words, so the menu always fits. */
   @media (max-width: 520px) {
+    .compact { flex-direction: column; align-items: flex-start; gap: 0; }
     .between .words,
     .new .words {
       display: none;

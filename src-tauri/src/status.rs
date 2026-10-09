@@ -346,7 +346,8 @@ pub fn claude_signal(session: &ClaudeSession) -> Option<Signal> {
     }
     match session.status.as_str() {
         "busy" => Some(Signal::Working),
-        "idle" => Some(Signal::Quiet),
+        // This is an explicit ready state, unlike a pause in terminal output.
+        "idle" => Some(Signal::Finished),
         _ => None,
     }
 }
@@ -675,7 +676,7 @@ mod tests {
     fn claude_says_what_it_is_doing() {
         let session = |status: &str, waiting: &str| ClaudeSession { status: status.into(), waiting_for: waiting.into(), ..Default::default() };
         assert_eq!(claude_signal(&session("busy", "")), Some(Signal::Working));
-        assert_eq!(claude_signal(&session("idle", "")), Some(Signal::Quiet));
+        assert_eq!(claude_signal(&session("idle", "")), Some(Signal::Finished));
         assert_eq!(claude_signal(&session("waiting", "dialog open")), Some(Signal::Asked("Waiting for your answer in the terminal".into())));
         assert_eq!(claude_signal(&session("busy", "sandbox request")), Some(Signal::Asked("Waiting: sandbox request".into())));
         // A word a later version invents is not guessed at.

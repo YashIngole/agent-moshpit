@@ -1,6 +1,6 @@
 // What the core tells the window. Mirrors `src-tauri/src/model.rs`.
 
-export type Phase = 'starting' | 'working' | 'needs_you' | 'done' | 'idle' | 'failed' | 'asleep'
+export type Phase = 'starting' | 'working' | 'quiet' | 'needs_you' | 'done' | 'idle' | 'failed' | 'asleep'
 
 export interface Agent {
   id: string
@@ -22,6 +22,7 @@ export interface Agent {
   running: boolean
   /** Whether a stopped one carries on where it left off, or starts afresh. */
   resumable: boolean
+  resume_scope?: 'none' | 'desk' | 'folder' | 'latest'
   resume_note: string
   /** Its terminal printed something since you last had it in front of you. */
   unread: boolean

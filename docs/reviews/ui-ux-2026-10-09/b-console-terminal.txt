@@ -1,0 +1,13 @@
+Total messages: 14 (Errors: 0, Warnings: 0)
+Returning 10 messages for level "info"
+
+[LOG] %cclipped-overflow-container%c section.panes.svelte-1pbmt9i clips a positioned child color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %cclipped-overflow-container%c div.term-host.svelte-fa34fu clips a positioned child color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %clow-contrast%c 1.1:1 (need 4.5:1) — text #000000 on #0b0d10 color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556
+[LOG] %ccodex-grid-background%c two-axis grid-line gradient background color: oklch(84% 0.19 80.46); font-weight: bold color: inherit JSHandle@node @ http://localhost:28430/detect.js:3556

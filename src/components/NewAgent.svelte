@@ -1,7 +1,7 @@
 <script lang="ts">
   // Seat a new agent: which program, what to do, and where. Lives in the side
   // panel, not a dialog. Starting one starts that program in a terminal here.
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { office } from '../lib/office.svelte'
   import LaunchSettings from './LaunchSettings.svelte'
@@ -20,7 +20,9 @@
   let launches = $state<Record<string, LaunchOptions>>(structuredClone(kept.launches))
   let starting = $state(false)
   let problem = $state('')
+  let folderProblem = $state(false)
   let taskField = $state<HTMLTextAreaElement>()
+  let folderField = $state<HTMLInputElement>()
 
   /** What can be chosen: what is on this computer, then what the office can install. */
   const choices = $derived([...office.installed, ...office.harnesses.filter(h => !h.installed && h.install_line)])
@@ -35,6 +37,7 @@
   /** Folders used before, to pick with one click. */
   const folders = $derived(office.folders.filter(f => f !== cwd.trim()).slice(0, 4))
   const baseName = (folder: string) => folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || folder
+  const folderLabel = (folder: string) => office.folders.filter(f => baseName(f) === baseName(folder)).length > 1 ? folder.replace(/[\\/]+$/, '').split(/[\\/]/).slice(-2).join('/') : baseName(folder)
 
   // Opened from a room's empty desk, the form takes that room's folder; from "Start another
   // like this", that desk's folder and program too.
@@ -56,17 +59,25 @@
 
   async function browse() {
     const picked = await bridge.pickFolder().catch(() => null)
-    if (picked) cwd = picked
+    if (picked) {
+      cwd = picked
+      folderProblem = false
+    }
   }
 
   async function start() {
+    if (starting) return
     problem = ''
+    folderProblem = false
     if (!kind) {
       problem = 'None of the programs an agent can be was found on this computer.'
       return
     }
     if (!cwd.trim()) {
-      problem = 'Choose the folder the agent should work in.'
+      folderProblem = true
+      await tick()
+      folderField?.focus()
+      folderField?.scrollIntoView({ block: 'center' })
       return
     }
     starting = true
@@ -104,6 +115,8 @@
   <!-- Ctrl+Enter starts the agent from anywhere in the form, the task box included. -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <form
+    id="new-agent"
+    novalidate
     onsubmit={event => {
       event.preventDefault()
       void start()
@@ -179,15 +192,16 @@
     {/if}
 
     <div>
-      <label class="label" for="new-cwd">Folder</label>
+      <div class="label"><label for="new-cwd">Folder</label> <span class="optional" aria-hidden="true">required</span></div>
       <div class="pair">
-        <input id="new-cwd" class="field" placeholder="The project they work in" bind:value={cwd} />
+        <input id="new-cwd" class="field" placeholder="The project they work in" required aria-invalid={folderProblem || undefined} aria-describedby={folderProblem ? 'new-cwd-error' : undefined} bind:value={cwd} bind:this={folderField} oninput={() => (folderProblem = false)} />
         <button type="button" class="button quiet" onclick={browse}>Browse</button>
       </div>
+      {#if folderProblem}<p id="new-cwd-error" class="problem" role="alert">Choose the folder the agent should work in.</p>{/if}
       {#if folders.length > 0}
         <div class="recent" role="group" aria-label="Folders used before">
           {#each folders as folder (folder)}
-            <button type="button" class="chip" title={folder} onclick={() => (cwd = folder)}>{baseName(folder)}</button>
+            <button type="button" class="chip" title={folder} aria-label="Use {folder}" onclick={() => { cwd = folder; folderProblem = false }}>{folderLabel(folder)}</button>
           {/each}
         </div>
       {/if}
@@ -214,22 +228,23 @@
       <p class="heads-up">Also known, but installed their own way: {missing.map(h => h.name).join(', ')}. Once one is, it is offered here.</p>
     {/if}
 
+  </form>
+  <footer>
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
-
     <div class="end">
-      <button type="submit" class="button" disabled={starting || !kind}>
+      <button type="submit" form="new-agent" class="button" disabled={starting || !kind}>
         {starting ? 'Starting…' : kind && !kind.installed ? `Install ${kind.name} and start` : 'Start agent'}
       </button>
       <button type="button" class="button quiet" onclick={() => office.closePanel()}>Cancel</button>
       <kbd class="keys">ctrl ↵</kbd>
     </div>
-  </form>
+  </footer>
 </aside>
 
 <style>
   .panel {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     width: var(--panel-width);
     min-width: 0;
     min-height: 0;
@@ -286,6 +301,8 @@
     align-content: start;
     gap: var(--s-4);
     padding: var(--s-4);
+    min-height: 0;
+    scroll-padding-block: var(--s-4);
     overflow-y: auto;
   }
   .pair {
@@ -343,7 +360,7 @@
     border: 1px solid currentColor;
     border-radius: 4px;
     font-family: var(--mono);
-    font-size: 10.5px;
+    font-size: var(--t-xs);
     font-weight: 500;
   }
   /* Dimmed only on the chosen option's light fill. On the field it is already the
@@ -390,21 +407,22 @@
     accent-color: var(--button);
   }
   .optional {
+    margin-inline-start: var(--s-1);
     font-weight: 400;
     color: var(--ink-2);
   }
-  /* Start is always in reach, however long the form is: it stays at the foot of the panel. */
-  .end {
-    position: sticky;
-    bottom: calc(-1 * var(--s-4));
-    z-index: 1;
-    display: flex;
-    align-items: center;
+  /* Actions have their own row, so they never cover a field or its error. */
+  footer {
+    display: grid;
     gap: var(--s-2);
-    margin: 0 calc(-1 * var(--s-4)) calc(-1 * var(--s-4));
     padding: var(--s-3) var(--s-4);
     border-top: 1px solid var(--line);
-    background: var(--panel);
+  }
+  .end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
   }
   /* The quietest ink at its full strength: a key cap's usual dimming on top of it
      would be under 4.5:1 on the panel. */

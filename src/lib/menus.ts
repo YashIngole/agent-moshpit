@@ -4,6 +4,7 @@ import { bridge } from './bridge'
 import { office, type MenuItem } from './office.svelte'
 import { terms } from './terms'
 import type { Agent } from './types'
+import { resumeAction, resumeHint } from './words'
 
 /** Everything that can be done with a desk, in one place. */
 export function deskItems(agent: Agent): MenuItem[] {
@@ -17,11 +18,11 @@ export function deskItems(agent: Agent): MenuItem[] {
   items.push({ label: 'Rename', hint: 'F2', run: () => office.startRename(agent.id) })
   if (agent.running) {
     // A right-click away from Paste: someone in the middle of something is asked about first.
-    const busy = office.busy(agent.id) ? `${agent.title} is ${agent.phase === 'needs_you' ? 'waiting for you' : agent.phase === 'starting' ? 'starting' : 'working'}.` : ''
+    const busy = office.busy(agent.id) ? `${agent.title} is ${agent.phase === 'needs_you' ? 'waiting for you' : agent.phase === 'starting' ? 'starting' : agent.phase === 'quiet' ? 'quiet and may still be working' : 'working'}.` : ''
     items.push({
       label: 'Restart their program',
-      hint: agent.resumable ? 'It carries on the conversation' : 'It starts afresh',
-      confirm: busy ? { text: `${busy} Restarting ends what it is doing; ${agent.resumable ? 'it carries on the conversation' : 'it starts afresh'}.`, yes: 'Restart it' } : undefined,
+      hint: resumeHint(agent),
+      confirm: busy ? { text: `${busy} Restarting ends its current program. ${resumeHint(agent)}`, yes: 'Restart it' } : undefined,
       run: () => void office.restart(agent.id)
     })
     items.push({
@@ -32,8 +33,8 @@ export function deskItems(agent: Agent): MenuItem[] {
     })
   } else {
     items.push({
-      label: agent.resumable ? 'Carry on' : 'Start again',
-      hint: agent.resumable ? 'Starts their program where it left off' : 'Starts their program afresh',
+      label: resumeAction(agent),
+      hint: resumeHint(agent),
       run: () => {
         office.show(agent.id)
         void office.wake(agent.id)
@@ -42,10 +43,11 @@ export function deskItems(agent: Agent): MenuItem[] {
   }
   if (office.editor) {
     const editor = office.editor.name
-    items.push({ label: `Open the folder in ${editor}`, hint: agent.cwd, run: () => office.openFolder(agent.id) })
+    items.push({ label: `Open the folder in ${editor}`, hint: agent.cwd, divided: true, run: () => office.openFolder(agent.id) })
   }
   items.push({
     label: 'Show their folder',
+    divided: !office.editor,
     hint: agent.cwd,
     run: () => void bridge.showFolder(agent.id).catch(error => (office.problem = typeof error === 'string' ? error : 'That folder could not be shown.'))
   })
@@ -61,9 +63,10 @@ export function deskItems(agent: Agent): MenuItem[] {
     label: 'Remove this desk',
     hint: 'Ends their program; Undo for a moment. Delete',
     danger: true,
+    divided: true,
     // Someone in the middle of something is asked about first; anyone else can be brought back for a moment.
     confirm: office.busy(agent.id)
-      ? { text: `${agent.title} is ${agent.phase === 'needs_you' ? 'waiting for you' : 'working'}. Their program is ended and the desk is taken away. ${agent.harness_name} keeps the conversation in its own history.`, yes: 'Remove the desk' }
+      ? { text: `${agent.title} is ${agent.phase === 'needs_you' ? 'waiting for you' : agent.phase === 'quiet' ? 'quiet and may still be working' : agent.phase === 'starting' ? 'starting' : 'working'}. Their program is ended and the desk is taken away. ${agent.harness_name} keeps the conversation in its own history.`, yes: 'Remove the desk' }
       : undefined,
     run: () => office.remove(agent.id)
   })

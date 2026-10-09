@@ -19,6 +19,10 @@
     return h.install_line ? 2 : 3
   }
   const running = (h: Harness) => office.jobs.some(j => j.harness === h.id && j.running)
+  const groups = $derived([
+    { name: 'Installed', rows: rows.filter(h => h.installed) },
+    { name: 'Available', rows: rows.filter(h => !h.installed) }
+  ].filter(group => group.rows.length > 0))
   /** Agents of this kind with their program running right now. */
   const busy = (h: Harness) => office.agents.filter(a => a.harness === h.id && a.running).length
 
@@ -44,8 +48,11 @@
   </header>
 
   <div class="body">
+    {#each groups as group (group.name)}
+    <section class="program-group" aria-label={group.name}>
+    <h3>{group.name}</h3>
     <ul>
-      {#each rows as h (h.id)}
+      {#each group.rows as h (h.id)}
         <li class:absent={!h.installed}>
           <div class="head">
             <span class="name">{h.name}</span>
@@ -83,6 +90,8 @@
         </li>
       {/each}
     </ul>
+    </section>
+    {/each}
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
     <section class="editor">
       <h3 id="editor-title">Files open in</h3>
@@ -183,7 +192,7 @@
   }
   li {
     display: grid;
-    /* No wider than the panel: a long command is cut short with an ellipsis, not the panel's edge. */
+    /* Commands stay readable in full, within the panel. */
     grid-template-columns: minmax(0, 1fr);
     gap: var(--s-2);
     padding: var(--s-3) 0;
@@ -220,14 +229,13 @@
     flex: 1;
     min-width: 0;
     padding: 5px 8px;
-    overflow: hidden;
+    overflow-wrap: anywhere;
     border: 1px solid var(--line);
     border-radius: var(--r-1);
     background: var(--term);
     color: var(--ink-2);
     font-size: var(--t-xs);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
     user-select: text;
   }
   .do .button {
@@ -244,7 +252,8 @@
     display: grid;
     gap: var(--s-2);
   }
-  .editor h3 {
+  .editor h3,
+  .program-group h3 {
     font-family: var(--mono);
     font-size: var(--t-xs);
     font-weight: 600;

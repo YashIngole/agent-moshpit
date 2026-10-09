@@ -98,10 +98,16 @@
         Agent programs
         <span>{office.outdated.length > 0 ? `${office.outdated.length} update${office.outdated.length === 1 ? '' : 's'} out: ${office.outdated.map(h => h.name).join(', ')}` : 'Install, update, see versions'}</span>
       </button>
-      <button type="button" role="menuitem" onclick={() => { close(); office.openVoice() }}>
+      <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openVoice() }}>
         Voice input
         <span>Local dictation, model downloads and language</span>
       </button>
+      {#if office.healthProblem}
+        <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.showHealthProblem() }}>Configuration warning<span>Open the file or dismiss the warning</span></button>
+      {/if}
+      {#if panes > 0}
+        <button type="button" role="menuitemcheckbox" tabindex="-1" aria-checked={office.listed} onclick={() => { close(true); office.toggleCompactFloor() }}>Compact floor<span>{office.listed ? 'Use the larger desks' : 'Give terminals more room'}</span></button>
+      {/if}
       {#if panes > 1}
         <button
           type="button"
@@ -202,6 +208,9 @@
     gap: var(--s-1);
     width: 268px;
     max-width: calc(100vw - 2 * var(--s-3));
+    max-height: calc(100dvh - var(--bar) - var(--s-4));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--s-2);
     border: 1px solid var(--line);
     border-radius: var(--r-2);

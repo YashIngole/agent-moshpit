@@ -57,7 +57,7 @@ Confirmed by the owner:
 
 What follows from running real CLIs instead of a backend:
 
-- Status is read, not reported. Claude Code says whether it is busy, idle or waiting in a file it keeps about each running session. Every other program is read from how its terminal behaves: printing, quiet, or ringing the bell. The office never reads the words on a screen, so a program is free to change them.
+- Status is read, not reported. Claude Code says whether it is busy, idle or waiting in a file it keeps about each running session. Every other program is read from how its terminal behaves: printing, quiet, ringing the bell, or sending a completion notice. Silence after work means Quiet, because completion is still unconfirmed. The office never reads the words on a screen, so a program is free to change them.
 - The office cannot say what an agent is working on, only that it is.
 - Whether a stopped agent carries on its conversation depends on the program: Claude Code, Codex and Hermes can, the others start afresh.
 - The CLIs are children of the app. Closing the window leaves them running; quitting the app ends them.

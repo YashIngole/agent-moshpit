@@ -274,7 +274,7 @@
         <circle class="d2" cx="137" cy="57.5" r="1.6" />
         <circle class="d3" cx="143" cy="57.5" r="1.6" />
       </g>
-    {:else if phase === 'idle'}
+    {:else if phase === 'idle' || phase === 'quiet'}
       <path class="prompt" d="M118 64.5l2.5 2-2.5 2" />
       <rect class="cursor dim" x="122" y="64.6" width="2.6" height="3.8" />
     {:else}
@@ -363,6 +363,7 @@
     --glow: var(--trouble);
   }
   .idle,
+  .quiet,
   .starting {
     --glow: var(--quiet);
   }

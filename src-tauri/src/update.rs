@@ -54,6 +54,11 @@ fn updater(app: &AppHandle) -> Option<Updater> {
     if let Some(url) = elsewhere {
         builder = builder.endpoints(vec![url.parse().ok()?]).ok()?;
     }
+    // An office asked only to fetch tries whatever the address offers, the version it already is included:
+    // a signature is made for one version, so a release's own file can only be tried as itself.
+    if std::env::var_os("MOSHPIT_UPDATE_ONLY_FETCH").is_some() {
+        builder = builder.version_comparator(|_, _| true);
+    }
     let handle = app.clone();
     // On Windows the installer starts and the office is ended on the spot: this runs first.
     builder.on_before_exit(move || crate::put_away(&handle)).build().ok()

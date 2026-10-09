@@ -5,8 +5,10 @@
 //   node tools/e2e/update-fetch.mjs v0.3.0
 //
 // It takes latest.json and the Windows installer from that release (a draft will do; the
-// `gh` command must be signed in), serves them from this computer as "version 99", and
-// asks the office, started as the named office `e2e` and told only to fetch, to update.
+// `gh` command must be signed in), serves them from this computer, and asks the office,
+// started as the named office `e2e` and told only to fetch, to update to it. (An office
+// told only to fetch takes any version for a newer one: a signature is made for one
+// version, so the file can only be offered as the version it is.)
 // The office must say the update was fetched and passed its check. Then one byte of the
 // installer is changed, and the office must refuse it. Nothing is put in place either time.
 import { execFileSync } from 'node:child_process'
@@ -54,7 +56,7 @@ const releases = createServer((request, response) => {
   if (request.url?.startsWith('/latest.json')) {
     const { port } = releases.address()
     response.writeHead(200, { 'content-type': 'application/json' })
-    response.end(JSON.stringify({ version: '99.0.0', notes: 'The real file, as a pretend newer version.', pub_date: new Date().toISOString(), platforms: { 'windows-x86_64': { signature: released.platforms['windows-x86_64'].signature, url: `http://127.0.0.1:${port}/${FILE}` } } }))
+    response.end(JSON.stringify({ version: released.version, notes: 'The real file, from this computer.', pub_date: new Date().toISOString(), platforms: { 'windows-x86_64': { signature: released.platforms['windows-x86_64'].signature, url: `http://127.0.0.1:${port}/${FILE}` } } }))
   } else {
     response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': serving.length })
     response.end(serving)
@@ -69,8 +71,14 @@ try {
   const attached = await attach(port)
   browser = attached.browser
   const page = attached.page
-  const offer = page.getByRole('menuitem', { name: /Update to 99\.0\.0/ })
-  const said = async () => (await page.locator('.toast').textContent().catch(() => '')) ?? ''
+  const offer = page.getByRole('menuitem', { name: `Update to ${released.version}` })
+  // Everything the office says while this runs is kept, so a failure can show what it said instead.
+  const heard = []
+  const said = async () => {
+    const now = ((await page.locator('.toast').textContent().catch(() => '')) ?? '').trim()
+    if (now && heard.at(-1) !== now) heard.push(now)
+    return now
+  }
   const ask = async () => {
     await page.getByRole('button', { name: 'More', exact: true }).click()
     await until(async () => (await offer.count()) === 1, 30000)
@@ -78,13 +86,15 @@ try {
   }
 
   await ask()
-  check('the real installer is fetched and passes the check against the app\'s key', await until(async () => (await said()).includes('passed its check')), await said())
-  check('and is not put in place', (await said()).includes('not put in place'))
+  check('the real installer is fetched and passes the check against the app\'s key', await until(async () => (await said()).includes('passed its check'), 40000), heard.join(' | '))
+  check('and is not put in place', heard.some(words => words.includes('not put in place')))
 
   serving = spoiled
   await sleep(500)
   await ask()
-  check('the same file with one byte changed is refused', await until(async () => (await said()).includes('could not be fetched')), await said())
+  heard.length = 0
+  check('the same file with one byte changed is refused', await until(async () => (await said()).includes('could not be fetched'), 40000), heard.join(' | '))
+  check('for its signature, not for its version', !heard.some(words => words.includes('announced version')), heard.join(' | '))
 } catch (error) {
   failed += 1
   console.log(`FAIL the test itself broke: ${error?.stack ?? error}`)

@@ -9,6 +9,7 @@ mod editor;
 mod engine;
 mod harness;
 mod link;
+mod mcp;
 mod model;
 mod office;
 mod proctree;
@@ -19,6 +20,9 @@ mod storage;
 mod toast;
 mod update;
 mod voice;
+
+/// Run the lightweight MCP subprocess without opening a desktop or another office.
+pub fn run_mcp_stdio() -> Result<(), String> { mcp::run_stdio() }
 
 use engine::{Handle, Shell};
 use model::{NewAgent, Phase, Snapshot};
@@ -985,9 +989,16 @@ pub fn run() {
             if let Some(text) = storage_problem {
                 problems.push(harness::Problem { text, file: desks.path.to_string_lossy().into_owned(), line: None });
             }
-            app.manage(StartupProblems(Mutex::new(problems)));
             let shell = Arc::new(Desktop { app: app.handle().clone(), desks, screens, shown: Mutex::new(None) });
-            app.manage(engine::start(shell, table, saved, kept));
+            let handle = engine::start(shell, table, saved, kept);
+            if std::env::var_os("MOSHPIT_DISABLE_MCP").is_none() {
+                let path = dir.join("coordination.json");
+                if let Err(text) = handle.enable_mcp(path.clone()) {
+                    problems.push(harness::Problem { text, file: path.to_string_lossy().into_owned(), line: None });
+                }
+            }
+            app.manage(handle);
+            app.manage(StartupProblems(Mutex::new(problems)));
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
             app.manage(voice::Voice::new(dir.join("voice-models")));

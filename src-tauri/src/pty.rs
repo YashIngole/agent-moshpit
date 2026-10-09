@@ -29,6 +29,7 @@ pub struct Launch {
     pub cwd: String,
     pub cols: u16,
     pub rows: u16,
+    pub env: Vec<(String, String)>,
 }
 
 /// What a terminal has shown, and who is watching it.
@@ -130,6 +131,11 @@ impl Terminals {
         if let Some(path) = crate::harness::child_path() {
             command.env("PATH", path);
         }
+        // A new office launched inside an agent must not pass that agent's
+        // capability to unrelated sessions or package-install jobs.
+        command.env_remove("MOSHPIT_MCP_ENDPOINT");
+        command.env_remove("MOSHPIT_MCP_TOKEN");
+        for (name, value) in &launch.env { command.env(name, value); }
         if !launch.cwd.is_empty() {
             command.cwd(&launch.cwd);
         }
@@ -463,13 +469,13 @@ mod tests {
         } else {
             ("/bin/sh".to_string(), vec!["-c".to_string(), format!("echo {word}")])
         };
-        Launch { program, args, cwd: String::new(), cols: 80, rows: 24 }
+        Launch { program, args, cwd: String::new(), cols: 80, rows: 24, env: vec![] }
     }
 
     /// A shell that waits to be typed into.
     fn shell() -> Launch {
         let (program, args) = if cfg!(windows) { ("cmd.exe".to_string(), vec!["/d".to_string(), "/q".to_string()]) } else { ("/bin/sh".to_string(), vec![]) };
-        Launch { program, args, cwd: String::new(), cols: 80, rows: 24 }
+        Launch { program, args, cwd: String::new(), cols: 80, rows: 24, env: vec![] }
     }
 
     fn watcher() -> (Sink, Arc<Mutex<Vec<u8>>>) {
@@ -603,7 +609,7 @@ mod tests {
     #[test]
     fn a_program_that_is_not_there_says_so() {
         let terms = Terminals::new(Arc::new(|_: &str, _: bool| {}));
-        let missing = Launch { program: "no-such-program-moshpit".into(), args: vec![], cwd: String::new(), cols: 80, rows: 24 };
+        let missing = Launch { program: "no-such-program-moshpit".into(), args: vec![], cwd: String::new(), cols: 80, rows: 24, env: vec![] };
         assert!(terms.start("a", missing).is_err());
         assert!(!terms.running("a"));
     }

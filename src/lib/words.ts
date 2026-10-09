@@ -19,16 +19,16 @@ export function doing(agent: Agent): string {
     case 'working':
       return agent.activity || 'Working'
     case 'starting':
-      return 'Getting set up'
+      return agent.activity || 'Getting set up'
     case 'done':
-      return 'Finished. Open their terminal to see what they did.'
+      return agent.activity || 'Finished. Open their terminal to see what they did.'
     case 'failed':
       return agent.activity || 'Something went wrong'
     case 'asleep':
       // Opening the desk shows where they left off; starting them again is a button there.
       return 'Not running. Open to see where they left off.'
     case 'idle':
-      return 'Waiting for something to do'
+      return agent.activity || 'Waiting for something to do'
   }
 }
 

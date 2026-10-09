@@ -70,6 +70,7 @@ Voice is off by default. Explicit model downloads contact **Hugging Face and its
 
 - [Guide](docs/guide.md): using the app, settings, and where its files are kept
 - [Programs](docs/programs.md): the CLIs it knows, and adding your own in `harnesses.json`
+- [Internal MCP](docs/internal-mcp.md): automatic desk naming, activity reports, delegated sessions and task results
 - [Development](docs/development.md): building from source, how the code is laid out, tests
 - [Known limits](docs/limits.md)
 - [Code signing policy](docs/code-signing-policy.md), with what the app sends

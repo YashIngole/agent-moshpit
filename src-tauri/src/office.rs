@@ -52,6 +52,9 @@ pub struct Desk {
     pub phase: Phase,
     pub since_ms: Millis,
     pub activity: String,
+    /// Agent descriptions supplement observed status; never hide an approval or failure.
+    reported_activity: String,
+    agent_named: bool,
     pub running: bool,
     /// When its program was last started.
     pub started_ms: Millis,
@@ -158,6 +161,7 @@ impl Office {
             desk.unread = false;
             desk.worked = false;
             desk.activity.clear();
+            desk.reported_activity.clear();
             desk.turn(Phase::Starting, now);
         }
     }
@@ -354,7 +358,7 @@ impl Office {
             return false;
         };
         let title = harness::shorten(title, 60);
-        if desk.saved.title_locked || title.is_empty() || desk.saved.title == title {
+        if desk.saved.title_locked || desk.agent_named || title.is_empty() || desk.saved.title == title {
             return false;
         }
         desk.saved.title = title;
@@ -368,6 +372,7 @@ impl Office {
         let Some(desk) = self.get_mut(id) else {
             return false;
         };
+        desk.agent_named = false;
         let title = harness::shorten(title, 60);
         if title.is_empty() {
             let auto = if desk.saved.auto_title.is_empty() { harness::shorten(fallback, 60) } else { desk.saved.auto_title.clone() };
@@ -395,6 +400,26 @@ impl Office {
         true
     }
 
+    pub fn agent_title(&mut self, id: &str, title: &str) {
+        if let Some(desk) = self.get_mut(id) {
+            if !desk.saved.title_locked {
+                desk.saved.title = harness::shorten(title, 60);
+                desk.agent_named = true;
+            }
+        }
+    }
+
+    pub fn agent_activity(&mut self, id: &str, activity: &str) {
+        if let Some(desk) = self.get_mut(id) { desk.reported_activity = harness::shorten(activity, 140); }
+    }
+
+    pub fn agent_directory(&mut self, id: &str, cwd: String) -> bool {
+        let Some(desk) = self.get_mut(id) else { return false };
+        if desk.saved.cwd == cwd { return false; }
+        desk.saved.cwd = cwd;
+        true
+    }
+
     pub fn views(&self, table: &[Harness]) -> Vec<AgentView> {
         self.desks
             .iter()
@@ -404,7 +429,7 @@ impl Office {
                     id: d.saved.id.clone(),
                     title: d.saved.title.clone(),
                     phase: d.phase,
-                    activity: d.activity.clone(),
+                    activity: if matches!(d.phase, Phase::Working | Phase::Starting | Phase::Idle | Phase::Done) && !d.reported_activity.is_empty() { d.reported_activity.clone() } else { d.activity.clone() },
                     harness: d.saved.harness.clone(),
                     harness_name: kind.map_or_else(|| d.saved.harness.clone(), |h| h.name.clone()),
                     harness_tag: kind.map_or_else(|| d.saved.harness.clone(), |h| h.tag.clone()),
@@ -440,6 +465,8 @@ impl Desk {
             phase,
             since_ms: now,
             activity: String::new(),
+            reported_activity: String::new(),
+            agent_named: false,
             running: false,
             started_ms: 0,
             worked: false,
@@ -552,6 +579,20 @@ mod tests {
         office.observed_trust("a", false);
         office.observe("a", &Signal::Quiet, false, 2000);
         assert_eq!(phase(&office), Phase::Idle);
+    }
+
+    #[test]
+    fn agent_activity_supplements_work_but_never_hides_an_observed_question() {
+        let mut office = office();
+        office.observe("a", &Signal::Working, false, 1000);
+        office.agent_activity("a", "Reading checkout tests");
+        assert_eq!(phase(&office), Phase::Working);
+        assert_eq!(office.views(&[])[0].activity, "Reading checkout tests");
+        office.observe("a", &Signal::Asked("May I change the API?".into()), false, 2000);
+        let question = office.views(&[])[0].activity.clone();
+        office.agent_activity("a", "Pretend everything is fine");
+        assert_eq!(phase(&office), Phase::NeedsYou);
+        assert_eq!(office.views(&[])[0].activity, question);
     }
 
     #[test]

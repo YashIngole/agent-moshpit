@@ -12,7 +12,7 @@ Tauri 2: a Rust core plus the operating system's own webview, with the interface
 
 ## Users
 
-Developers who run several coding-agent CLIs at once on their own computer: Claude Code and Codex first, and others such as Gemini CLI and Hermes. The agents mostly work in different repositories or git worktrees. The user is busy in an editor or in one agent's terminal and looks over to see who is working, who needs an answer, and who has finished. Agent Moshpit is meant to be published as open source, not kept as a private tool. It has not been pushed anywhere yet.
+Developers who run several coding-agent CLIs at once on their own computer: Claude Code and Codex first, and others such as Gemini CLI and Hermes. The agents mostly work in different repositories or git worktrees. The user is busy in an editor or in one agent's terminal and looks over to see who is working, who needs an answer, and who has finished. Agent Moshpit is open source, not a private tool: it was published on 2026-10-09 at github.com/YashIngole/agent-moshpit, with a download page at agentmoshpit.com.
 
 ## Product Purpose
 
@@ -90,7 +90,7 @@ Open decisions:
 - Whether to show sessions the office did not start (one typed into another terminal, or one inside a desktop app) and offer to carry them on here. It is in the plan (`docs/plan-cli-office.md`, step 6) and is not built.
 - Whether an agent should outlive the app. Today quitting ends every program.
 - What a desk says while its agent is working. Today it says only "Working".
-- macOS and Linux: written for, not yet run.
+- macOS and Linux: built and checked by CI since 2026-10-09, not yet used by hand.
 
 ## Brand Commitments
 

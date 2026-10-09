@@ -55,7 +55,7 @@ The [guide](docs/guide.md) covers the rest: the floor, terminals, the desk menu,
 | System | Status |
 | --- | --- |
 | Windows 11 | Used every day. Tested by hand and by a test that drives the real app. |
-| macOS | Built and checked by CI. Not yet used by hand. |
+| macOS | 10.15+ on Intel, 11+ on Apple Silicon. Built and checked by CI. Not yet used by hand. |
 | Linux | Built and checked by CI. Not yet used by hand. |
 
 On macOS and Linux a few things are missing for now: a click on a notification does not open that agent's desk, the right-click **Paste** may ask before reading the clipboard, and the webview's own keys (reload, for one) are not turned off. If you run either build, please [report what breaks](https://github.com/YashIngole/agent-moshpit/issues). All known gaps are in [limits.md](docs/limits.md).

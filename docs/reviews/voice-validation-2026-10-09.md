@@ -42,7 +42,14 @@ DESIGN.md and its sidecar were preserved. Earlier failed runs exposed an encodin
 error, overlapping build/UI tests, MCP argument-boundary and macOS socket-mode
 bugs, and fixture assumptions about window destruction, brief working states and
 Windows short-path aliases. These were corrected and affected checks rerun.
-No failed or cancelled run is counted as passing.
+No failed or cancelled run is counted as passing. The v0.5.0 installer run exposed
+Tauri's default macOS 10.13 minimum, below the pinned native engine's C++17
+filesystem requirement. v0.5.1 aligns the bundle and direct Cargo minimum at
+10.15 and refreshes the Mac native cache. A filesystem-only project identity
+test now creates no live shells, avoiding an unrelated macOS PTY allocation
+failure; its worktree/subfolder checks are retained and same-name isolation
+is asserted explicitly. Live-shell MCP fixtures share a test-only guard to bound
+PTY use on small runners. Update-fetch test cleanup now respects its named instance.
 
 The Windows baseline was built from research commit
 `066ee92c87c196f4abb3d135b2066dedd561ee44`: the release executable is 5,964,800

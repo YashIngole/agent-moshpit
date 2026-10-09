@@ -12,9 +12,13 @@ impl Shell for Quiet {
     fn save(&self, _: u64, _: &[SavedDesk]) {}
 }
 
-struct Fixture { handle: Handle, hub: Arc<Hub>, dir: PathBuf, a: String, b: String }
+// Bound live-shell fan-out on runners with a small native PTY pool. Each test
+// still exercises real terminals; pure project checks below use no shell.
+static FIXTURE_TERMINALS: Mutex<()> = Mutex::new(());
+struct Fixture { handle: Handle, hub: Arc<Hub>, dir: PathBuf, a: String, b: String, _terminals: std::sync::MutexGuard<'static, ()> }
 impl Fixture {
     fn new() -> Self {
+        let terminals = FIXTURE_TERMINALS.lock().unwrap_or_else(|e| e.into_inner());
         let dir = std::env::temp_dir().join(format!("moshpit-mcp-{}", random_id().unwrap()));
         std::fs::create_dir_all(dir.join(".git")).unwrap();
         std::fs::create_dir_all(dir.join("sub")).unwrap();
@@ -30,7 +34,7 @@ impl Fixture {
         let b = handle.new_agent(make(&dir.join("sub")), 80, 24).unwrap();
         let hub = Hub::start(handle.clone(), dir.join("coordination.json")).unwrap();
         hub.issue(&a).unwrap(); hub.issue(&b).unwrap();
-        Self { handle, hub, dir, a, b }
+        Self { handle, hub, dir, a, b, _terminals: terminals }
     }
     fn call(&self, caller: &str, name: &str, args: Value) -> Result<Value, String> { self.hub.call(&self.handle, caller, name, &args) }
     fn queued(&self) -> Task {
@@ -174,13 +178,20 @@ fn a_fast_child_result_is_not_overwritten_by_launch_completion() {
 
 #[test]
 fn worktrees_and_subfolders_share_a_project_but_equal_names_do_not() {
-    let f = Fixture::new();
-    let worktree = f.dir.join("sibling");
-    let git_dir = f.dir.join(".git/worktrees/sibling");
+    // Project identity is a filesystem check; it needs no terminal or live shell.
+    let dir = std::env::temp_dir().join(format!("moshpit-project-{}", random_id().unwrap()));
+    std::fs::create_dir_all(dir.join(".git")).unwrap();
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    let worktree = dir.join("sibling");
+    let git_dir = dir.join(".git/worktrees/sibling");
     std::fs::create_dir_all(&worktree).unwrap();
     std::fs::create_dir_all(&git_dir).unwrap();
     std::fs::write(worktree.join(".git"), format!("gitdir: {}\n", git_dir.display())).unwrap();
     std::fs::write(git_dir.join("commondir"), "../..\n").unwrap();
-    assert_eq!(project_key(&f.dir).unwrap(), project_key(&worktree).unwrap());
-    assert_eq!(project_key(&f.dir).unwrap(), project_key(&f.dir.join("sub")).unwrap());
+    assert_eq!(project_key(&dir).unwrap(), project_key(&worktree).unwrap());
+    assert_eq!(project_key(&dir).unwrap(), project_key(&dir.join("sub")).unwrap());
+    let same_name = dir.join("unrelated").join(dir.file_name().unwrap());
+    std::fs::create_dir_all(same_name.join(".git")).unwrap();
+    assert_ne!(project_key(&dir).unwrap(), project_key(&same_name).unwrap());
+    std::fs::remove_dir_all(dir).unwrap();
 }

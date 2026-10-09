@@ -102,7 +102,7 @@ try {
   await browser?.close().catch(() => {})
   killTree(child.pid)
   releases.close()
-  forgetAddress('e2e')
+  forgetAddress()
   await sleep(300)
   for (const gone of [folder, data]) rmSync(gone, { recursive: true, force: true })
 }

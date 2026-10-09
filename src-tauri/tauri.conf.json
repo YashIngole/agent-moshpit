@@ -30,6 +30,7 @@
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
     },
     "macOS": {
+      "minimumSystemVersion": "10.15",
       "signingIdentity": "-",
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist"

@@ -1,0 +1,15 @@
+// agentmoshpit.com on Cloudflare: the files in site/, served as they are.
+//
+//   npm run build:site
+//   npx wrangler deploy --config tools/cloudflare/site.jsonc
+//
+// No code runs for a request: these are static files, with the headers in
+// site/_headers and the redirects in site/_redirects.
+{
+  "name": "agentmoshpit",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../../site"
+  },
+  "routes": [{ "pattern": "agentmoshpit.com", "custom_domain": true }]
+}

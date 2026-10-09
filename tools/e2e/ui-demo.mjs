@@ -288,12 +288,12 @@ try {
   await page.keyboard.press('Control+0')
   await page.keyboard.press('Control+Shift+KeyF')
   check('Ctrl+Shift+F finds in a terminal', await until(async () => (await page.getByRole('searchbox').count()) + (await page.locator('.find input').count()) > 0))
+  // The field takes the keyboard on the next frame, which a browser with no screen can be slow to draw.
+  check('and takes the keyboard from the terminal', await until(() => page.evaluate(() => document.activeElement?.matches('.find input') ?? false)))
   await page.keyboard.type('src')
-  check('and says when it has found it', ((await page.locator('.find .hint').textContent()) ?? '') !== 'not found')
-  // What a failure of the next check has to say for itself: where the keyboard was, and what the field held.
-  const finding = await page.evaluate(() => ({ keyboard: `${document.activeElement?.tagName}.${document.activeElement?.className}`, field: document.querySelector('.find input')?.value ?? null }))
+  check('and says when it has found it', (await page.locator('.find input').inputValue()) === 'src' && ((await page.locator('.find .hint').textContent()) ?? '') !== 'not found')
   await page.keyboard.press('Escape')
-  check('Escape closes the find bar', await until(async () => (await page.locator('.find').count()) === 0), JSON.stringify(finding))
+  check('Escape closes the find bar', await until(async () => (await page.locator('.find').count()) === 0))
 
   const target = page.locator('.pane').first()
   const targetTitle = (await target.locator('h2').textContent()) ?? ''

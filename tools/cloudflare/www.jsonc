@@ -1,0 +1,10 @@
+// www.agentmoshpit.com: sends everyone to agentmoshpit.com, keeping the path.
+//
+//   npx wrangler deploy --config tools/cloudflare/www.jsonc
+{
+  "name": "agentmoshpit-www",
+  "main": "www.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "www.agentmoshpit.com", "custom_domain": true }]
+}

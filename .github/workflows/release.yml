@@ -15,9 +15,19 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # By hand, for a tag that is already there: the installers are built from the tag,
+  # by this file as it is on the branch the run is started from.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The version tag to build, for example v0.2.0'
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   # One draft, made first, so that the four builds below do not each make their own.
@@ -27,23 +37,19 @@ jobs:
       release_id: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Find or make the draft release
         id: draft
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          find_draft() { gh api "repos/$GITHUB_REPOSITORY/releases" --jq "[.[] | select(.tag_name == \"$TAG\" and .draft)][0].id // empty"; }
-          id=$(find_draft)
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq "[.[] | select(.tag_name == \"$TAG\" and .draft)][0].id // empty")
           if [ -z "$id" ]; then
             notes="docs/releases/$TAG.md"
-            if [ -f "$notes" ]; then
-              gh release create "$TAG" --draft --verify-tag --title "Agent Moshpit $TAG" --notes-file "$notes"
-            else
-              gh release create "$TAG" --draft --verify-tag --title "Agent Moshpit $TAG" --notes ""
-            fi
-            id=$(find_draft)
+            [ -f "$notes" ] || { notes=$(mktemp); : > "$notes"; }
+            id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -X POST -f tag_name="$TAG" -f name="Agent Moshpit $TAG" -F draft=true -F body=@"$notes" --jq .id)
           fi
           test -n "$id"
           echo "id=$id" >> "$GITHUB_OUTPUT"
@@ -66,6 +72,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Linux packages Tauri needs
         if: runner.os == 'Linux'

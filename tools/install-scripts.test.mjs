@@ -170,30 +170,36 @@ test('install.sh checks the Mac download the same way', async () => {
   assert.match(bad.stderr, /is not the file the signed list names/)
 })
 
-/** Windows PowerShell where it is, otherwise PowerShell 7 if this computer has it. */
-const powershell = ['powershell', 'pwsh'].find(name => spawnSync(name, ['-NoProfile', '-Command', 'exit 0']).status === 0)
+/** Every PowerShell this computer has: Windows PowerShell 5.1, the one people run install.ps1
+ * in on Windows, and PowerShell 7 where it is installed. Windows must have at least one. */
+const powershells = ['powershell', 'pwsh'].filter(name => spawnSync(name, ['-NoProfile', '-Command', 'exit 0']).status === 0)
+// Windows PowerShell started from PowerShell 7 (as on CI) would inherit 7's module path.
+const plainEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'))
 
-test('install.ps1 runs only what the signed list names', { skip: !powershell && process.platform !== 'win32' ? 'no PowerShell on this computer' : false }, async () => {
+test('install.ps1 runs only what the signed list names', { skip: powershells.length === 0 && process.platform !== 'win32' ? 'no PowerShell on this computer' : false }, async () => {
+  assert.ok(powershells.length > 0, 'Windows PowerShell was not found')
   const exe = 'agent-moshpit_windows_x64-setup.exe'
   const script = prepared('install.ps1', [
     [/^ {4}\$repo = .*$/m, `    $repo = 'http://127.0.0.1:${port}/releases'`],
     [/^ {4}\$signers = .*$/m, `    $signers = '${signers()}'`]
   ])
-  const attempt = () => run(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { env: { ...process.env, MOSHPIT_INSTALL_ONLY_FETCH: '1' } })
-  publish()
-  const good = await attempt()
-  assert.equal(good.status, 0, good.stderr + good.stdout)
-  assert.match(good.stdout, new RegExp(`Fetched and checked ${exe.replace(/\./g, '\\.')} \\(v9\\.9\\.9, 4096 bytes\\)`))
-  const refused = async (what, pattern) => {
-    const bad = await attempt()
-    assert.notEqual(bad.status, 0, `${what} was accepted`)
-    assert.match(bad.stderr + bad.stdout, pattern, what)
+  for (const powershell of powershells) {
+    const attempt = () => run(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { env: { ...plainEnv, MOSHPIT_INSTALL_ONLY_FETCH: '1' } })
+    publish()
+    const good = await attempt()
+    assert.equal(good.status, 0, `${powershell}: ${good.stderr}${good.stdout}`)
+    assert.ok(good.stdout.includes(`Fetched and checked ${exe} (v9.9.9, 4096 bytes)`), `${powershell}: ${good.stdout}`)
+    const refused = async (what, pattern) => {
+      const bad = await attempt()
+      assert.notEqual(bad.status, 0, `${powershell}: ${what} was accepted`)
+      assert.match(bad.stderr + bad.stdout, pattern, `${powershell}: ${what}`)
+    }
+    publish({ served: { ...files, [exe]: changed(files[exe]) } })
+    await refused('a changed installer', /is not the file the signed list names/)
+    publish()
+    release.sig = null
+    await refused('a missing signature', /signature of the release's list of installers could not be downloaded/)
+    publish({ key: 'other' })
+    await refused("another key's signature", /not signed with Agent Moshpit's key/)
   }
-  publish({ served: { ...files, [exe]: changed(files[exe]) } })
-  await refused('a changed installer', /is not the file the signed list names/)
-  publish()
-  release.sig = null
-  await refused('a missing signature', /signature of the release's list of installers could not be downloaded/)
-  publish({ key: 'other' })
-  await refused("another key's signature", /not signed with Agent Moshpit's key/)
 })

@@ -48,13 +48,25 @@
         $sums = Join-Path $work 'SHA256SUMS'
         Get-File "$repo/latest/download/SHA256SUMS" $sums "the release's signed list of installers"
         Get-File "$repo/latest/download/SHA256SUMS.sig" "$sums.sig" "the signature of the release's list of installers"
-        [IO.File]::WriteAllText((Join-Path $work 'signers'), "$signers`n")
-        $quoted = { param($path) '"' + $path + '"' }
-        $check = Start-Process -FilePath $keygen.Source -NoNewWindow -Wait -PassThru `
-            -ArgumentList @('-Y', 'verify', '-f', (& $quoted (Join-Path $work 'signers')), '-I', $signer, '-n', 'agentmoshpit-install', '-s', (& $quoted "$sums.sig")) `
-            -RedirectStandardInput $sums -RedirectStandardOutput (Join-Path $work 'verify.out') -RedirectStandardError (Join-Path $work 'verify.err')
+        $allowed = Join-Path $work 'signers'
+        [IO.File]::WriteAllText($allowed, "$signers`n")
+        # ssh-keygen reads the signed bytes on its input; they are written exactly as downloaded.
+        $start = New-Object System.Diagnostics.ProcessStartInfo
+        $start.FileName = $keygen.Source
+        $start.Arguments = '-Y verify -f "{0}" -I {1} -n agentmoshpit-install -s "{2}"' -f $allowed, $signer, "$sums.sig"
+        $start.UseShellExecute = $false
+        $start.RedirectStandardInput = $true
+        $start.RedirectStandardOutput = $true
+        $start.RedirectStandardError = $true
+        $check = [Diagnostics.Process]::Start($start)
+        $signed = [IO.File]::ReadAllBytes($sums)
+        $check.StandardInput.BaseStream.Write($signed, 0, $signed.Length)
+        $check.StandardInput.Close()
+        $null = $check.StandardOutput.ReadToEnd()
+        $said = $check.StandardError.ReadToEnd()
+        $check.WaitForExit()
         if ($check.ExitCode -ne 0) {
-            if ((Get-Content -Raw (Join-Path $work 'verify.err')) -match 'option') {
+            if ($said -match 'option') {
                 Stop-Install "this Windows' OpenSSH Client is too old to check signatures (8.1 or newer is needed). Update Windows, then run this again."
             }
             Stop-Install "the release's list of installers is not signed with Agent Moshpit's key."
@@ -73,11 +85,14 @@
         Write-Host "Getting $file ($tag)"
         $to = Join-Path $work $file
         Get-File "$repo/download/$tag/$file" $to $file
-        if ((Get-FileHash -Algorithm SHA256 -LiteralPath $to).Hash.ToLowerInvariant() -ne $want) {
+        $stream = [IO.File]::OpenRead($to)
+        try { $have = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) }
+        finally { $stream.Dispose() }
+        if ($have -ne $want) {
             Stop-Install "$file is not the file the signed list names. Nothing was run."
         }
         if ($onlyFetch) {
-            Write-Host "Fetched and checked $file ($tag, $((Get-Item -LiteralPath $to).Length) bytes). It was not installed: this was asked only to fetch it."
+            Write-Host "Fetched and checked $file ($tag, $((New-Object IO.FileInfo $to).Length) bytes). It was not installed: this was asked only to fetch it."
             return
         }
 

@@ -313,11 +313,12 @@ impl Hub {
                 let title = optional_string(args, "title", 60)?;
                 let worktree = args.get("worktree").map(|v| v.as_bool().ok_or("worktree must be a boolean.")).transpose()?.unwrap_or(false);
                 if handle.snapshot().agents.iter().filter(|a| a.running).count() >= 20 { return Err("The office already has twenty running sessions.".into()); }
+                let launch = inherited(&own.harness, &own.launch, &harness)?;
                 let child = random_id()?;
                 let (task, fresh) = self.reserve(caller, &child, args, true)?;
                 if !fresh { return Ok(json!({"session_id":task.to,"task_id":task.id,"task":task_view(&task),"reused":true})); }
                 let prompt = format!("{}\n\nThis task was delegated through Agent Moshpit (task_id: {}). Use get_context, update your activity, and report_result with your findings, changed files and validation when finished. Do not edit files outside your assigned task.", task.prompt, task.id);
-                let spec = NewAgent { harness, cwd: own.cwd, prompt, title: String::new(), worktree, launch: Default::default() };
+                let spec = NewAgent { harness, cwd: own.cwd, prompt, title: String::new(), worktree, launch };
                 match handle.new_agent_id(spec, 100, 30, task.to.clone(), Some(&title)) {
                     Ok(_) => {
                         // A fast child may already have reported a result: do not overwrite it.
@@ -380,6 +381,25 @@ impl Hub {
             _ => Err("Unknown Moshpit tool.".into()),
         }
     }
+}
+
+/// A delegated session never runs with looser settings than the session that asked for it.
+/// The same program inherits the asker's launch settings. Settings cannot be translated
+/// between programs, so an asker with permission settings of its own can only start its own program.
+fn inherited(parent: &str, options: &crate::launch::Options, harness: &str) -> Result<crate::launch::Options, String> {
+    if parent == harness {
+        return Ok(options.clone());
+    }
+    let restricted = !options.permission.is_empty()
+        || !options.sandbox.is_empty()
+        || !options.approval.is_empty()
+        || !options.profile.is_empty()
+        || !options.allowed_tools.is_empty()
+        || !options.disallowed_tools.is_empty();
+    if restricted {
+        return Err(format!("This session was started with its own permission settings, which carry over only to the same program. Start a {parent} session instead."));
+    }
+    Ok(Default::default())
 }
 
 fn task_view(task: &Task) -> Value {

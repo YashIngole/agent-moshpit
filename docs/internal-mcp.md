@@ -74,7 +74,12 @@ Other CLI adapters remain usable without this integration.
 
 Discovery and messaging are scoped to the caller's project. Git worktrees and
 subfolders share their common Git directory; unrelated folders with the same
-name are separate. New sessions can only inherit the caller's directory, with
+name are separate. A new session of the same program inherits the caller's launch
+settings, permissions and sandbox included, so delegation never loosens them. Those
+settings cannot be translated between programs: a caller started with permission
+settings of its own (permissions, sandbox, approvals, a Codex profile or Claude tool
+rules) can only start its own program, and a caller on its CLI's own settings starts
+the other program on that program's own. New sessions can only inherit the caller's directory, with
 the optional CLI worktree choice. This is coordination scope, not a replacement
 for the CLI's filesystem sandbox or permission policy.
 

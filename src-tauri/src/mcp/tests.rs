@@ -195,3 +195,21 @@ fn worktrees_and_subfolders_share_a_project_but_equal_names_do_not() {
     assert_ne!(project_key(&dir).unwrap(), project_key(&same_name).unwrap());
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn delegated_sessions_never_get_looser_settings() {
+    // A pure check of what a child is launched with; it needs no terminal or live shell.
+    use crate::launch::Options;
+    let plan = Options { permission: "plan".into(), model: "opus".into(), ..Options::default() };
+    assert_eq!(inherited("claude", &plan, "claude").unwrap(), plan);
+    assert!(inherited("claude", &plan, "codex").unwrap_err().contains("Start a claude session"));
+    let read_only = Options { permission: "read-only".into(), ..Options::default() };
+    assert!(inherited("codex", &read_only, "claude").is_err());
+    let profiled = Options { profile: "locked".into(), ..Options::default() };
+    assert!(inherited("codex", &profiled, "claude").is_err());
+    let limited = Options { disallowed_tools: vec!["Bash".into()], ..Options::default() };
+    assert!(inherited("claude", &limited, "codex").is_err());
+    // A session on its CLI's own permission settings starts the other program on that program's own.
+    let model_only = Options { model: "gpt-x".into(), ..Options::default() };
+    assert_eq!(inherited("codex", &model_only, "claude").unwrap(), Options::default());
+}

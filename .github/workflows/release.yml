@@ -40,11 +40,26 @@ jobs:
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.TAG }}
+          # The whole history, to see whether the tag is on main.
+          fetch-depth: 0
       - id: commit
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # A release ships what main has: merged work, never a branch on its way there.
+      - name: The tag is on main
+        run: |
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::$TAG is not on main. Merge the work first, then tag main."
+            exit 1
+          }
+
+      # latest.json offers the tag's version; the app it installs must say the same,
+      # or every office would be offered this update again and again.
+      - name: The app's versions are the tag's
+        run: node tools/release-check.mjs "$TAG"
 
   quality:
     needs: resolve
@@ -59,7 +74,7 @@ jobs:
     outputs:
       release_id: ${{ steps.draft.outputs.id }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 
@@ -94,7 +109,7 @@ jobs:
             target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 
@@ -113,16 +128,17 @@ jobs:
         shell: pwsh
         run: Add-Content $env:GITHUB_ENV 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri
           key: ${{ matrix.target }}
@@ -133,7 +149,7 @@ jobs:
         if: runner.os != 'Linux'
         run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys --release --target ${{ matrix.target }}
 
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -166,7 +182,7 @@ jobs:
     needs: [resolve, draft, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 

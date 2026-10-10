@@ -1,6 +1,6 @@
 [package]
 name = "agent-moshpit"
-version = "0.5.3"
+version = "0.5.4"
 description = "A small desktop office for coding agents: Claude Code, Codex and the rest, each in a terminal of its own"
 license = "MIT"
 edition = "2021"

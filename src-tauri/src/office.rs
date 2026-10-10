@@ -101,6 +101,10 @@ const OPENING_MS: Millis = 30_000;
 /// ...after printing for no longer than this (the quiet after printing included).
 /// Real work, even a quick answer, keeps a spinner going for longer.
 const BRIEF_MS: Millis = 4_000;
+/// Quiet this long after working, with no sign of work, counts as finished. Most programs
+/// never send a completion notice, and Claude Code and Codex keep a spinner or a status
+/// going while they work, so a full minute of silence is the end of the stretch.
+const QUIET_SETTLES_MS: Millis = 60_000;
 
 #[derive(Debug, Default)]
 pub struct Office {
@@ -291,7 +295,8 @@ impl Office {
                     return desk.turn(Phase::NeedsYou, now);
                 }
                 desk.rested = true;
-                if matches!(signal, Signal::Quiet) && desk.worked && desk.phase != Phase::Done {
+                let settled = desk.phase == Phase::Quiet && now.saturating_sub(desk.since_ms) >= QUIET_SETTLES_MS;
+                if matches!(signal, Signal::Quiet) && desk.worked && desk.phase != Phase::Done && !settled {
                     desk.activity = "No recent output. It may still be working.".into();
                     return desk.turn(Phase::Quiet, now);
                 }
@@ -711,6 +716,30 @@ mod tests {
         office.heard("a", 7_000, true, 7_100);
         office.heard("a", 7_000, false, 8_000);
         assert!(!unread(&office));
+    }
+
+    #[test]
+    fn a_long_silence_after_work_settles_for_programs_that_never_confirm() {
+        let mut office = office();
+        office.observe("a", &Signal::Working, false, 300);
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000).unwrap().to, Phase::Quiet);
+        // Still within the minute: unconfirmed, and still busy.
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000 + QUIET_SETTLES_MS - 1), None);
+        assert_eq!(office.busy(), 1);
+        // A full minute of silence is the end of the stretch: flagged for whoever was away...
+        assert_eq!(office.observe("a", &Signal::Quiet, false, 9_000 + QUIET_SETTLES_MS).unwrap().to, Phase::Done);
+        assert_eq!(office.busy(), 0);
+        office.mark_seen("a", 80_000);
+        assert_eq!(phase(&office), Phase::Idle);
+        // ...and simply idle for someone looking at its terminal.
+        office.observe("a", &Signal::Working, false, 90_000);
+        office.observe("a", &Signal::Quiet, true, 95_000);
+        assert_eq!(office.observe("a", &Signal::Quiet, true, 95_000 + QUIET_SETTLES_MS).unwrap().to, Phase::Idle);
+        // Work resuming within the minute keeps it working.
+        office.observe("a", &Signal::Working, false, 200_000);
+        office.observe("a", &Signal::Quiet, false, 205_000);
+        office.observe("a", &Signal::Working, false, 230_000);
+        assert_eq!(phase(&office), Phase::Working);
     }
 
     #[test]

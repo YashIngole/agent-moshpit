@@ -968,17 +968,21 @@ pub fn run() {
                 return;
             }
             let handle = window.state::<Handle>();
+            // Recording needs the window in front of the user. A model download does not:
+            // it carries on behind a minimized or closed window, and ends only on quitting.
+            let voice = window.state::<voice::Voice>();
             if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) || window.is_minimized().unwrap_or(false) {
-                window.state::<voice::Voice>().window(false);
-                window.state::<voice::Voice>().shutdown();
+                voice.window(false);
+            } else if matches!(event, WindowEvent::Resized(_) | WindowEvent::Focused(true)) {
+                // macOS restores a minimized window without resizing it, so focus counts too.
+                voice.window(true);
             }
-            if matches!(event, WindowEvent::Resized(_)) && !window.is_minimized().unwrap_or(true) { window.state::<voice::Voice>().window(true); }
             match event {
                 // Chosen in the window: closing it quits, asking first if anyone is busy.
                 WindowEvent::CloseRequested { api, .. } if HAS_TRAY.load(Ordering::Relaxed) && !QUITTING.load(Ordering::Relaxed) => {
                     if window.state::<Chosen>().now.lock().unwrap().close_quits {
                         api.prevent_close();
-                        window.state::<voice::Voice>().window(true);
+                        voice.window(true);
                         request_quit(window.app_handle());
                     }
                 }

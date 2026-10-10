@@ -39,6 +39,18 @@ impl Model {
     }
 }
 
+/// What a checked model file looked like. A change to either means it is checked again in full.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Stamp {
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+}
+
+pub fn stamp(path: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(path).ok()?;
+    meta.is_file().then(|| Stamp { len: meta.len(), modified: meta.modified().ok() })
+}
+
 pub fn validate(
     mut reader: impl Read,
     bytes: u64,

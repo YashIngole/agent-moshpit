@@ -6,7 +6,7 @@ Node 22 (22.12 or later) or Node 24, Rust 1.89 or later, and the [Tauri prerequi
 
 Local voice adds **CMake and a C++ toolchain** for pinned `whisper-rs = 0.16.0` / `whisper-rs-sys = 0.15.0` (vendored whisper.cpp 1.8.3), and native `cpal = 0.15.3`. GPU features and OpenMP are off. `.cargo/config.toml` disables host-native tuning and SSE4.2/AVX/AVX2/FMA/F16C/AVX512/AVX-VNNI options for distributable CPU builds. Do not replace these with `-march=native` or local-only flags. The actual CMake cache is included in the Windows verification record; old-CPU hardware has not been tested.
 
-- **Windows:** Visual Studio C++ tools, CMake, and a discoverable `libclang.dll` (`LIBCLANG_PATH` can name its folder). The pinned crate's packaged bindings include glibc layout assertions that fail on Windows, so bindings are generated for this target. Existing LLVM/libclang can be reused; no audio SDK is installed separately. The x64 target uses static Rust/C++ runtime linkage; CI inspects DLL imports to reject an unbundled Microsoft C++ runtime dependency. Raw desktop tests also check the hosted runner's WebView2 Runtime.
+- **Windows:** Visual Studio C++ tools, CMake, and a discoverable `libclang.dll` (`LIBCLANG_PATH` can name its folder). Without LLVM installed, the Python `libclang` wheel has one: `py -m pip install --target <folder> libclang`, then set `LIBCLANG_PATH` to `<folder>\clang\native`. The pinned crate's packaged bindings include glibc layout assertions that fail on Windows, so bindings are generated for this target. Existing LLVM/libclang can be reused; no audio SDK is installed separately. The x64 target uses static Rust/C++ runtime linkage; CI inspects DLL imports to reject an unbundled Microsoft C++ runtime dependency. Raw desktop tests also check the hosted runner's WebView2 Runtime.
 - **Linux:** add `libasound2-dev` and `cmake` to Tauri's build packages. `WHISPER_DONT_GENERATE_BINDINGS=1` uses the packaged bindings on 64-bit Linux and avoids libclang. Runtime capture requires working ALSA libraries/default input (PipeWire/PulseAudio systems commonly expose an ALSA route).
 - **macOS:** macOS 10.15 or newer, CMake, Xcode command-line tools and libclang for target bindings. Tauri and direct Cargo builds both set the deployment minimum to 10.15 for the pinned engine's C++17 filesystem dependency. Native capture uses CoreAudio. `src-tauri/Info.plist` supplies the microphone usage description and `Entitlements.plist` the audio-input entitlement. The CI/release workflow retains both ARM and Intel Mac targets; permission behavior requires a bundled app smoke test.
 
@@ -26,6 +26,8 @@ npm run tauri build -- --debug --no-bundle     # only the program, with debuggin
 The last one leaves `agent-moshpit.exe` in `src-tauri/target/debug`, or in `debug` under your cargo target folder if you have set one. The installers are not signed, so Windows and macOS will warn the first time. The macOS app is signed ad hoc, with no certificate, which is what lets it open at all on Apple Silicon.
 
 A release is made by pushing a tag: `.github/workflows/release.yml` builds the installers for the three systems and attaches them to a draft release, which a person reads and publishes. The draft's text is `docs/releases/<tag>.md`.
+
+Before anything is built, the run checks two things and stops if either fails: the tagged commit is on `main` (merge first, then tag), and `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` all carry the tag's version (`node tools/release-check.mjs <tag>` checks the same locally). `latest.json` offers the tag's version, so a build reporting another one would be offered to every office again and again. The workflows' third-party actions are pinned to full commits, because the release job holds the update-signing key; update a pin by resolving the new tag to its commit.
 
 The same run signs what an installed office updates itself from, with the app's own update key (the repository secret `TAURI_SIGNING_PRIVATE_KEY`; its public half is in `tauri.conf.json`), and writes `latest.json`, which a running office reads to learn that a newer version is out. That signing is asked for by `src-tauri/tauri.release.conf.json`, which only the release run uses, so a build on your own computer needs no key. The key has nothing to do with Windows or Apple code signing.
 
@@ -82,7 +84,7 @@ The look is dark, the office after hours: graphite rooms, matte desks, and the o
 ```sh
 cd src-tauri && cargo test     # the core: desks, status, the program table, terminals
 npm test                       # the window's layout of panes, file paths, links, words, looks and times
-npm run test:tools             # repeatable release manifests
+npm run test:tools             # repeatable release manifests, version checks
 npm run check                  # the window's types
 npm run test:ui                # builds the window and drives it in a headless Edge or Chrome, with demo data
 ```

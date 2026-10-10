@@ -84,13 +84,17 @@ struct Machine {
     target: Option<Target>,
     // 0 captures, 1 stops and transcribes, 2 cancels and discards.
     mode: Arc<AtomicU8>,
-    ready: Vec<Model>,
+    /// Models whose files passed their full check, as they looked then.
+    ready: Vec<(Model, models::Stamp)>,
     download_cancel: Option<Arc<AtomicBool>>,
     window_open: bool,
 }
 impl Machine {
     fn changed(&mut self) {
         self.view.sequence += 1;
+    }
+    fn has(&self, model: Model) -> bool {
+        self.ready.iter().any(|(m, _)| *m == model)
     }
     fn accepts(&self, epoch: u64, target: &Target) -> bool {
         self.epoch == epoch
@@ -124,12 +128,24 @@ impl Machine {
     }
 }
 
+/// How long a loaded recognizer is kept after its last recording.
+const KEEP_LOADED: Duration = Duration::from_secs(5 * 60);
+
+/// The recognizer from the last recording, so the next one need not load it again.
+#[derive(Default)]
+struct Loaded {
+    model: Option<(Model, models::Stamp, Arc<WhisperContext>)>,
+    uses: u64,
+}
+
 #[derive(Clone)]
 pub struct Voice {
     state: Arc<Mutex<Machine>>,
     dir: PathBuf,
-    // File validation, removal and promotion cannot race each other.
+    // File validation, removal and promotion cannot race each other. A download
+    // writes its own partial file and takes this only to move it into place.
     disk: Arc<Mutex<()>>,
+    loaded: Arc<Mutex<Loaded>>,
 }
 
 impl Voice {
@@ -138,6 +154,7 @@ impl Voice {
             state: Arc::new(Mutex::new(Machine::default())),
             dir,
             disk: Arc::new(Mutex::new(())),
+            loaded: Arc::new(Mutex::new(Loaded::default())),
         };
         voice.state.lock().unwrap().view.verifying = true;
         let check = voice.clone();
@@ -147,14 +164,11 @@ impl Voice {
             for model in [Model::Small, Model::Base] {
                 // An interrupted download is never offered as a model.
                 let _ = std::fs::remove_file(check.dir.join(format!("{}.part", model.file())));
-                if models::verify(
-                    &check.dir.join(model.file()),
-                    model,
-                    &AtomicBool::new(false),
-                )
-                .is_ok()
-                {
-                    ready.push(model);
+                let path = check.dir.join(model.file());
+                if models::verify(&path, model, &AtomicBool::new(false)).is_ok() {
+                    if let Some(stamp) = models::stamp(&path) {
+                        ready.push((model, stamp));
+                    }
                 }
             }
             let mut state = check.state.lock().unwrap();
@@ -172,7 +186,7 @@ impl Voice {
                 .map(|id| ModelView {
                     id,
                     bytes: id.bytes(),
-                    ready: state.ready.contains(&id),
+                    ready: state.has(id),
                 })
                 .to_vec(),
             ..state.view.clone()
@@ -184,10 +198,12 @@ impl Voice {
     }
     pub fn window(&self, open: bool) {
         let mut state = self.state.lock().unwrap();
-        state.window_open = open;
-        if !open {
+        // The window going away ends a recording. Further events while it stays
+        // minimized change nothing, so they cannot clear a message shown later.
+        if !open && state.window_open {
             state.cancel();
         }
+        state.window_open = open;
     }
     pub fn cancel_agent(&self, agent: &str) {
         let mut state = self.state.lock().unwrap();
@@ -227,7 +243,7 @@ impl Voice {
         if state.view.busy {
             return Err("The previous voice worker is finishing. Try again in a moment.".into());
         }
-        if !state.ready.contains(&settings.model) {
+        if !state.has(settings.model) {
             return Err("Download the selected voice model first, then try again.".into());
         }
         state.cancel();
@@ -243,6 +259,7 @@ impl Voice {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 voice.record(&engine, &target, epoch, &mode, &settings)
             }));
+            voice.release_later();
             let mut state = voice.state.lock().unwrap();
             if state.accepts(epoch, &target) {
                 match outcome {
@@ -386,12 +403,10 @@ impl Voice {
             state.changed();
         }
         let path = self.dir.join(settings.model.file());
-        {
-            let _disk = self.disk.lock().unwrap();
-            models::verify(&path, settings.model, &AtomicBool::new(false))?;
-        }
+        let stamp = self.checked(settings.model, &path)?;
+        let recognizer = self.recognizer(settings.model, stamp, &path)?;
         transcribe(
-            &path,
+            &recognizer,
             &pcm,
             settings.language,
             Abort {
@@ -402,12 +417,59 @@ impl Voice {
         )
     }
 
+    /// The model as it passed its full check, or checked again in full when its file changed since.
+    fn checked(&self, model: Model, path: &std::path::Path) -> Result<models::Stamp, String> {
+        let _disk = self.disk.lock().unwrap();
+        let known = self.state.lock().unwrap().ready.iter().find(|(m, _)| *m == model).map(|(_, s)| *s);
+        let now = models::stamp(path).ok_or("Download this voice model before recording.")?;
+        if known != Some(now) {
+            models::verify(path, model, &AtomicBool::new(false))?;
+            let mut state = self.state.lock().unwrap();
+            state.ready.retain(|(m, _)| *m != model);
+            state.ready.push((model, now));
+        }
+        Ok(now)
+    }
+
+    /// The recognizer for this model file, loaded once and kept between recordings.
+    fn recognizer(&self, model: Model, stamp: models::Stamp, path: &std::path::Path) -> Result<Arc<WhisperContext>, String> {
+        let mut loaded = self.loaded.lock().unwrap();
+        loaded.uses += 1;
+        if let Some((m, s, context)) = &loaded.model {
+            if *m == model && *s == stamp {
+                return Ok(context.clone());
+            }
+        }
+        // Let the previous one go before loading another.
+        loaded.model = None;
+        let mut context_params = WhisperContextParameters::default();
+        context_params.use_gpu(false);
+        let context = Arc::new(WhisperContext::new_with_params(path, context_params).map_err(|e| {
+            format!("The local model could not load: {e}. Check available memory, or use Base.")
+        })?);
+        loaded.model = Some((model, stamp, context.clone()));
+        Ok(context)
+    }
+
+    /// Give back the recognizer's memory once no recording has used it for a while.
+    fn release_later(&self) {
+        let uses = self.loaded.lock().unwrap().uses;
+        let voice = self.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(KEEP_LOADED);
+            let mut loaded = voice.loaded.lock().unwrap();
+            if loaded.uses == uses {
+                loaded.model = None;
+            }
+        });
+    }
+
     pub fn download(&self, model: Model) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
         if state.view.downloading.is_some() || state.view.verifying {
             return Err("A model is being downloaded or checked. Wait for it to finish.".into());
         }
-        if state.ready.contains(&model) {
+        if state.has(model) {
             return Ok(());
         }
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -418,7 +480,8 @@ impl Voice {
         state.changed();
         let voice = self.clone();
         std::thread::spawn(move || {
-            let _disk = voice.disk.lock().unwrap();
+            // Only this download writes its partial file, so recording with a model that is
+            // already in place goes on meanwhile. The folder is locked only to move it in.
             let partial = voice.dir.join(format!("{}.part", model.file()));
             let result = (|| {
                 std::fs::create_dir_all(&voice.dir)
@@ -427,17 +490,21 @@ impl Voice {
                     voice.state.lock().unwrap().view.received = received;
                 })
             })();
+            let _disk = voice.disk.lock().unwrap();
             let mut state = voice.state.lock().unwrap();
             let result = if cancelled.load(Ordering::Acquire) {
                 Err("Download cancelled.".into())
             } else {
                 result
             };
-            let result = result
-                .and_then(|verified| verified.promote(&voice.dir.join(model.file()), &cancelled));
+            let destination = voice.dir.join(model.file());
+            let result = result.and_then(|verified| verified.promote(&destination, &cancelled)).and_then(|()| {
+                models::stamp(&destination).ok_or_else(|| "The verified model could not be read back.".to_string())
+            });
             match result {
-                Ok(()) => {
-                    state.ready.push(model);
+                Ok(stamp) => {
+                    state.ready.retain(|(m, _)| *m != model);
+                    state.ready.push((model, stamp));
                 }
                 Err(why) => {
                     state.view.download_error = why;
@@ -472,7 +539,11 @@ impl Voice {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(format!("The model could not be removed: {e}")),
         }
-        state.ready.retain(|m| *m != model);
+        state.ready.retain(|(m, _)| *m != model);
+        let mut loaded = self.loaded.lock().unwrap();
+        if loaded.model.as_ref().is_some_and(|(m, _, _)| *m == model) {
+            loaded.model = None;
+        }
         state.changed();
         Ok(())
     }
@@ -521,17 +592,16 @@ unsafe extern "C" fn abort(data: *mut std::ffi::c_void) -> bool {
     let data = unsafe { &*(data as *const Abort) };
     data.mode.load(Ordering::Acquire) == 2 || !data.engine.voice_live(&data.target)
 }
+/// Whisper is prone to hearing words in noise ("Thank you."). A segment it judges this
+/// likely to be no speech at all is left out.
+const NO_SPEECH: f32 = 0.8;
+
 fn transcribe(
-    path: &std::path::Path,
+    context: &WhisperContext,
     pcm: &[f32],
     language: Language,
     mut cancellation: Abort,
 ) -> Result<String, String> {
-    let mut context_params = WhisperContextParameters::default();
-    context_params.use_gpu(false);
-    let context = WhisperContext::new_with_params(path, context_params).map_err(|e| {
-        format!("The local model could not load: {e}. Check available memory, or use Base.")
-    })?;
     let mut state = context
         .create_state()
         .map_err(|e| format!("Local voice could not start: {e}"))?;
@@ -562,6 +632,9 @@ fn transcribe(
         .map_err(|e| format!("Local transcription stopped: {e}. Try a shorter recording."))?;
     let mut text = String::new();
     for segment in state.as_iter() {
+        if segment.no_speech_probability() >= NO_SPEECH {
+            continue;
+        }
         text.push_str(
             segment
                 .to_str()

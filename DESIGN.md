@@ -453,6 +453,12 @@ The amber strip stays while someone is waiting, including when their terminal is
 - **Moving and dropping:** a pane being dragged is at 55% opacity, and the one it would trade places with is ringed in blue. So is a pane with files held over it.
 - **An install or an update** runs in a pane like any other, with a download mark where the face would be.
 
+### Voice input
+
+The top bar's Voice button is always present and opens setup when voice is disabled, its model is missing, or no running terminal is selected. During capture its icon becomes a stop square and its label becomes Stop; while preparing or transcribing it is disabled and says Working. The side panel uses the existing fields and quiet buttons: readiness first, microphone selection and refresh, then the two model choices, language and shortcut. Base is recommended for speed; model names omit their quantization format.
+
+A recording notice sits under the top bar on `panel`, with blue status text and an `ink-2` hint. The terminal destination, actual microphone name and elapsed recording time sit beside an 88px input meter, a blue fill on `wall` with pill corners. Stop and insert is primary, cancellation quiet. A transcription notice keeps the destination and elapsed time with an explicit microphone-stopped hint. Errors use `trouble-wash` and `trouble-ink`, with setup, retry and dismissal actions. Controls wrap below the text under 760px. The meter has accessible numeric values; changing timers stay outside the live announcement.
+
 ### The person
 One drawing with eight poses. At work they type, read with a hand on the mouse, or think with a hand to the chin, changing now and then. Needing you is a raised hand that waves. Done is leaning back with hands behind the head; trouble is hands on the head; away is asleep on folded arms; idle, quiet and starting sit still with hands on the keys. The terminal cursor also follows the reduced-motion preference.
 

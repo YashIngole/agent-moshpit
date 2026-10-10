@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
 import type { Editor, ModelCatalog, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
-import type { VoiceModel, VoiceSettings, VoiceView } from './voice'
+import type { VoiceInputs, VoiceModel, VoiceSettings, VoiceView } from './voice'
 
 /**
  * What a terminal sends. `kept` is true for the first piece only: the screen as
@@ -97,6 +97,7 @@ export interface Bridge {
    */
   updateNow(): Promise<boolean>
   voiceView(): Promise<VoiceView>
+  voiceInputs(): Promise<VoiceInputs>
   voiceConfig(settings: VoiceSettings): Promise<void>
   voiceStart(agent: string): Promise<void>
   voiceStop(): Promise<void>
@@ -199,6 +200,7 @@ function tauriBridge(): Bridge {
     onNewer: fn => subscribe<Newer | null>('office:newer', fn),
     updateNow: () => invoke<boolean>('update_now'),
     voiceView: () => invoke<VoiceView>('voice_view'),
+    voiceInputs: () => invoke<VoiceInputs>('voice_inputs'),
     voiceConfig: settings => invoke('voice_config', { settings }),
     voiceStart: agent => invoke('voice_start', { agent }),
     voiceStop: () => invoke('voice_stop'),

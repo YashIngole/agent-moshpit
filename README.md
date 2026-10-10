@@ -19,7 +19,7 @@ Run multiple Claude Code, Codex and other coding agents side by side in one desk
 - **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
 - **Updates when you say.** When a newer version is out, the ⋯ menu offers it. One click fetches it, checks it against the app's own key and starts the office again.
 - **Private.** No account, no telemetry. See [what it sends](#what-it-sends).
-- **Local voice input.** Optional dictation into a selected live terminal. Download a model under **⋯ → Voice input**, then use the mic. Review the text and press Enter yourself; voice never sends it for you.
+- **Local voice input.** Press **Voice** to set up a model and choose your microphone, then dictate into a selected live terminal with live audio feedback. Review the text and press Enter yourself; voice never sends it for you.
 
 ## Install
 

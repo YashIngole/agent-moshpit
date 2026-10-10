@@ -170,13 +170,15 @@ test('install.sh checks the Mac download the same way', async () => {
   assert.match(bad.stderr, /is not the file the signed list names/)
 })
 
-/** Every PowerShell this computer has: Windows PowerShell 5.1, the one people run install.ps1
- * in on Windows, and PowerShell 7 where it is installed. Windows must have at least one. */
-const powershells = ['powershell', 'pwsh'].filter(name => spawnSync(name, ['-NoProfile', '-Command', 'exit 0']).status === 0)
+/** install.ps1 is for Windows: every PowerShell there, Windows PowerShell 5.1 (the one people
+ * run it in) and PowerShell 7 where it is installed. */
+const powershells = process.platform === 'win32' ? ['powershell', 'pwsh'].filter(name => spawnSync(name, ['-NoProfile', '-Command', 'exit 0']).status === 0) : []
 // Windows PowerShell started from PowerShell 7 (as on CI) would inherit 7's module path.
 const plainEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'))
+/** An error as PowerShell 7 prints it is coloured and wrapped; this is its words. */
+const words = text => text.replace(/\x1b\[[0-9;]*m/g, '').replace(/\n\s*\|\s*/g, ' ').replace(/\s+/g, ' ')
 
-test('install.ps1 runs only what the signed list names', { skip: powershells.length === 0 && process.platform !== 'win32' ? 'no PowerShell on this computer' : false }, async () => {
+test('install.ps1 runs only what the signed list names', { skip: process.platform !== 'win32' ? 'install.ps1 is for Windows' : false }, async () => {
   assert.ok(powershells.length > 0, 'Windows PowerShell was not found')
   const exe = 'agent-moshpit_windows_x64-setup.exe'
   const script = prepared('install.ps1', [
@@ -192,7 +194,7 @@ test('install.ps1 runs only what the signed list names', { skip: powershells.len
     const refused = async (what, pattern) => {
       const bad = await attempt()
       assert.notEqual(bad.status, 0, `${powershell}: ${what} was accepted`)
-      assert.match(bad.stderr + bad.stdout, pattern, `${powershell}: ${what}`)
+      assert.match(words(bad.stderr + bad.stdout), pattern, `${powershell}: ${what}`)
     }
     publish({ served: { ...files, [exe]: changed(files[exe]) } })
     await refused('a changed installer', /is not the file the signed list names/)

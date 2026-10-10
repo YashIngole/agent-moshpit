@@ -106,6 +106,8 @@ The Windows debug build accepts `MOSHPIT_TEST_DEBUG_PORT` only for a named offic
 
 Unit tests cover actual PCM formats/channel boundaries, 60-second bounds, silence/short rejection, ANSI/control sanitization, state cancellation, pinned file size/hash, atomic completion, hidden panes, restarted PTY generations, and excluding voice echo from saved screens. `npm run test:ui` adds deterministic demo listening/transcribing/failure/download/remove/cancel tests; it stubs clipboard writes and never uses a microphone or downloads a model.
 
+After `npm run build`, `node tools/e2e/voice-ux.mjs` checks setup, input selection, silence feedback, retry, narrow layouts and terminal focus in a browser. On Windows, `node tools/e2e/voice-setup-app.mjs` checks the desktop IPC, native input enumeration and persisted settings; set `MOSHPIT_APP` when the executable is outside the default debug target folder. Both run in isolated test data and never start microphone capture. CI runs the browser suite on all three platforms and the native setup check on Windows.
+
 The debug build accepts **`MOSHPIT_VOICE_WAV` only with a named `MOSHPIT_INSTANCE` and explicit `MOSHPIT_DATA_DIR`**. It requires PCM16 WAV, no longer than 60 seconds, and feeds the same conversion/recognition path. A bad fixture fails without opening a microphone. Release builds never read this variable. This is a test hook, not an audio-file feature.
 
 For the opt-in real-app fixture test, provide isolated storage with whisper.cpp v1.8.3's `samples/jfk.wav` and the pinned models, then:

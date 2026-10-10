@@ -1,6 +1,6 @@
 # Voice input repair — 10 October 2026
 
-The owner reported that voice input did not work and its UX was poor, identifying their version as 0.5.3. The installed executable at `E:/Softwares/Agent Moshpit/agent-moshpit.exe` reports 0.5.2, and GitHub's latest published release was 0.5.2 during this work. The repair is isolated on `fix/voice-input`, based on `origin/main` at `d4e9d20`; the old `cli-office` checkout is preserved.
+The owner reported that voice input did not work and its UX was poor, identifying their version as 0.5.3. The installed executable at `E:/Softwares/Agent Moshpit/agent-moshpit.exe` reports 0.5.2, and GitHub's latest published release was 0.5.2 at the start of this repair. The repair was isolated on `fix/voice-input`, based on `origin/main` at `d4e9d20`; the old `cli-office` checkout is preserved.
 
 ## Findings and changes
 
@@ -26,7 +26,18 @@ Screenshots are from the simulated browser office, without microphone capture: [
 
 Run `npm run test:ui` for the main browser suite and `npm run build; node tools/e2e/voice-ux.mjs` for the focused recovery checks. The recorded-audio desktop check uses `tools/e2e/voice-app.mjs`, existing isolated model/WAV fixtures, a named instance and a temporary data directory.
 
-The initial local deliverables are `.impeccable/review/voice-fix-build/Agent-Moshpit-voice-fix-test-setup.exe`, `agent-moshpit.exe` and their SHA-256 manifest in `checksums.json`. Native setup smoke checks can target the optimized executable with `MOSHPIT_APP` and `node tools/e2e/voice-setup-app.mjs`. Those initial test artifacts retain version 0.5.2. Following the owner's instruction to ship, the release is prepared as v0.5.3 with the focused browser suite on all three CI platforms and native setup coverage on Windows. Publication requires successful release CI, all platform packages and real-app update signature/tamper checks.
+The initial local deliverables are `.impeccable/review/voice-fix-build/Agent-Moshpit-voice-fix-test-setup.exe`, `agent-moshpit.exe` and their SHA-256 manifest in `checksums.json`. Native setup smoke checks can target the optimized executable with `MOSHPIT_APP` and `node tools/e2e/voice-setup-app.mjs`. Those initial test artifacts retain version 0.5.2. Following the owner's instruction to ship, the repair was released as v0.5.3 with the focused browser suite on all three CI platforms and native setup coverage on Windows.
+
+## Published release validation
+
+[v0.5.3](https://github.com/YashIngole/agent-moshpit/releases/tag/v0.5.3) was published on 10 October 2026 at 15:32:48 UTC after [PR #4](https://github.com/YashIngole/agent-moshpit/pull/4) merged. The tag resolves to `65941e06110f9fe996c75e5ecb92d1f46ad126e6`, contained in main's merge commit `05af94240d6297f18a524821d0e664ee12527801` with identical trees.
+
+- [PR CI](https://github.com/YashIngole/agent-moshpit/actions/runs/38062568300), [main CI](https://github.com/YashIngole/agent-moshpit/actions/runs/38063217443) and the [release pipeline](https://github.com/YashIngole/agent-moshpit/actions/runs/38062640586) all passed. Release CI tested the exact tagged commit before packaging.
+- Linux, Windows and both Mac architectures produced their installers and signed update artifacts. The manifest has all four generic platform entries, plus installer-specific entries; every URL names v0.5.3.
+- The downloaded NSIS installer is 3,039,099 bytes and reports 0.5.3. Its extracted executable is 9,289,216 bytes, reports 0.5.3 and passed the native voice setup smoke test in isolated data without starting capture or replacing the installed app.
+- `node tools/e2e/update-fetch.mjs v0.5.3` passed against the real release installer: the desktop updater accepted its signature and rejected a one-byte change. Both attempts ran with installation disabled.
+- The unauthenticated public `releases/latest/download/latest.json` returned 0.5.3. The public latest Windows download matched both the checked installer and GitHub's asset digest: SHA-256 `65ac5b19e18b8d362f93a4049b5e3fb355e30d5e27fa6f9aeb70232cbcb5a4f2`.
+- The website demo and version metadata were deployed to `agentmoshpit.com` with Cloudflare version `872eed63-45ec-49e5-a079-32920e6dbd76`. Both local and live `tools/check-site.mjs` checks passed: all six pages, metadata/schema, links/assets, indexing headers, install scripts, 404 behavior and the JavaScript demo.
 
 ## Limits
 

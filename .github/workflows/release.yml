@@ -190,3 +190,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node tools/release-manifest.mjs "$GITHUB_REPOSITORY" "${{ needs.draft.outputs.release_id }}" "$TAG"
+
+      # The install commands (site/install.sh, site/install.ps1) take an installer only
+      # from this list, and only when its signature matches the key they pin, which is
+      # tools/install-signers. The secret is that key's private half (OpenSSH format).
+      - name: Write, sign and attach SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_SIGNING_KEY: ${{ secrets.INSTALL_SIGNING_KEY }}
+        run: |
+          node tools/release-checksums.mjs write "$GITHUB_REPOSITORY" "${{ needs.draft.outputs.release_id }}" "$TAG"
+          key="$RUNNER_TEMP/install-signing"
+          trap 'rm -f "$key"' EXIT
+          ( umask 077; printf '%s\n' "$INSTALL_SIGNING_KEY" > "$key" )
+          ssh-keygen -q -Y sign -f "$key" -n agentmoshpit-install SHA256SUMS
+          rm -f "$key"
+          # The pinned key must accept it, or no one could install this release.
+          ssh-keygen -Y verify -f tools/install-signers -I installers@agentmoshpit.com -n agentmoshpit-install -s SHA256SUMS.sig < SHA256SUMS
+          node tools/release-checksums.mjs upload "$GITHUB_REPOSITORY" "${{ needs.draft.outputs.release_id }}"

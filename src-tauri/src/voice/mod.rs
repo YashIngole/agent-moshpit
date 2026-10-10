@@ -411,8 +411,7 @@ impl Voice {
             settings.language,
             Abort {
                 mode: mode.clone(),
-                engine: engine.clone(),
-                target: target.clone(),
+                live: Some((engine.clone(), target.clone())),
             },
         )
     }
@@ -584,24 +583,35 @@ fn fixture_pcm() -> Result<Option<Vec<f32>>, String> {
 
 struct Abort {
     mode: Arc<AtomicU8>,
-    engine: Handle,
-    target: Target,
+    /// The terminal the text is for. Transcription stops once it is gone. None in tests.
+    live: Option<(Handle, Target)>,
 }
 unsafe extern "C" fn abort(data: *mut std::ffi::c_void) -> bool {
     // `data` points to the stack value in transcribe, alive for the entire full() call.
     let data = unsafe { &*(data as *const Abort) };
-    data.mode.load(Ordering::Acquire) == 2 || !data.engine.voice_live(&data.target)
+    data.mode.load(Ordering::Acquire) == 2 || data.live.as_ref().is_some_and(|(engine, target)| !engine.voice_live(target))
 }
-/// Whisper is prone to hearing words in noise ("Thank you."). A segment it judges this
-/// likely to be no speech at all is left out.
-const NO_SPEECH: f32 = 0.8;
+fn transcribe(context: &WhisperContext, pcm: &[f32], language: Language, cancellation: Abort) -> Result<String, String> {
+    kept(&recognize(context, pcm, language, cancellation)?)
+}
 
-fn transcribe(
+/// The text worth inserting from what the model heard: its words, without the notes it
+/// writes for sounds that are not speech.
+fn kept(heard: &[String]) -> Result<String, String> {
+    let text = sanitize(&without_sound_notes(&heard.concat()));
+    if text.is_empty() {
+        return Err("No words were recognised. Check the language and try again.".into());
+    }
+    Ok(text)
+}
+
+/// What the model heard: each passage, with how likely the model thinks it is no speech at all.
+fn recognize(
     context: &WhisperContext,
     pcm: &[f32],
     language: Language,
     mut cancellation: Abort,
-) -> Result<String, String> {
+) -> Result<Vec<String>, String> {
     let mut state = context
         .create_state()
         .map_err(|e| format!("Local voice could not start: {e}"))?;
@@ -630,25 +640,44 @@ fn transcribe(
     state
         .full(params, pcm)
         .map_err(|e| format!("Local transcription stopped: {e}. Try a shorter recording."))?;
-    let mut text = String::new();
+    let mut heard = Vec::new();
+    let mut length = 0;
     for segment in state.as_iter() {
-        if segment.no_speech_probability() >= NO_SPEECH {
-            continue;
-        }
-        text.push_str(
-            segment
-                .to_str()
-                .map_err(|e| format!("The transcript could not be read: {e}"))?,
-        );
-        if text.len() > 32 * 1024 {
+        let text = segment.to_str().map_err(|e| format!("The transcript could not be read: {e}"))?.to_string();
+        length += text.len();
+        if length > 32 * 1024 {
             return Err("The transcript was too long. Try a shorter recording.".into());
         }
+        heard.push(text);
     }
-    let text = sanitize(&text);
-    if text.is_empty() {
-        return Err("No words were recognised. Check the language and try again.".into());
+    Ok(heard)
+}
+
+/// The model's notes for sounds that are not speech: `[BLANK_AUDIO]` for a fan or a breath,
+/// `[APPLAUSE]` for typing, `(music)`, `*sighs*`, `♪ … ♪`. Its no-speech score was no help
+/// (about 1e-8 for noise and speech alike), but these notes are how it says there were no words.
+fn without_sound_notes(text: &str) -> String {
+    let mut words = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find(['[', '(', '*', '♪']) {
+        let open = rest[start..].chars().next().unwrap();
+        let close = match open { '[' => ']', '(' => ')', other => other };
+        let after = start + open.len_utf8();
+        match rest[after..].find(close) {
+            Some(length) => {
+                words.push_str(&rest[..start]);
+                words.push(' ');
+                rest = &rest[after + length + close.len_utf8()..];
+            }
+            // A lone bracket is kept as it is: only a closed note is dropped.
+            None => {
+                words.push_str(&rest[..after]);
+                rest = &rest[after..];
+            }
+        }
     }
-    Ok(text)
+    words.push_str(rest);
+    words
 }
 
 /// Remove ANSI/C1 CSI and strings (OSC/DCS/etc), all controls, and line breaks.
@@ -745,6 +774,64 @@ mod tests {
         assert!(!state.accepts(0, &target));
         assert!(state.accepts(1, &target));
     }
+    /// What a recording becomes after capture, with the real Base model: the speech check,
+    /// amplification, recognition and the no-speech filter, as `record` runs them.
+    /// `MOSHPIT_VOICE_FIXTURES` names the folder of the desktop voice test (docs/development.md).
+    #[test]
+    #[ignore = "needs the Base model and jfk.wav in MOSHPIT_VOICE_FIXTURES"]
+    fn the_real_model_hears_short_speech_and_not_noise() {
+        let fixtures = PathBuf::from(std::env::var_os("MOSHPIT_VOICE_FIXTURES").expect("MOSHPIT_VOICE_FIXTURES"));
+        let mut params = WhisperContextParameters::default();
+        params.use_gpu(false);
+        let context = WhisperContext::new_with_params(fixtures.join(Model::Base.file()), params).unwrap();
+        let wav = hound::WavReader::open(fixtures.join("jfk.wav")).unwrap();
+        let jfk: Vec<f32> = wav.into_samples::<i16>().map(|s| f32::from(s.unwrap()) / 32768.0).collect();
+        let at = |from: f32, to: f32| jfk[(from * 16_000.0) as usize..(to * 16_000.0) as usize].to_vec();
+        let hear = |name: &str, clip: Vec<f32>| -> Result<String, String> {
+            let result = audio::speech(&clip).and_then(|()| {
+                let mut clip = clip;
+                audio::normalize(&mut clip);
+                let heard = recognize(&context, &clip, Language::English, Abort { mode: Arc::new(AtomicU8::new(0)), live: None })?;
+                eprintln!("{name}: the model wrote {heard:?}");
+                kept(&heard)
+            });
+            eprintln!("{name}: {result:?}");
+            result
+        };
+        let mut x = 7u32;
+        let mut noise = || { x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223); (x >> 8) as f32 / (1 << 23) as f32 - 1.0 };
+        let n = 32_000;
+        let fan: Vec<f32> = (0..n).map(|i| noise() * 0.02 * (1.0 + 0.2 * (std::f32::consts::TAU * 1.5 * i as f32 / 16_000.0).sin())).collect();
+        let mut low = 0.0f32;
+        let rumble: Vec<f32> = (0..n).map(|_| { low = 0.98 * low + noise() * 0.2; low * 0.03 }).collect();
+        let typing: Vec<f32> = (0..n).map(|i| if i % 2_400 < 60 { noise() * 0.3 * (1.0 - (i % 2_400) as f32 / 60.0) } else { noise() * 0.002 }).collect();
+        let breath: Vec<f32> = (0..n).map(|i| noise() * 0.01 * (std::f32::consts::PI * i as f32 / n as f32).sin()).collect();
+        let white: Vec<f32> = (0..n).map(|_| noise() * 0.02).collect();
+        let hum: Vec<f32> = (0..n).map(|i| 0.02 * (std::f32::consts::TAU * 50.0 * i as f32 / 16_000.0).sin()).collect();
+
+        // Speech, including short phrases with no pause around them, is heard as words.
+        assert!(hear("whole sample", jfk.clone()).unwrap().contains("ask not what your country can do for you"));
+        assert!(hear("1.40-2.00", at(1.4, 2.0)).unwrap().contains("America"));
+        assert!(hear("9.60-10.20", at(9.6, 10.2)).unwrap().contains("country"));
+        assert!(hear("3.00-3.60", at(3.0, 3.6)).is_ok());
+        // Hiss and hum stop at the speech check; the model writes only sound notes for the
+        // rest of the noise, so nothing is inserted.
+        for (name, clip) in [("white", white), ("hum", hum), ("fan", fan), ("rumble", rumble), ("typing", typing), ("breath", breath)] {
+            assert!(hear(name, clip).is_err(), "{name}");
+        }
+    }
+
+    #[test]
+    fn sound_notes_are_not_words() {
+        for note in [" [BLANK_AUDIO]", " [APPLAUSE]", "(music)", " *sighs*", "♪ la la ♪", "[ Silence ] (wind)"] {
+            assert!(kept(&[note.into()]).is_err(), "{note:?}");
+        }
+        assert_eq!(kept(&[" Fix the [BLANK_AUDIO] failing test.".into()]).unwrap(), "Fix the failing test.");
+        assert_eq!(kept(&[" Hello".into(), " world.".into()]).unwrap(), "Hello world.");
+        // A bracket that never closes is not a note; a later note still goes.
+        assert_eq!(kept(&["array[0 is empty (music)".into()]).unwrap(), "array[0 is empty");
+    }
+
     #[test]
     fn default_is_off_and_multilingual_without_sending() {
         let settings = Settings::default();

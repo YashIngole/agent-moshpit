@@ -70,12 +70,18 @@ try {
     await call('rename_session', { title: 'Coordinate API review' })
     const sessions = await call('list_sessions')
     assert.ok(sessions.sessions.some(row => row.session.id === id))
-    const spec = { harness: 'claude', prompt: 'Review the API tests in this directory', title: 'API reviewer', request_key: 'initial-review' }
+    // This parent is Codex: its delegated sessions are Codex too, with its permission boundary.
+    const spec = { harness: 'codex', prompt: 'Review the API tests in this directory', title: 'API reviewer', request_key: 'initial-review' }
     const child = await call('start_session', spec)
     const repeat = await call('start_session', spec)
     assert.equal(repeat.reused, true)
     assert.equal(repeat.session_id, child.session_id)
-    await call('start_session', { ...spec, harness: 'codex' }, true)
+    // Another program is refused, whatever its request key: its permissions could be broader.
+    const other = await call('start_session', { ...spec, harness: 'claude', request_key: 'another-program' }, true)
+    assert.match(other.content[0].text, /same program/)
+    record('other-program-refused', { id })
+    // A request key already used for another task is refused too.
+    await call('start_session', { ...spec, prompt: 'Something else entirely' }, true)
     const result = await call('get_task', { task_id: child.task_id, wait_seconds: 25 })
     assert.equal(result.task.status, 'completed')
     assert.equal(result.task.validation, 'Model-free fixture passed')

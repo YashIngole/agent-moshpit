@@ -85,26 +85,35 @@ pub fn speech(pcm: &[f32]) -> Result<(), String> {
     if pcm.len() > MAX_SAMPLES || pcm.iter().any(|v| !v.is_finite()) {
         return Err("The microphone returned invalid audio. Try another input device.".into());
     }
-    // Require at least 200ms of 20ms windows that stand out, not just a single click.
+    // Require at least 200ms of non-silent 20ms windows, not just a single click.
     let levels: Vec<f64> = pcm
         .chunks(RATE / 50)
         .map(|chunk| (chunk.iter().map(|v| f64::from(*v).powi(2)).sum::<f64>() / chunk.len() as f64).sqrt())
         .collect();
-    // A quiet microphone is fine, but steady room noise is not speech: words must stand
-    // clearly above this recording's own quietest moments (its pauses), as well as above
-    // a fixed floor. Otherwise amplified hiss reaches the model, which invents words in it.
-    let mut sorted = levels.clone();
-    sorted.sort_by(f64::total_cmp);
-    let background = sorted[sorted.len() / 10];
-    let threshold = (background * 3.0).max(0.002);
-    let audible = levels.iter().filter(|level| **level > threshold).count();
+    let audible = levels.iter().filter(|level| **level > 0.002).count();
     if audible < 10 {
         return Err(
             "No clear speech was heard. Choose your microphone in Voice input and check that the input meter moves when you speak.".into(),
         );
     }
+    // Hiss and hum are steady; speech is not, even without a pause around it. Only a level
+    // this flat stops here, because amplified it would reach the model, which invents words
+    // in noise. Rumble and fans vary more and are left to the model's own no-speech judgement.
+    let mut sorted = levels;
+    sorted.sort_by(f64::total_cmp);
+    let (quietest, loudest) = (sorted[sorted.len() / 10], sorted[sorted.len() * 9 / 10]);
+    if loudest < quietest * STEADY {
+        return Err(
+            "Only steady background noise was heard. Speak closer to the microphone, or choose another one in Voice input.".into(),
+        );
+    }
     Ok(())
 }
+
+/// The loudest tenth of a recording's 20ms windows over its quietest tenth, below which it is
+/// steady noise. White noise and mains hum measure 1.00 to 1.07. Every half-second or longer
+/// stretch of speech in the recorded sample measures at least 1.50, pauses or none.
+const STEADY: f64 = 1.3;
 
 pub struct DeviceCapture {
     pub stream: cpal::Stream,
@@ -280,18 +289,25 @@ mod tests {
         assert!(Capture::new(0, 48_000).is_err());
         assert!(Capture::new(2, 0).is_err());
     }
+    /// Real speech, cut from whisper.cpp's sample recording (see testdata/README.md).
+    fn spoken(clip: &[u8]) -> Vec<f32> {
+        clip.as_chunks::<2>().0.iter().map(|b| f32::from(i16::from_le_bytes(*b)) / 32768.0).collect()
+    }
+    const NO_PAUSE: &[u8] = include_bytes!("testdata/jfk-1.40-2.00.s16");
+    const ENDS_MID_PHRASE: &[u8] = include_bytes!("testdata/jfk-9.60-10.20.s16");
+    const LEAST_VARIED: &[u8] = include_bytes!("testdata/jfk-7.65-8.15.s16");
+
     /// Repeatable noise between -1 and 1, without a dependency.
     fn hiss(n: usize, seed: u32) -> Vec<f32> {
         let mut x = seed;
         (0..n).map(|_| { x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223); (x >> 8) as f32 / (1 << 23) as f32 - 1.0 }).collect()
     }
-
-    /// A recording as people make one: room noise, then words, then room noise.
-    fn spoken(noise: f32, voice: f32) -> Vec<f32> {
-        let mut pcm: Vec<f32> = hiss(RATE * 3 / 10, 1).into_iter().map(|v| v * noise).collect();
-        pcm.extend(hiss(RATE * 6 / 10, 2).into_iter().enumerate().map(|(i, v)| v * noise + (i as f32 * 0.1).sin() * voice));
-        pcm.extend(hiss(RATE * 3 / 10, 3).into_iter().map(|v| v * noise));
-        pcm
+    fn hum(n: usize, level: f32) -> Vec<f32> {
+        let tone = |hz: f32, i: usize| (std::f32::consts::TAU * hz * i as f32 / RATE as f32).sin();
+        (0..n).map(|i| level * (tone(50.0, i) + 0.5 * tone(150.0, i))).collect()
+    }
+    fn mixed(a: &[f32], b: &[f32]) -> Vec<f32> {
+        a.iter().zip(b).map(|(x, y)| x + y).collect()
     }
 
     #[test]
@@ -301,24 +317,40 @@ mod tests {
         let mut click = vec![0.0; RATE];
         click[100] = 1.0;
         assert!(speech(&click).is_err());
-        assert!(speech(&spoken(0.0005, 0.06)).is_ok());
-        // A quiet microphone previously failed the fixed 0.008 RMS cutoff.
-        let quiet = spoken(0.0005, 0.005);
-        assert!(speech(&quiet).is_ok());
         assert!(speech(&vec![0.001; RATE]).is_err());
-        let mut boosted = quiet;
-        normalize(&mut boosted);
-        assert!(boosted.iter().any(|v| v.abs() > 0.09));
-        assert!(boosted.iter().all(|v| v.abs() <= 1.0));
     }
 
     #[test]
-    fn steady_room_noise_is_not_speech() {
-        // Loud enough to pass the fixed floor on its own, but nothing stands out of it.
-        let fan: Vec<f32> = hiss(RATE * 2, 4).into_iter().map(|v| v * 0.01).collect();
-        assert!(speech(&fan).is_err());
-        // Words over the same noise still count.
-        assert!(speech(&spoken(0.01, 0.08)).is_ok());
+    fn speech_without_pauses_around_it_is_speech() {
+        // An earlier check measured words against the recording's own quietest moments,
+        // and so refused speech that filled the whole recording.
+        for clip in [NO_PAUSE, ENDS_MID_PHRASE, LEAST_VARIED] {
+            let pcm = spoken(clip);
+            assert!(speech(&pcm).is_ok(), "{} samples", pcm.len());
+        }
+        // Quiet speech too: a quiet microphone previously failed a fixed 0.008 RMS cutoff.
+        let mut quiet: Vec<f32> = spoken(NO_PAUSE).iter().map(|v| v * 0.03).collect();
+        assert!(speech(&quiet).is_ok());
+        normalize(&mut quiet);
+        assert!(quiet.iter().any(|v| v.abs() > 0.4));
+        assert!(quiet.iter().all(|v| v.abs() <= 1.0));
+    }
+
+    #[test]
+    fn steady_hiss_and_hum_are_not_speech() {
+        // Loud enough to pass the fixed floor on their own, but flat.
+        let white: Vec<f32> = hiss(RATE * 2, 4).into_iter().map(|v| v * 0.02).collect();
+        assert!(speech(&white).unwrap_err().contains("steady"));
+        assert!(speech(&hum(RATE * 2, 0.02)).unwrap_err().contains("steady"));
+        // Words over the same noise still count, short ones in a long recording included.
+        let words = spoken(NO_PAUSE);
+        let noise: Vec<f32> = hiss(words.len(), 5).into_iter().map(|v| v * 0.03).collect();
+        assert!(speech(&mixed(&words, &noise)).is_ok());
+        let mut long_hum = hum(RATE * 4, 0.05);
+        for (at, v) in words.iter().take(RATE * 4 / 10).enumerate() {
+            long_hum[RATE * 2 + at] += v;
+        }
+        assert!(speech(&long_hum).is_ok());
     }
 
     #[test]

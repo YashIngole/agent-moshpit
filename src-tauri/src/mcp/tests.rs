@@ -197,19 +197,44 @@ fn worktrees_and_subfolders_share_a_project_but_equal_names_do_not() {
 }
 
 #[test]
-fn delegated_sessions_never_get_looser_settings() {
+fn delegated_sessions_are_the_same_program_with_the_same_settings() {
     // A pure check of what a child is launched with; it needs no terminal or live shell.
     use crate::launch::Options;
-    let plan = Options { permission: "plan".into(), model: "opus".into(), ..Options::default() };
+    let plan = Options { permission: "plan".into(), model: "opus".into(), disallowed_tools: vec!["Bash".into()], ..Options::default() };
     assert_eq!(inherited("claude", &plan, "claude").unwrap(), plan);
     assert!(inherited("claude", &plan, "codex").unwrap_err().contains("Start a claude session"));
-    let read_only = Options { permission: "read-only".into(), ..Options::default() };
-    assert!(inherited("codex", &read_only, "claude").is_err());
-    let profiled = Options { profile: "locked".into(), ..Options::default() };
-    assert!(inherited("codex", &profiled, "claude").is_err());
-    let limited = Options { disallowed_tools: vec!["Bash".into()], ..Options::default() };
-    assert!(inherited("claude", &limited, "codex").is_err());
-    // A session on its CLI's own permission settings starts the other program on that program's own.
-    let model_only = Options { model: "gpt-x".into(), ..Options::default() };
-    assert_eq!(inherited("codex", &model_only, "claude").unwrap(), Options::default());
+    // No launch overrides is not the same as no restriction: the parent's harness row or its
+    // CLI's own configuration may restrict it, and another program would not read either.
+    assert!(inherited("codex", &Options::default(), "claude").is_err());
+    assert!(inherited("claude", &Options::default(), "codex").is_err());
+    assert_eq!(inherited("codex", &Options::default(), "codex").unwrap(), Options::default());
+}
+
+#[test]
+fn another_program_is_refused_through_the_tool_even_without_launch_overrides() {
+    let _terminals = FIXTURE_TERMINALS.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("moshpit-mcp-boundary-{}", random_id().unwrap()));
+    std::fs::create_dir_all(dir.join(".git")).unwrap();
+    // A Codex row whose own arguments carry a sandbox restriction, run here by a plain shell
+    // that ignores them. Its desk has no launch overrides at all.
+    let mut row: Harness = harness::built_in().into_iter().find(|h| h.id == "codex").unwrap();
+    (row.program, row.args) = if cfg!(windows) {
+        ("cmd.exe".into(), ["/d", "/q", "/k", "rem", "--sandbox", "read-only"].map(String::from).into())
+    } else {
+        ("/bin/sh".into(), ["-c", "exec /bin/sh", "--sandbox", "read-only"].map(String::from).into())
+    };
+    row.package.clear(); row.update.clear(); row.task = TaskArg::None;
+    row.trust = TrustFrom::None; row.session = SessionFrom::Unknown; row.resume.clear();
+    let handle = engine::start(Arc::new(Quiet::default()), vec![row], vec![], vec![]);
+    let parent = handle.new_agent(NewAgent { harness: "codex".into(), cwd: dir.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false, launch: Default::default() }, 80, 24).unwrap();
+    let hub = Hub::start(handle.clone(), dir.join("coordination.json")).unwrap();
+    hub.issue(&parent).unwrap();
+    let refused = hub.call(&handle, &parent, "start_session", &json!({"harness":"claude","prompt":"Review the API","request_key":"broader"})).unwrap_err();
+    assert!(refused.contains("same program"), "{refused}");
+    // Nothing was recorded or started.
+    assert!(hub.state.lock().unwrap().journal.tasks.is_empty());
+    assert_eq!(handle.snapshot().agents.len(), 1);
+    hub.shutdown();
+    handle.shutdown();
+    let _ = std::fs::remove_dir_all(dir);
 }

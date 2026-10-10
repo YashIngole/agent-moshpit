@@ -383,23 +383,17 @@ impl Hub {
     }
 }
 
-/// A delegated session never runs with looser settings than the session that asked for it.
-/// The same program inherits the asker's launch settings. Settings cannot be translated
-/// between programs, so an asker with permission settings of its own can only start its own program.
+/// A delegated session never runs with looser permissions than the session that asked for it.
+/// A session's boundary comes from Moshpit's launch settings, but also from its program's
+/// row in the harness table and from that program's own configuration, which Moshpit cannot
+/// read or translate into another program's terms. So a delegated session is always the same
+/// program: started from the same row, reading the same configuration, with the asker's
+/// launch settings, permissions and sandbox included.
 fn inherited(parent: &str, options: &crate::launch::Options, harness: &str) -> Result<crate::launch::Options, String> {
-    if parent == harness {
-        return Ok(options.clone());
+    if parent != harness {
+        return Err(format!("Delegated sessions run the same program as the session that starts them, so they keep its permission boundary. Start a {parent} session instead."));
     }
-    let restricted = !options.permission.is_empty()
-        || !options.sandbox.is_empty()
-        || !options.approval.is_empty()
-        || !options.profile.is_empty()
-        || !options.allowed_tools.is_empty()
-        || !options.disallowed_tools.is_empty();
-    if restricted {
-        return Err(format!("This session was started with its own permission settings, which carry over only to the same program. Start a {parent} session instead."));
-    }
-    Ok(Default::default())
+    Ok(options.clone())
 }
 
 fn task_view(task: &Task) -> Value {

@@ -22,7 +22,7 @@ the connection reports its actual directory so later delegation follows it.
 | `rename_session` | Give your own desk a concise title when the user has not named it |
 | `set_activity` | Describe current work on the existing desk |
 | `list_sessions` | Discover desks in this project and their delegation relationships |
-| `start_session` | Launch Claude Code or Codex with a delegated task |
+| `start_session` | Launch another session of the caller's own program with a delegated task |
 | `send_task` | Queue a task for another connected session in this project |
 | `check_inbox` | Read previews of assigned tasks and results; use `get_task` for full text |
 | `accept_task` | Mark an assigned inbox task as in progress |
@@ -74,12 +74,17 @@ Other CLI adapters remain usable without this integration.
 
 Discovery and messaging are scoped to the caller's project. Git worktrees and
 subfolders share their common Git directory; unrelated folders with the same
-name are separate. A new session of the same program inherits the caller's launch
-settings, permissions and sandbox included, so delegation never loosens them. Those
-settings cannot be translated between programs: a caller started with permission
-settings of its own (permissions, sandbox, approvals, a Codex profile or Claude tool
-rules) can only start its own program, and a caller on its CLI's own settings starts
-the other program on that program's own. New sessions can only inherit the caller's directory, with
+name are separate. A delegated session is always the caller's own program: started
+from the same harness row, reading the same CLI configuration, and inheriting the
+caller's launch settings, permissions and sandbox included, so delegation does not
+loosen them. A session's permission boundary also comes from its harness row's
+arguments and its CLI's own configuration, which Moshpit cannot read or translate into
+another program's terms, so Codex cannot start Claude Code and Claude Code cannot start
+Codex through MCP. Two limits remain: a permission mode changed inside the caller's
+session after it started (for example with Shift+Tab) is not visible to Moshpit, so the
+new session starts with the caller's launch-time settings; and with `worktree`, project
+settings that live only in uncommitted files are whatever the program's worktree
+carries. New sessions can only inherit the caller's directory, with
 the optional CLI worktree choice. This is coordination scope, not a replacement
 for the CLI's filesystem sandbox or permission policy.
 

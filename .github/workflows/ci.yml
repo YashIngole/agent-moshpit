@@ -88,6 +88,9 @@ jobs:
       - name: Interface in a browser, with demo data
         run: node tools/e2e/ui-demo.mjs
 
+      - name: Voice setup, recovery and terminal focus
+        run: node tools/e2e/voice-ux.mjs
+
       - name: Agent launch settings and catalog refresh
         run: node tools/e2e/launch-settings.mjs
 
@@ -150,6 +153,12 @@ jobs:
         env:
           MOSHPIT_APP: ${{ github.workspace }}\src-tauri\target\debug\agent-moshpit.exe
         run: npm run test:app
+
+      - name: Native Windows voice setup without microphone capture
+        if: runner.os == 'Windows'
+        env:
+          MOSHPIT_APP: ${{ github.workspace }}/src-tauri/target/debug/agent-moshpit.exe
+        run: node tools/e2e/voice-setup-app.mjs
 
       - name: Internal MCP in the Windows desktop
         if: runner.os == 'Windows'

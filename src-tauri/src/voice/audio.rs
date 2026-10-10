@@ -1,7 +1,7 @@
 //! Bounded conversion on the device callback. No I/O or inference here.
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, SizedSample};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub const RATE: usize = 16_000;
@@ -91,12 +91,12 @@ pub fn speech(pcm: &[f32]) -> Result<(), String> {
         .filter(|chunk| {
             let energy =
                 chunk.iter().map(|v| f64::from(*v).powi(2)).sum::<f64>() / chunk.len() as f64;
-            energy.sqrt() > 0.008
+            energy.sqrt() > 0.002
         })
         .count();
     if audible < 10 {
         return Err(
-            "No clear speech was heard. Check the default microphone and try again.".into(),
+            "No clear speech was heard. Choose your microphone in Voice input and check that the input meter moves when you speak.".into(),
         );
     }
     Ok(())
@@ -107,14 +107,59 @@ pub struct DeviceCapture {
     pub audio: Arc<Mutex<Capture>>,
     pub failed: Arc<AtomicBool>,
     pub count: Arc<AtomicUsize>,
+    pub level: Arc<AtomicU32>,
+    pub name: String,
 }
 
-pub fn open() -> Result<DeviceCapture, String> {
-    let device = cpal::default_host().default_input_device().ok_or(
-        "No microphone was found. Connect one and choose it as the system's default input.",
-    )?;
+/// Give quiet speech usable amplitude after the silence check, with bounded gain.
+pub fn normalize(pcm: &mut [f32]) {
+    let peak = pcm.iter().fold(0.0f32, |peak, v| peak.max(v.abs()));
+    if peak > 0.0 && peak < 0.5 {
+        let gain = (0.5 / peak).min(20.0);
+        for sample in pcm {
+            *sample *= gain;
+        }
+    }
+}
+
+#[derive(Default, serde::Serialize)]
+pub struct Inputs {
+    pub devices: Vec<String>,
+    pub default: Option<String>,
+}
+
+/// Enumeration does not open a recording stream or request microphone capture.
+pub fn inputs() -> Result<Inputs, String> {
+    let host = cpal::default_host();
+    let default = host.default_input_device().and_then(|d| d.name().ok());
+    let mut devices = Vec::new();
+    for device in host.input_devices().map_err(|e| {
+        format!("Microphones could not be listed: {e}. Reconnect your microphone and refresh.")
+    })? {
+        if let Ok(name) = device.name() {
+            if !devices.contains(&name) {
+                devices.push(name);
+            }
+        }
+    }
+    Ok(Inputs { devices, default })
+}
+
+pub fn open(selected: Option<&str>) -> Result<DeviceCapture, String> {
+    let host = cpal::default_host();
+    let device = match selected.filter(|name| !name.is_empty()) {
+        Some(name) => host.input_devices().map_err(|e| format!("Microphones could not be listed: {e}"))?
+            .find(|d| d.name().is_ok_and(|n| n == name))
+            .ok_or("The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.")?,
+        None => host.default_input_device().ok_or(
+            "No microphone was found. Connect one, then choose it in Voice input.",
+        )?,
+    };
+    let name = device
+        .name()
+        .unwrap_or_else(|_| "Selected microphone".into());
     let config = device.default_input_config().map_err(|e| {
-        format!("The default microphone is unavailable: {e}. Check system microphone access.")
+        format!("The microphone {name} is unavailable: {e}. Check system microphone access.")
     })?;
     let capture = Arc::new(Mutex::new(Capture::new(
         config.channels(),
@@ -122,20 +167,21 @@ pub fn open() -> Result<DeviceCapture, String> {
     )?));
     let failed = Arc::new(AtomicBool::new(false));
     let count = Arc::new(AtomicUsize::new(0));
+    let level = Arc::new(AtomicU32::new(0));
     let stream_config = config.clone().into();
     let stream = match config.sample_format() {
-        cpal::SampleFormat::I8 => build::<i8>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::I16 => build::<i16>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::I32 => build::<i32>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::I64 => build::<i64>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::U8 => build::<u8>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::U16 => build::<u16>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::U32 => build::<u32>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::U64 => build::<u64>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::F32 => build::<f32>(&device, &stream_config, &capture, &failed, &count),
-        cpal::SampleFormat::F64 => build::<f64>(&device, &stream_config, &capture, &failed, &count),
-        _ => return Err("The default microphone's sample format is unsupported. Choose another input device.".into()),
-    }.map_err(|e| format!("The microphone could not start: {e}. Check system microphone access and the default input device."))?;
+        cpal::SampleFormat::I8 => build::<i8>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::I16 => build::<i16>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::I32 => build::<i32>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::I64 => build::<i64>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::U8 => build::<u8>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::U16 => build::<u16>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::U32 => build::<u32>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::U64 => build::<u64>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::F32 => build::<f32>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::F64 => build::<f64>(&device, &stream_config, &capture, &failed, &count, &level),
+        _ => return Err("This microphone's sample format is unsupported. Choose another input device in Voice input.".into()),
+    }.map_err(|e| format!("The microphone {name} could not start: {e}. Check system microphone access or choose another input in Voice input."))?;
     stream.play().map_err(|e| {
         format!("The microphone could not record: {e}. Check system microphone access.")
     })?;
@@ -144,6 +190,8 @@ pub fn open() -> Result<DeviceCapture, String> {
         audio: capture,
         failed,
         count,
+        level,
+        name,
     })
 }
 
@@ -153,6 +201,7 @@ fn build<T: SizedSample>(
     capture: &Arc<Mutex<Capture>>,
     failed: &Arc<AtomicBool>,
     count: &Arc<AtomicUsize>,
+    level: &Arc<AtomicU32>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError>
 where
     f32: FromSample<T>,
@@ -161,6 +210,7 @@ where
     let error = failed.clone();
     let overflow = failed.clone();
     let count = count.clone();
+    let level = level.clone();
     device.build_input_stream(
         config,
         move |samples: &[T], _| {
@@ -168,6 +218,23 @@ where
             if let Ok(mut audio) = capture.try_lock() {
                 audio.push(samples);
                 count.store(audio.pcm.len(), Ordering::Release);
+                // Report a perceptual RMS level from this callback, without exposing audio.
+                let energy = samples
+                    .iter()
+                    .map(|s| {
+                        let value = f32::from_sample(*s);
+                        if value.is_finite() {
+                            f64::from(value.clamp(-1.0, 1.0)).powi(2)
+                        } else {
+                            0.0
+                        }
+                    })
+                    .sum::<f64>()
+                    / samples.len().max(1) as f64;
+                level.store(
+                    (energy.sqrt().sqrt() * 100.0).clamp(0.0, 100.0) as u32,
+                    Ordering::Release,
+                );
             } else {
                 overflow.store(true, Ordering::Release);
             }
@@ -217,5 +284,23 @@ mod tests {
         click[100] = 1.0;
         assert!(speech(&click).is_err());
         assert!(speech(&vec![0.04; RATE]).is_ok());
+        // A quiet microphone previously failed the fixed 0.008 RMS cutoff.
+        let quiet: Vec<f32> = (0..RATE).map(|i| (i as f32 * 0.1).sin() * 0.005).collect();
+        assert!(speech(&quiet).is_ok());
+        assert!(speech(&vec![0.001; RATE]).is_err());
+        let mut boosted = quiet;
+        normalize(&mut boosted);
+        assert!(boosted.iter().any(|v| v.abs() > 0.09));
+        assert!(boosted.iter().all(|v| v.abs() <= 1.0));
+    }
+
+    #[test]
+    #[ignore = "Enumerates this machine's input devices without recording"]
+    fn list_native_inputs_without_recording() {
+        let inputs = inputs().unwrap();
+        println!(
+            "default: {:?}; microphones: {:?}",
+            inputs.default, inputs.devices
+        );
     }
 }

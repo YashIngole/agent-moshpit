@@ -91,12 +91,12 @@ Each terminal keeps 5,000 lines of scrollback, and the core keeps the last half 
 
 ## Voice input
 
-Voice starts off. Open **⋯ → Voice input**, enable **local voice**, and explicitly download a model. The panel identifies **Hugging Face** as the model host before download; no account or payment is needed. Downloads go into the app's data folder, separate from the installer, and are checked for their exact size and SHA-256 before becoming usable. An interrupted or failed download is never used. **Remove** deletes a downloaded model.
+Voice starts off. Press **Voice** in the top bar (or **⋯ → Voice input**), enable **local voice**, and press **Download selected model**. The panel shows what is needed to finish setup and identifies **Hugging Face** as the model host before download; no account or payment is needed. Downloads go into the app's data folder, separate from the installer, and are checked for their exact size and SHA-256 before becoming usable. An interrupted or failed download is never used. **Remove** deletes a downloaded model.
 
-- **Small Q5_1**, recommended: 190,085,487 bytes (190.1 MB).
-- **Base Q5_1**, lighter: 59,707,625 bytes (59.7 MB).
+- **Base**, recommended for faster dictation: 59,707,625 bytes (59.7 MB).
+- **Small**, larger and slower on CPU: 190,085,487 bytes (190.1 MB). Existing model choices are preserved.
 
-Select a terminal with a running program and press the **mic** in the top bar. The system's default microphone is used. Listening is **blue**, with the original terminal's name and elapsed time. **Stop and insert** stops the microphone and transcribes locally on the CPU. **Cancel voice input** discards the recording or pending result. Recording stops automatically at 60 seconds; very short and silent audio is rejected. No mic is opened by enabling voice or downloading a model.
+Choose a **Microphone** in setup, or leave it on **System default**. **Refresh microphones** finds newly connected devices without recording. Close setup, select a terminal with a running program, and press **Voice**. Listening is **blue**, with the original terminal's name, microphone name, elapsed time and a live input meter. If the meter stays empty, check mute or cancel and choose another microphone. **Stop and insert** stops the microphone and transcribes locally on the CPU. Elapsed transcription time remains visible; Small can take a minute on CPU. **Cancel voice input** discards the recording or pending result. Recording stops automatically at 60 seconds; very short and silent audio is rejected. No mic is opened by enabling voice, listing devices or downloading a model. An error offers **Try again** and **Voice setup**.
 
 The default in-app toggle is **Ctrl+Shift+Space**. Choose **Ctrl+Alt+Shift+Space** or **No shortcut** in the panel if your program uses that key. The shortcut is reserved only while voice is enabled; plain Space and the office's existing keys retain their behavior. Holding the shortcut does not repeatedly toggle capture.
 
@@ -236,7 +236,7 @@ The data folder is `%APPDATA%\io.github.yashingole.agentmoshpit` on Windows, `~/
 | --- | --- |
 | `desks.json` | The desks: which program, the name, the folder, and the id of the conversation when it is known. |
 | `window.json` | The window's size and place. |
-| `settings.json` | Whether closing the window quits; voice enabled/model/language/shortcut preferences. Written when changed. |
+| `settings.json` | Whether closing the window quits; voice enabled/model/language/shortcut/microphone preferences. Written when changed. |
 | `voice-models/` | Verified optional model weights. No recordings or transcript files. Partial downloads are not used. |
 | `screens/` | Each desk's last screen, written when the office quits. |
 | `pasted/` | Pictures pasted into terminals. Cleared after a week. |

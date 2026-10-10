@@ -146,14 +146,14 @@ export function demoBridge(): Bridge {
   const cancelVoice = () => {
     voiceEpoch += 1
     clearTimeout(recordingLimit)
-    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', busy: false })
+    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', busy: false, level: 0, transcribing_ms: null })
   }
   const finishVoice = () => {
     if (voice.phase !== 'listening') throw 'Voice is not listening.'
     clearTimeout(recordingLimit)
     const epoch = voiceEpoch
     const target = voice.agent!
-    voiceChange({ phase: 'transcribing' })
+    voiceChange({ phase: 'transcribing', level: 0, transcribing_ms: Date.now() })
     setTimeout(() => {
       if (epoch !== voiceEpoch || !agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) return
       if (['silence', 'short', 'inference-error'].includes(params.get('voice') ?? '')) {
@@ -163,7 +163,7 @@ export function demoBridge(): Bridge {
       const text = cleanVoice('Fix the\ncheckout total\x1b[31m\x1b[0m\x03')
       seen.typed.push({ agent: target, data: text })
       print(target, text)
-      voiceChange({ phase: 'idle', agent: null, started_ms: null, busy: false, message: 'Text inserted. Review it in the terminal; press Enter yourself to send.' })
+      voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, message: 'Text inserted. Review it in the terminal; press Enter yourself to send.' })
     }, 600)
   }
   const listeners = new Set<(snapshot: Snapshot) => void>()
@@ -362,6 +362,10 @@ export function demoBridge(): Bridge {
     onNewer: () => () => {},
     // Nothing is fetched in a pretend office: it says so the way a failure would, or is asked for and noted.
     voiceView: async () => structuredClone(voice),
+    voiceInputs: async () => {
+      if (params.get('voice') === 'inputs-error') throw 'Microphones could not be listed. Reconnect your microphone and refresh.'
+      return { devices: ['Built-in microphone', 'USB microphone'], default: 'Built-in microphone' }
+    },
     voiceConfig: async settings => { cancelVoice(); voiceSettings = { ...settings } },
     voiceStart: async target => {
       if (!voiceSettings.enabled) throw 'Enable local voice in the Voice input panel first.'
@@ -369,8 +373,11 @@ export function demoBridge(): Bridge {
       if (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) throw 'Select a visible terminal whose program is running before recording.'
       if (voice.busy) throw 'The previous voice worker is finishing. Try again in a moment.'
       cancelVoice()
+      if (voiceSettings.microphone && !['Built-in microphone', 'USB microphone'].includes(voiceSettings.microphone)) {
+        voiceChange({ phase: 'error', message: 'The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.' }); return
+      }
       if (params.get('voice') === 'mic-error') { voiceChange({ phase: 'error', message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
-      voiceChange({ phase: 'listening', agent: target, started_ms: Date.now(), busy: true })
+      voiceChange({ phase: 'listening', agent: target, started_ms: Date.now(), busy: true, microphone: voiceSettings.microphone ?? 'Built-in microphone', level: params.get('voice') === 'silence' ? 0 : 36 })
       recordingLimit = setTimeout(finishVoice, 60_000)
     },
     voiceStop: async () => finishVoice(),

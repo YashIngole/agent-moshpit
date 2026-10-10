@@ -4,8 +4,10 @@ export interface VoiceSettings {
   model: VoiceModel
   language: 'auto' | 'english' | 'hindi'
   shortcut: 'space' | 'altspace' | 'none'
+  microphone: string | null
 }
-export const DEFAULT_VOICE: VoiceSettings = { enabled: false, model: 'small', language: 'auto', shortcut: 'space' }
+export const DEFAULT_VOICE: VoiceSettings = { enabled: false, model: 'base', language: 'auto', shortcut: 'space', microphone: null }
+export interface VoiceInputs { devices: string[]; default: string | null }
 export interface VoiceView {
   sequence: number
   phase: 'idle' | 'preparing' | 'listening' | 'transcribing' | 'error'
@@ -18,8 +20,11 @@ export interface VoiceView {
   download_error: string
   verifying: boolean
   busy: boolean
+  level: number
+  microphone: string
+  transcribing_ms: number | null
 }
-export const EMPTY_VOICE: VoiceView = { sequence: 0, phase: 'idle', agent: null, started_ms: null, message: '', models: [], downloading: null, received: 0, download_error: '', verifying: false, busy: false }
+export const EMPTY_VOICE: VoiceView = { sequence: 0, phase: 'idle', agent: null, started_ms: null, message: '', models: [], downloading: null, received: 0, download_error: '', verifying: false, busy: false, level: 0, microphone: '', transcribing_ms: null }
 export function voiceKey(event: Pick<KeyboardEvent, 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'code'>, settings: VoiceSettings): boolean {
   return settings.enabled && settings.shortcut !== 'none' && event.ctrlKey && event.shiftKey && !event.metaKey && event.code === 'Space' && event.altKey === (settings.shortcut === 'altspace')
 }

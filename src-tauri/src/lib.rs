@@ -847,6 +847,11 @@ fn app_version(app: AppHandle) -> String {
 fn voice_view(voice: State<'_, voice::Voice>) -> voice::View { voice.view() }
 
 #[tauri::command]
+async fn voice_inputs() -> Result<voice::Inputs, String> {
+    tauri::async_runtime::spawn_blocking(voice::inputs).await.map_err(|e| format!("Microphones could not be listed: {e}"))?
+}
+
+#[tauri::command]
 fn voice_config(chosen: State<'_, Chosen>, voice: State<'_, voice::Voice>, settings: voice::Settings) -> Result<(), String> {
     voice.cancel();
     let mut now = chosen.now.lock().unwrap();
@@ -955,7 +960,7 @@ pub fn run() {
             update_now,
             app_version,
             pick_folder,
-            voice_view, voice_config, voice_start, voice_stop, voice_cancel,
+            voice_view, voice_inputs, voice_config, voice_start, voice_stop, voice_cancel,
             voice_download, voice_cancel_download, voice_remove
         ])
         .on_window_event(|window, event| {

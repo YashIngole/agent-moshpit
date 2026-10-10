@@ -1,6 +1,7 @@
 //! Local dictation. A capture owns one terminal run, and never submits a prompt.
 mod audio;
 mod models;
+pub use audio::{inputs, Inputs};
 pub use models::Model;
 
 use crate::engine::Handle;
@@ -18,6 +19,7 @@ pub struct Settings {
     pub model: Model,
     pub language: Language,
     pub shortcut: Shortcut,
+    pub microphone: Option<String>,
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -70,6 +72,9 @@ pub struct View {
     pub download_error: String,
     pub verifying: bool,
     pub busy: bool,
+    pub level: u32,
+    pub microphone: String,
+    pub transcribing_ms: Option<u64>,
 }
 
 #[derive(Default)]
@@ -100,6 +105,9 @@ impl Machine {
         self.view.agent = None;
         self.view.started_ms = None;
         self.view.message.clear();
+        self.view.level = 0;
+        self.view.microphone.clear();
+        self.view.transcribing_ms = None;
         self.changed();
     }
 
@@ -109,6 +117,8 @@ impl Machine {
         }
         self.mode.store(1, Ordering::Release);
         self.view.phase = Phase::Transcribing;
+        self.view.level = 0;
+        self.view.transcribing_ms = Some(crate::model::now_ms());
         self.changed();
         Ok(())
     }
@@ -260,8 +270,9 @@ impl Voice {
                     }
                 }
                 state.target = None;
-                state.view.agent = None;
                 state.view.started_ms = None;
+                state.view.level = 0;
+                state.view.transcribing_ms = None;
             }
             state.view.busy = false;
             state.changed();
@@ -288,7 +299,7 @@ impl Voice {
         let capture = if fixture.is_some() {
             None
         } else {
-            Some(audio::open()?)
+            Some(audio::open(settings.microphone.as_deref())?)
         };
         {
             let mut state = self.state.lock().unwrap();
@@ -297,9 +308,14 @@ impl Voice {
             }
             state.view.phase = Phase::Listening;
             state.view.started_ms = Some(crate::model::now_ms());
+            state.view.microphone = capture
+                .as_ref()
+                .map_or_else(|| "Recorded audio fixture".into(), |c| c.name.clone());
             state.changed();
         }
         let began = Instant::now();
+        let mut last_count = 0;
+        let mut last_audio = Instant::now();
         while mode.load(Ordering::Acquire) == 0
             && !capture.as_ref().is_some_and(|c| {
                 c.failed.load(Ordering::Acquire)
@@ -311,10 +327,26 @@ impl Voice {
                 self.cancel_agent(&target.agent);
                 break;
             }
+            if let Some(capture) = &capture {
+                let count = capture.count.load(Ordering::Acquire);
+                if count != last_count {
+                    last_count = count;
+                    last_audio = Instant::now();
+                }
+                if last_audio.elapsed() >= Duration::from_secs(3) {
+                    return Err("The microphone is not delivering audio. Check microphone access in system settings, then choose an available input in Voice input.".into());
+                }
+                let level = capture.level.load(Ordering::Acquire);
+                let mut state = self.state.lock().unwrap();
+                if state.accepts(epoch, target) && state.view.level != level {
+                    state.view.level = level;
+                    state.changed();
+                }
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
         // Stop capture BEFORE model loading or inference. The stream stays on its owner thread.
-        let (pcm, failed) = if let Some(audio::DeviceCapture {
+        let (mut pcm, failed) = if let Some(audio::DeviceCapture {
             stream,
             audio,
             failed,
@@ -339,12 +371,18 @@ impl Voice {
             );
         }
         audio::speech(&pcm)?;
+        audio::normalize(&mut pcm);
         {
             let mut state = self.state.lock().unwrap();
             if !state.accepts(epoch, target) {
                 return Err("Recording cancelled.".into());
             }
             state.view.phase = Phase::Transcribing;
+            state.view.level = 0;
+            state
+                .view
+                .transcribing_ms
+                .get_or_insert_with(crate::model::now_ms);
             state.changed();
         }
         let path = self.dir.join(settings.model.file());
@@ -639,7 +677,11 @@ mod tests {
         let settings = Settings::default();
         assert!(!settings.enabled);
         assert_eq!(settings.language, Language::Auto);
-        assert_eq!(settings.model, Model::Small);
+        assert_eq!(settings.model, Model::Base);
+        assert_eq!(settings.microphone, None);
+        let legacy: Settings = serde_json::from_str(r#"{"enabled":true,"model":"small"}"#).unwrap();
+        assert_eq!(legacy.model, Model::Small);
+        assert_eq!(legacy.microphone, None);
     }
     #[test]
     fn only_listening_can_stop_and_cancel_invalidates_every_phase() {

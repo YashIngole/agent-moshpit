@@ -142,29 +142,32 @@ export function demoBridge(): Bridge {
   let voiceEpoch = 0
   let downloadEpoch = 0
   let recordingLimit: ReturnType<typeof setTimeout> | undefined
+  let hearing: ReturnType<typeof setInterval> | undefined
   const voiceChange = (patch: Partial<VoiceView>) => { voice = { ...voice, ...patch, sequence: voice.sequence + 1 } }
   const cancelVoice = () => {
     voiceEpoch += 1
     clearTimeout(recordingLimit)
-    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', busy: false, level: 0, transcribing_ms: null })
+    clearInterval(hearing)
+    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', busy: false, level: 0, transcribing_ms: null, partial: '' })
   }
   const finishVoice = () => {
-    if (voice.phase !== 'listening') throw 'Voice is not listening.'
+    if (voice.phase !== 'listening' && voice.phase !== 'preparing') throw 'Voice is not listening.'
     clearTimeout(recordingLimit)
+    clearInterval(hearing)
     const epoch = voiceEpoch
     const target = voice.agent!
     voiceChange({ phase: 'transcribing', level: 0, transcribing_ms: Date.now() })
     setTimeout(() => {
       if (epoch !== voiceEpoch || !agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) return
       if (['silence', 'short', 'inference-error'].includes(params.get('voice') ?? '')) {
-        voiceChange({ phase: 'error', agent: null, started_ms: null, busy: false, message: params.get('voice') === 'silence' ? 'No clear speech was heard. Check the default microphone and try again.' : params.get('voice') === 'short' ? 'That recording was too short. Speak for at least half a second, then stop.' : 'Local transcription stopped. Try a shorter recording.' })
+        voiceChange({ phase: 'error', agent: null, started_ms: null, busy: false, partial: '', message: params.get('voice') === 'silence' ? 'No clear speech was heard. Check the default microphone and try again.' : params.get('voice') === 'short' ? 'That recording was too short. Speak for at least half a second, then stop.' : 'Local transcription stopped. Try a shorter recording.' })
         return
       }
       const text = cleanVoice('Fix the\ncheckout total\x1b[31m\x1b[0m\x03')
       seen.typed.push({ agent: target, data: text })
       print(target, text)
-      voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, message: 'Text inserted. Review it in the terminal; press Enter yourself to send.' })
-    }, 600)
+      voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, partial: '', message: 'Inserted. Press Enter in the terminal to send.' })
+    }, 400)
   }
   const listeners = new Set<(snapshot: Snapshot) => void>()
   const followers = new Map<string, Set<OnTerminal>>()
@@ -378,7 +381,13 @@ export function demoBridge(): Bridge {
       }
       if (params.get('voice') === 'mic-error') { voiceChange({ phase: 'error', message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
       voiceChange({ phase: 'listening', agent: target, started_ms: Date.now(), busy: true, microphone: voiceSettings.microphone ?? 'Built-in microphone', level: params.get('voice') === 'silence' ? 0 : 36 })
-      recordingLimit = setTimeout(finishVoice, 60_000)
+      recordingLimit = setTimeout(finishVoice, 300_000)
+      // The words of the phrase being spoken, as the model hears more of it.
+      if (params.get('voice') !== 'silence') {
+        const words = ['Fix', 'the', 'checkout', 'total']
+        let heard = 0
+        hearing = setInterval(() => { if (heard < words.length) voiceChange({ partial: words.slice(0, ++heard).join(' ') }) }, 300)
+      }
     },
     voiceStop: async () => finishVoice(),
     voiceCancel: async () => cancelVoice(),

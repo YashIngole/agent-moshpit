@@ -1,11 +1,12 @@
 //! Bounded conversion on the device callback. No I/O or inference here.
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, SizedSample};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub const RATE: usize = 16_000;
-pub const MAX_SECONDS: usize = 60;
+/// A recording's longest: phrases are typed as they are settled, so length costs no waiting.
+pub const MAX_SECONDS: usize = 300;
 pub const MAX_SAMPLES: usize = RATE * MAX_SECONDS;
 
 pub struct Capture {
@@ -28,7 +29,7 @@ impl Capture {
             );
         }
         Ok(Self {
-            pcm: Vec::with_capacity(MAX_SAMPLES),
+            pcm: Vec::with_capacity(RATE * 30),
             channels: usize::from(channels),
             rate,
             frame_sum: 0.0,
@@ -119,7 +120,6 @@ pub struct DeviceCapture {
     pub stream: cpal::Stream,
     pub audio: Arc<Mutex<Capture>>,
     pub failed: Arc<AtomicBool>,
-    pub count: Arc<AtomicUsize>,
     pub level: Arc<AtomicU32>,
     pub name: String,
 }
@@ -179,20 +179,19 @@ pub fn open(selected: Option<&str>) -> Result<DeviceCapture, String> {
         config.sample_rate().0,
     )?));
     let failed = Arc::new(AtomicBool::new(false));
-    let count = Arc::new(AtomicUsize::new(0));
     let level = Arc::new(AtomicU32::new(0));
     let stream_config = config.clone().into();
     let stream = match config.sample_format() {
-        cpal::SampleFormat::I8 => build::<i8>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::I16 => build::<i16>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::I32 => build::<i32>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::I64 => build::<i64>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::U8 => build::<u8>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::U16 => build::<u16>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::U32 => build::<u32>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::U64 => build::<u64>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::F32 => build::<f32>(&device, &stream_config, &capture, &failed, &count, &level),
-        cpal::SampleFormat::F64 => build::<f64>(&device, &stream_config, &capture, &failed, &count, &level),
+        cpal::SampleFormat::I8 => build::<i8>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::I16 => build::<i16>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::I32 => build::<i32>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::I64 => build::<i64>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::U8 => build::<u8>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::U16 => build::<u16>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::U32 => build::<u32>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::U64 => build::<u64>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::F32 => build::<f32>(&device, &stream_config, &capture, &failed, &level),
+        cpal::SampleFormat::F64 => build::<f64>(&device, &stream_config, &capture, &failed, &level),
         _ => return Err("This microphone's sample format is unsupported. Choose another input device in Voice input.".into()),
     }.map_err(|e| format!("The microphone {name} could not start: {e}. Check system microphone access or choose another input in Voice input."))?;
     stream.play().map_err(|e| {
@@ -202,7 +201,6 @@ pub fn open(selected: Option<&str>) -> Result<DeviceCapture, String> {
         stream,
         audio: capture,
         failed,
-        count,
         level,
         name,
     })
@@ -213,7 +211,6 @@ fn build<T: SizedSample>(
     config: &cpal::StreamConfig,
     capture: &Arc<Mutex<Capture>>,
     failed: &Arc<AtomicBool>,
-    count: &Arc<AtomicUsize>,
     level: &Arc<AtomicU32>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError>
 where
@@ -221,16 +218,15 @@ where
 {
     let capture = capture.clone();
     let error = failed.clone();
-    let overflow = failed.clone();
-    let count = count.clone();
+    let poisoned = failed.clone();
     let level = level.clone();
     device.build_input_stream(
         config,
         move |samples: &[T], _| {
-            // Never wait on the control thread. A missed callback makes this recording fail.
-            if let Ok(mut audio) = capture.try_lock() {
+            // The recording loop holds this only to copy what arrived since it last looked,
+            // a few microseconds, so waiting for it costs no audio.
+            if let Ok(mut audio) = capture.lock() {
                 audio.push(samples);
-                count.store(audio.pcm.len(), Ordering::Release);
                 // Report a perceptual RMS level from this callback, without exposing audio.
                 let energy = samples
                     .iter()
@@ -249,7 +245,7 @@ where
                     Ordering::Release,
                 );
             } else {
-                overflow.store(true, Ordering::Release);
+                poisoned.store(true, Ordering::Release);
             }
         },
         move |_| {

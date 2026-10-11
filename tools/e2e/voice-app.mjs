@@ -71,15 +71,19 @@ try {
   await until(async () => (await view()).phase === 'listening')
   const started = Date.now()
   await invoke('voice_stop')
-  await until(async () => !(await view()).busy, 180_000)
+  await until(async () => !(await view()).busy, 30_000)
   const finished = await view()
+  const stopped = Date.now() - started
   assert.equal(finished.phase, 'idle', finished.message)
-  const text = await page.locator('.xterm-accessibility-tree').innerText()
-  assert.match(text.replace(/\s+/g, ' '), /ask not/i)
+  // Phrases are typed as they are settled; the program's echo of the last one can trail the result.
+  const terminal = () => page.locator('.xterm-accessibility-tree').innerText()
+  await until(async () => /ask not.*your country/i.test((await terminal()).replace(/\s+/g, ' ')), 10_000)
+  const text = await terminal()
+  assert.match(text.replace(/\s+/g, ' '), /fellow americans.*ask not what your country can do for you.*what you can do for your country/i)
   assert(text.length > before.length, 'This inference must insert new text')
   assert(!text.includes('YOU SAID:'), 'The fake program must not receive Enter')
   assert(!existsSync(path.join(data, 'screens', `${agent}.screen`)))
-  console.log(`ok ${model.id} JFK WAV inserted without Enter; stop-to-result ${Date.now() - started}ms (one fixture, not a benchmark)`)
+  console.log(`ok ${model.id} JFK WAV inserted in full without Enter; stop-to-result ${stopped}ms (11 s of audio arriving at once, debug build; one fixture, not a benchmark)`)
   }
 
   await invoke('voice_start', { agent })

@@ -12,7 +12,7 @@
   import VoicePanel from './components/VoicePanel.svelte'
   import VoiceStatus from './components/VoiceStatus.svelte'
   import { voice } from './lib/voice.svelte'
-  import { voiceKey } from './lib/voice'
+  import { voiceKey, voiceKeyUp } from './lib/voice'
   import { startBeat } from './lib/beat'
   import { bridge, type Drop } from './lib/bridge'
   import { FLOOR_WIDTH, office } from './lib/office.svelte'
@@ -85,7 +85,7 @@
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     const pane = office.focused && office.open.has(office.focused) ? office.focused : ''
     if (voiceKey(event, voice.settings)) {
-      if (!event.repeat) void voice.toggle(pane)
+      if (!event.repeat) void voice.press(pane)
       return true
     }
     // Back to the floor and back again. Not Escape: a program in a terminal uses that itself.
@@ -159,11 +159,11 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} oncontextmenu={onContextMenu} />
+<!-- Holding the voice shortcut talks; letting go of it, or of the window, finishes. -->
+<svelte:window onkeydown={onKey} onkeyup={event => voiceKeyUp(event, voice.settings) && voice.release()} onblur={() => voice.release()} oncontextmenu={onContextMenu} />
 
 <div class="app" class:terminals={office.terminals} class:paneled={office.panel !== null} class:dragging>
   <TopBar />
-  <VoiceStatus />
   {#if office.problem}
     <p class="problem-strip" role="alert">
       <span>{office.problem}</span>
@@ -180,6 +180,7 @@
   {/if}
   <KnockBand />
   <div class="work" style:--floor="{office.floorWidth}px">
+    <VoiceStatus />
     <Floor />
     {#if office.terminals}
       <!-- A separator that can be moved is a control: it takes focus and the arrow keys. -->

@@ -9,9 +9,9 @@
 
   <button type="button" class="mic" class:listening={voice.view.phase === 'listening'}
     aria-label={label}
-    title={voice.active ? 'Recording controls are below the bar' : setup ? 'Open voice input setup' : `Talk into ${agent?.title} (${shortcutLabel(voice.settings.shortcut)})`}
+    title={voice.active ? 'Recording controls are below the bar' : setup ? 'Open voice input setup' : voice.settings.shortcut === 'none' ? `Talk into ${agent?.title}` : `Talk into ${agent?.title}: click, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak`}
     disabled={voice.changing || voice.acting || (voice.view.phase !== 'listening' && (voice.active || voice.view.busy))}
-    onclick={() => setup && !voice.active ? office.openVoice() : void voice.toggle(agent?.id ?? '')}>
+    onclick={() => setup && !voice.active ? office.openVoice() : voice.view.phase === 'listening' ? void voice.finish() : void voice.toggle(agent?.id ?? '')}>
     {#if voice.view.phase === 'listening'}
       <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1" /></svg>
     {:else}

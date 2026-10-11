@@ -19,7 +19,7 @@
         ['Ctrl+Shift+Q', 'Quit, asking first if anyone is busy'],
         ['Ctrl+Q', 'The same, when the keyboard is not in a terminal (there it is the program’s)'],
         ['Ctrl+Shift+/', 'This list'],
-        [shortcutLabel(voice.settings.shortcut), 'Start / stop local voice when enabled; configure in More → Voice input']
+        [shortcutLabel(voice.settings.shortcut), 'Voice, when enabled: hold to talk and let go to finish, or tap to talk hands-free and tap again. Set up in More → Voice input']
       ]
     },
     {

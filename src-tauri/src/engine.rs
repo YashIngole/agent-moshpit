@@ -481,9 +481,12 @@ impl Handle {
         self.voice_target(&target.agent).as_ref() == Some(target)
     }
 
-    pub fn voice_write(&self, target: &crate::voice::Target, data: &[u8]) -> Result<(), String> {
+    /// Types dictated words as plain text. `more` puts a space before them: they follow
+    /// words this recording already typed.
+    pub fn voice_write(&self, target: &crate::voice::Target, data: &[u8], more: bool) -> Result<(), String> {
         let text = crate::voice::sanitize(std::str::from_utf8(data).map_err(|_| "The voice text was invalid and discarded.")?);
         if text.is_empty() || text.len() > 32 * 1024 { return Err("The voice text was empty or too long and discarded.".into()); }
+        let text = if more { format!(" {text}") } else { text };
         let mut state = self.inner.state.lock().unwrap();
         if !state.visible.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
             return Err("The recording's pane closed or its program stopped. Its text was discarded.".into());
@@ -1061,17 +1064,17 @@ mod tests {
         // Selecting another pane must not move or discard this recording's target.
         engine.watch(vec![], vec![id.clone()]);
         assert!(engine.voice_live(&target));
-        assert!(engine.voice_write(&target, b"focus-change").is_ok());
+        assert!(engine.voice_write(&target, b"focus-change", false).is_ok());
         let invalid = crate::voice::Target { run: target.run + 100, ..target.clone() };
-        assert!(engine.voice_write(&invalid, b"must-not-reach-the-terminal").is_err());
+        assert!(engine.voice_write(&invalid, b"must-not-reach-the-terminal", false).is_err());
         engine.watch(vec![], vec![]);
         assert!(!engine.voice_live(&target));
-        assert!(engine.voice_write(&target, b"also-discarded").is_err());
+        assert!(engine.voice_write(&target, b"also-discarded", false).is_err());
         engine.watch(vec![id.clone()], vec![id.clone()]);
-        assert!(engine.voice_write(&target, b"voice\r\ntext\x1b[31m\x03").is_ok());
+        assert!(engine.voice_write(&target, b"voice\r\ntext\x1b[31m\x03", true).is_ok());
         engine.restart(&id, 80, 24).unwrap();
         assert!(!engine.voice_live(&target));
-        assert!(engine.voice_write(&target, b"stale-result").is_err());
+        assert!(engine.voice_write(&target, b"stale-result", false).is_err());
         assert_ne!(engine.voice_target(&id).unwrap().run, target.run);
         engine.shutdown();
         assert!(shell.screens.lock().unwrap().is_empty());

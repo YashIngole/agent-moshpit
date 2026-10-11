@@ -1,5 +1,6 @@
 //! Local dictation. A capture owns one terminal run, and never submits a prompt.
 mod audio;
+mod live;
 mod models;
 pub use audio::{inputs, Inputs};
 pub use models::Model;
@@ -75,6 +76,10 @@ pub struct View {
     pub level: u32,
     pub microphone: String,
     pub transcribing_ms: Option<u64>,
+    /// The words of the phrase still being spoken, before they are typed.
+    pub partial: String,
+    /// Why this computer cannot run local voice; empty when it can.
+    pub unsupported: String,
 }
 
 #[derive(Default)]
@@ -112,11 +117,14 @@ impl Machine {
         self.view.level = 0;
         self.view.microphone.clear();
         self.view.transcribing_ms = None;
+        self.view.partial.clear();
         self.changed();
     }
 
+    /// Stop listening and finish. Also while the microphone is still opening: a shortcut held
+    /// and released by then ends the recording before it began.
     fn stop(&mut self) -> Result<(), String> {
-        if self.view.phase != Phase::Listening {
+        if !matches!(self.view.phase, Phase::Listening | Phase::Preparing) {
             return Err("Voice is not listening.".into());
         }
         self.mode.store(1, Ordering::Release);
@@ -156,7 +164,11 @@ impl Voice {
             disk: Arc::new(Mutex::new(())),
             loaded: Arc::new(Mutex::new(Loaded::default())),
         };
-        voice.state.lock().unwrap().view.verifying = true;
+        {
+            let mut state = voice.state.lock().unwrap();
+            state.view.verifying = true;
+            state.view.unsupported = processor_problem().unwrap_or_default().into();
+        }
         let check = voice.clone();
         std::thread::spawn(move || {
             let _disk = check.disk.lock().unwrap();
@@ -230,6 +242,9 @@ impl Voice {
     }
 
     pub fn start(&self, engine: Handle, agent: String, settings: Settings) -> Result<(), String> {
+        if let Some(problem) = processor_problem() {
+            return Err(problem.into());
+        }
         if !settings.enabled {
             return Err("Enable local voice in the Voice input panel first.".into());
         }
@@ -263,19 +278,9 @@ impl Voice {
             let mut state = voice.state.lock().unwrap();
             if state.accepts(epoch, &target) {
                 match outcome {
-                    Ok(Ok(text)) => {
-                        // The same text path as terminal keys. PTY generation is checked under
-                        // the write lock; a restart cannot redirect text into its replacement.
-                        match engine.voice_write(&target, text.as_bytes()) {
-                            Ok(()) => {
-                                state.view.phase = Phase::Idle;
-                                state.view.message = "Text inserted. Review it in the terminal; press Enter yourself to send.".into();
-                            }
-                            Err(why) => {
-                                state.view.phase = Phase::Error;
-                                state.view.message = why;
-                            }
-                        }
+                    Ok(Ok(())) => {
+                        state.view.phase = Phase::Idle;
+                        state.view.message = "Inserted. Press Enter in the terminal to send.".into();
                     }
                     Ok(Err(why)) => {
                         state.view.phase = Phase::Error;
@@ -290,6 +295,7 @@ impl Voice {
                 state.view.started_ms = None;
                 state.view.level = 0;
                 state.view.transcribing_ms = None;
+                state.view.partial.clear();
             }
             state.view.busy = false;
             state.changed();
@@ -297,6 +303,7 @@ impl Voice {
         Ok(())
     }
 
+    /// One recording, typed into its terminal phrase by phrase as it is spoken.
     fn record(
         &self,
         engine: &Handle,
@@ -304,10 +311,19 @@ impl Voice {
         epoch: u64,
         mode: &Arc<AtomicU8>,
         settings: &Settings,
-    ) -> Result<String, String> {
+    ) -> Result<(), String> {
         if mode.load(Ordering::Acquire) == 2 || !engine.voice_live(target) {
             return Err("Recording cancelled.".into());
         }
+        // The model loads while the microphone opens and the user starts speaking.
+        let mut model = Pending::start({
+            let (voice, model) = (self.clone(), settings.model);
+            move || {
+                let path = voice.dir.join(model.file());
+                let stamp = voice.checked(model, &path)?;
+                voice.recognizer(model, stamp, &path)
+            }
+        });
         #[cfg(debug_assertions)]
         let fixture = fixture_pcm()?;
         #[cfg(not(debug_assertions))]
@@ -323,6 +339,9 @@ impl Voice {
             if !state.accepts(epoch, target) {
                 return Err("Recording cancelled.".into());
             }
+            if mode.load(Ordering::Acquire) == 1 {
+                return Err("The shortcut was released before the microphone opened. Hold it while you speak, or tap it once to talk hands-free.".into());
+            }
             state.view.phase = Phase::Listening;
             state.view.started_ms = Some(crate::model::now_ms());
             state.view.microphone = capture
@@ -330,14 +349,13 @@ impl Voice {
                 .map_or_else(|| "Recorded audio fixture".into(), |c| c.name.clone());
             state.changed();
         }
+        let mut writer = Writer { voice: self, engine, target, epoch, typed: false };
+        let mut dictation = Dictation::new(mode.clone(), settings.language);
+        let mut heard = fixture.unwrap_or_default();
         let began = Instant::now();
-        let mut last_count = 0;
         let mut last_audio = Instant::now();
         while mode.load(Ordering::Acquire) == 0
-            && !capture.as_ref().is_some_and(|c| {
-                c.failed.load(Ordering::Acquire)
-                    || c.count.load(Ordering::Acquire) >= audio::MAX_SAMPLES
-            })
+            && heard.len() < audio::MAX_SAMPLES
             && began.elapsed() < Duration::from_secs(audio::MAX_SECONDS as u64)
         {
             if !engine.voice_live(target) {
@@ -345,12 +363,14 @@ impl Voice {
                 break;
             }
             if let Some(capture) = &capture {
-                let count = capture.count.load(Ordering::Acquire);
-                if count != last_count {
-                    last_count = count;
-                    last_audio = Instant::now();
+                if capture.failed.load(Ordering::Acquire) {
+                    break;
                 }
-                if last_audio.elapsed() >= Duration::from_secs(3) {
+                let before = heard.len();
+                heard.extend_from_slice(&capture.audio.lock().unwrap().pcm[before..]);
+                if heard.len() != before {
+                    last_audio = Instant::now();
+                } else if last_audio.elapsed() >= Duration::from_secs(3) {
                     return Err("The microphone is not delivering audio. Check microphone access in system settings, then choose an available input in Voice input.".into());
                 }
                 let level = capture.level.load(Ordering::Acquire);
@@ -360,23 +380,26 @@ impl Voice {
                     state.changed();
                 }
             }
+            match model.poll() {
+                Some(Err(why)) => return Err(why.clone()),
+                Some(Ok(context)) => {
+                    if let Some(preview) = dictation.step(context, &heard, &mut |text| writer.write(text))? {
+                        self.show_partial(epoch, target, preview);
+                    }
+                }
+                None => {}
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
-        // Stop capture BEFORE model loading or inference. The stream stays on its owner thread.
-        let (mut pcm, failed) = if let Some(audio::DeviceCapture {
-            stream,
-            audio,
-            failed,
-            ..
-        }) = capture
-        {
-            drop(stream);
-            (
-                std::mem::take(&mut audio.lock().unwrap().pcm),
-                failed.load(Ordering::Acquire),
-            )
-        } else {
-            (fixture.unwrap_or_default(), false)
+        // Stop capture BEFORE the last recognition. The stream stays on its owner thread.
+        let failed = match capture {
+            Some(audio::DeviceCapture { stream, audio, failed, .. }) => {
+                drop(stream);
+                let before = heard.len();
+                heard.extend_from_slice(&audio.lock().unwrap().pcm[before..]);
+                failed.load(Ordering::Acquire)
+            }
+            None => false,
         };
         if mode.load(Ordering::Acquire) == 2 {
             return Err("Recording cancelled.".into());
@@ -387,8 +410,6 @@ impl Voice {
                     .into(),
             );
         }
-        audio::speech(&pcm)?;
-        audio::normalize(&mut pcm);
         {
             let mut state = self.state.lock().unwrap();
             if !state.accepts(epoch, target) {
@@ -396,24 +417,28 @@ impl Voice {
             }
             state.view.phase = Phase::Transcribing;
             state.view.level = 0;
-            state
-                .view
-                .transcribing_ms
-                .get_or_insert_with(crate::model::now_ms);
+            state.view.transcribing_ms.get_or_insert_with(crate::model::now_ms);
             state.changed();
         }
-        let path = self.dir.join(settings.model.file());
-        let stamp = self.checked(settings.model, &path)?;
-        let recognizer = self.recognizer(settings.model, stamp, &path)?;
-        transcribe(
-            &recognizer,
-            &pcm,
-            settings.language,
-            Abort {
-                mode: mode.clone(),
-                live: Some((engine.clone(), target.clone())),
-            },
-        )
+        // A recording that was all room noise says so, unless phrases were already typed.
+        if let Err(why) = audio::speech(&heard) {
+            return if writer.typed { Ok(()) } else { Err(why) };
+        }
+        let context = model.wait()?;
+        dictation.finish(&context, &heard, &mut |text| writer.write(text))?;
+        if writer.typed {
+            Ok(())
+        } else {
+            Err("No words were recognised. Check the language and try again.".into())
+        }
+    }
+
+    fn show_partial(&self, epoch: u64, target: &Target, text: String) {
+        let mut state = self.state.lock().unwrap();
+        if state.accepts(epoch, target) && state.view.partial != text {
+            state.view.partial = text;
+            state.changed();
+        }
     }
 
     /// The model as it passed its full check, or checked again in full when its file changed since.
@@ -565,7 +590,7 @@ fn fixture_pcm() -> Result<Option<Vec<f32>>, String> {
         || wav.duration() > spec.sample_rate * audio::MAX_SECONDS as u32
     {
         return Err(
-            "Use a PCM16 WAV fixture no longer than 60 seconds. Microphone was not opened.".into(),
+            format!("Use a PCM16 WAV fixture no longer than {} seconds. Microphone was not opened.", audio::MAX_SECONDS),
         );
     }
     let mut capture = audio::Capture::new(spec.channels, spec.sample_rate)?;
@@ -581,31 +606,220 @@ fn fixture_pcm() -> Result<Option<Vec<f32>>, String> {
     Ok(Some(capture.pcm))
 }
 
+/// Why this computer cannot run local voice, if it cannot. On x86-64 the engine is built for
+/// AVX2, FMA, F16C and BMI2 (.cargo/config.toml) and would crash on a processor without them.
+/// Nothing in it runs until a recording, so checking first is enough.
+pub fn processor_problem() -> Option<&'static str> {
+    #[cfg(target_arch = "x86_64")]
+    if !(std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+        && std::arch::is_x86_feature_detected!("bmi2"))
+    {
+        return Some("Local voice needs a processor with AVX2 (Intel from 2013 or AMD from 2015), and this computer's processor does not have it.");
+    }
+    None
+}
+
+/// Work on its own thread, and what came of it once it is done.
+enum Pending<T> {
+    Working(std::thread::JoinHandle<Result<T, String>>),
+    Done(Result<T, String>),
+}
+impl<T: Send + 'static> Pending<T> {
+    fn start(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Self {
+        Self::Working(std::thread::spawn(work))
+    }
+    /// What came of the work, if it is done. Never waits.
+    fn poll(&mut self) -> Option<&Result<T, String>> {
+        if matches!(self, Self::Working(worker) if worker.is_finished()) {
+            let Self::Working(worker) = std::mem::replace(self, Self::Done(Err(String::new()))) else {
+                unreachable!()
+            };
+            *self = Self::Done(joined(worker));
+        }
+        match self {
+            Self::Done(result) => Some(result),
+            Self::Working(_) => None,
+        }
+    }
+    fn wait(self) -> Result<T, String> {
+        match self {
+            Self::Working(worker) => joined(worker),
+            Self::Done(result) => result,
+        }
+    }
+}
+fn joined<T>(worker: std::thread::JoinHandle<Result<T, String>>) -> Result<T, String> {
+    worker.join().unwrap_or_else(|_| Err("Local voice stopped unexpectedly. Try again.".into()))
+}
+
+/// Types settled words into the recording's terminal, a space between phrases.
+struct Writer<'a> {
+    voice: &'a Voice,
+    engine: &'a Handle,
+    target: &'a Target,
+    epoch: u64,
+    typed: bool,
+}
+impl Writer<'_> {
+    fn write(&mut self, text: &str) -> Result<(), String> {
+        if text.is_empty() {
+            return Ok(());
+        }
+        let state = self.voice.state.lock().unwrap();
+        if !state.accepts(self.epoch, self.target) {
+            return Err("Recording cancelled.".into());
+        }
+        // The same text path as terminal keys. PTY generation is checked under the write
+        // lock; a restart cannot redirect text into its replacement.
+        self.engine.voice_write(self.target, text.as_bytes(), self.typed)?;
+        self.typed = true;
+        Ok(())
+    }
+}
+
+/// Recognition while the user speaks (see `live`): one stretch at a time, on its own thread,
+/// so the recording loop keeps the level meter moving.
+struct Dictation {
+    mode: Arc<AtomicU8>,
+    language: Language,
+    /// Set when the preview being recognised is no longer wanted.
+    over: Arc<AtomicBool>,
+    /// Where the words typed so far end in the recording.
+    settled: usize,
+    /// Where the last preview started ends.
+    previewed: usize,
+    /// The last preview finished: where it starts and ends, and its words.
+    preview: Option<(usize, usize, String)>,
+    working: Option<(live::Job, std::thread::JoinHandle<Result<String, String>>)>,
+}
+
+impl Dictation {
+    fn new(mode: Arc<AtomicU8>, language: Language) -> Self {
+        Self { mode, language, over: Arc::new(AtomicBool::new(false)), settled: 0, previewed: 0, preview: None, working: None }
+    }
+
+    /// Takes a finished stretch's words and starts the next one. Returns the words to show
+    /// as still being spoken, when they changed.
+    fn step(&mut self, context: &Arc<WhisperContext>, heard: &[f32], typed: &mut dyn FnMut(&str) -> Result<(), String>) -> Result<Option<String>, String> {
+        let mut shown = None;
+        if self.working.as_ref().is_some_and(|(_, worker)| worker.is_finished()) {
+            let (job, worker) = self.working.take().unwrap();
+            shown = self.done(job, joined(worker), typed)?;
+        }
+        if self.working.is_none() {
+            if let Some(job) = live::next(heard, self.settled, self.previewed) {
+                self.begin(context, heard, job);
+            }
+        }
+        Ok(shown)
+    }
+
+    fn begin(&mut self, context: &Arc<WhisperContext>, heard: &[f32], job: live::Job) {
+        let (live::Job::Settle(from, to) | live::Job::Preview(from, to)) = job;
+        let preview = matches!(job, live::Job::Preview(..));
+        if preview {
+            self.previewed = to;
+        }
+        self.over = Arc::new(AtomicBool::new(false));
+        // Typed words are recognised to the end unless the recording is cancelled.
+        let abort = Abort { mode: self.mode.clone(), over: preview.then(|| self.over.clone()) };
+        let (context, pcm, language) = (context.clone(), heard[from..to].to_vec(), self.language);
+        self.working = Some((job, std::thread::spawn(move || words(&context, pcm, language, abort))));
+    }
+
+    /// A settled phrase is typed; a preview is shown, unless the phrase it was of is typed.
+    fn done(&mut self, job: live::Job, result: Result<String, String>, typed: &mut dyn FnMut(&str) -> Result<(), String>) -> Result<Option<String>, String> {
+        match job {
+            live::Job::Settle(from, to) if from == self.settled => {
+                // A phrase the model made nothing of is passed over, not retried.
+                typed(&result.unwrap_or_default())?;
+                self.settled = to;
+                self.preview = None;
+                Ok(Some(String::new()))
+            }
+            live::Job::Preview(from, to) if from == self.settled => {
+                let text = result.unwrap_or_default();
+                let shown = (!text.is_empty()).then(|| text.clone());
+                self.preview = Some((from, to, text));
+                Ok(shown)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// After the recording: the words since the last pause. A preview that already covers
+    /// them is used as it is, so stopping after a pause types at once.
+    fn finish(&mut self, context: &WhisperContext, heard: &[f32], typed: &mut dyn FnMut(&str) -> Result<(), String>) -> Result<(), String> {
+        let levels = live::Levels::of(heard);
+        let complete = |settled: usize, from: usize, to: usize| from == settled && (to >= heard.len() || levels.silent_from(to));
+        if let Some((job, worker)) = self.working.take() {
+            match job {
+                live::Job::Preview(from, to) if !complete(self.settled, from, to) => {
+                    // Not wanted any more: it stops by itself, and nothing waits for it.
+                    self.over.store(true, Ordering::Release);
+                }
+                _ => {
+                    self.done(job, joined(worker), typed)?;
+                }
+            }
+        }
+        if heard.len() <= self.settled || levels.silent_from(self.settled) {
+            return Ok(());
+        }
+        let text = match self.preview.take() {
+            Some((from, to, text)) if complete(self.settled, from, to) => text,
+            _ => words(context, heard[self.settled..].to_vec(), self.language, Abort { mode: self.mode.clone(), over: None })?,
+        };
+        typed(&text)
+    }
+}
+
+impl Drop for Dictation {
+    /// A recording that ends early leaves no preview running.
+    fn drop(&mut self) {
+        self.over.store(true, Ordering::Release);
+    }
+}
+
 struct Abort {
     mode: Arc<AtomicU8>,
-    /// The terminal the text is for. Transcription stops once it is gone. None in tests.
-    live: Option<(Handle, Target)>,
+    /// Set once a preview is no longer wanted. None for words that will be typed.
+    over: Option<Arc<AtomicBool>>,
 }
 unsafe extern "C" fn abort(data: *mut std::ffi::c_void) -> bool {
-    // `data` points to the stack value in transcribe, alive for the entire full() call.
+    // `data` points to the stack value in recognize, alive for the entire full() call.
     let data = unsafe { &*(data as *const Abort) };
-    data.mode.load(Ordering::Acquire) == 2 || data.live.as_ref().is_some_and(|(engine, target)| !engine.voice_live(target))
-}
-fn transcribe(context: &WhisperContext, pcm: &[f32], language: Language, cancellation: Abort) -> Result<String, String> {
-    kept(&recognize(context, pcm, language, cancellation)?)
+    data.mode.load(Ordering::Acquire) == 2 || data.over.as_ref().is_some_and(|over| over.load(Ordering::Acquire))
 }
 
-/// The text worth inserting from what the model heard: its words, without the notes it
+/// The words in a stretch of recording: amplified, recognised, without sound notes.
+fn words(context: &WhisperContext, mut pcm: Vec<f32>, language: Language, cancellation: Abort) -> Result<String, String> {
+    audio::normalize(&mut pcm);
+    Ok(clean(&recognize(context, &pcm, language, cancellation)?))
+}
+
+/// The text worth typing from what the model heard: its words, without the notes it
 /// writes for sounds that are not speech.
-fn kept(heard: &[String]) -> Result<String, String> {
-    let text = sanitize(&without_sound_notes(&heard.concat()));
-    if text.is_empty() {
-        return Err("No words were recognised. Check the language and try again.".into());
-    }
-    Ok(text)
+fn clean(heard: &[String]) -> String {
+    sanitize(&without_sound_notes(&heard.concat()))
 }
 
-/// What the model heard: each passage, with how likely the model thinks it is no speech at all.
+/// Recognition threads: half the logical processors, about one per core. Six were a quarter
+/// faster than four on a six-core laptop.
+fn threads() -> i32 {
+    std::thread::available_parallelism().map_or(4, |n| n.get() / 2).clamp(2, 8) as i32
+}
+
+/// The model's window, in 20 ms steps: the recording and a second more, at least six seconds,
+/// at most the thirty it was trained on. The full window costs as much for a word as for thirty
+/// seconds of speech, and on short phrases heard no more than this one did.
+fn window(samples: usize) -> i32 {
+    (samples / (audio::RATE / 50) + 50).clamp(300, 1500) as i32
+}
+
+/// What the model heard, passage by passage.
 fn recognize(
     context: &WhisperContext,
     pcm: &[f32],
@@ -616,10 +830,8 @@ fn recognize(
         .create_state()
         .map_err(|e| format!("Local voice could not start: {e}"))?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-    params.set_n_threads(
-        std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).clamp(1, 4))
-            as i32,
-    );
+    params.set_n_threads(threads());
+    params.set_audio_ctx(window(pcm.len()));
     params.set_language(match language {
         Language::Auto => None,
         Language::English => Some("en"),
@@ -774,30 +986,54 @@ mod tests {
         assert!(!state.accepts(0, &target));
         assert!(state.accepts(1, &target));
     }
-    /// What a recording becomes after capture, with the real Base model: the speech check,
-    /// amplification, recognition and the no-speech filter, as `record` runs them.
-    /// `MOSHPIT_VOICE_FIXTURES` names the folder of the desktop voice test (docs/development.md).
+    /// The engine must be built with the instruction sets that make it usable. Without them
+    /// it took 49 s to recognise 11 s of speech (see .cargo/config.toml).
     #[test]
-    #[ignore = "needs the Base model and jfk.wav in MOSHPIT_VOICE_FIXTURES"]
-    fn the_real_model_hears_short_speech_and_not_noise() {
+    fn the_engine_is_built_for_speed() {
+        let info = whisper_rs::print_system_info();
+        #[cfg(target_arch = "x86_64")]
+        for feature in ["AVX = 1", "AVX2 = 1", "FMA = 1", "F16C = 1"] {
+            assert!(info.contains(feature), "{feature} is missing: {info}");
+        }
+        #[cfg(target_arch = "aarch64")]
+        assert!(info.contains("NEON = 1"), "{info}");
+        // The processor running this has what the engine needs, or voice says so up front.
+        #[cfg(target_arch = "x86_64")]
+        assert_eq!(processor_problem().is_none(), std::arch::is_x86_feature_detected!("avx2"));
+    }
+
+    /// Feeds a recording to dictation as the microphone would, 20 ms every 20 ms, then stops.
+    /// Returns the phrases typed while it was spoken, those typed on stopping, and how long
+    /// stopping took.
+    fn dictate(context: &Arc<WhisperContext>, pcm: &[f32]) -> (Vec<String>, Vec<String>, Duration) {
+        let mut dictation = Dictation::new(Arc::new(AtomicU8::new(0)), Language::English);
+        let (mut during, mut after) = (Vec::new(), Vec::new());
+        let mut heard = Vec::new();
+        for chunk in pcm.chunks(audio::RATE / 50) {
+            heard.extend_from_slice(chunk);
+            dictation.step(context, &heard, &mut |text| { if !text.is_empty() { during.push(text.to_string()) } Ok(()) }).unwrap();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let began = Instant::now();
+        dictation.finish(context, &heard, &mut |text| { if !text.is_empty() { after.push(text.to_string()) } Ok(()) }).unwrap();
+        (during, after, began.elapsed())
+    }
+
+    fn plain(text: &str) -> String {
+        text.to_lowercase().chars().filter(|c| c.is_alphanumeric() || *c == ' ').collect()
+    }
+
+    /// What recordings become with the real models, as `record` runs them, and how long it
+    /// takes. Run in release to see what users get. `MOSHPIT_VOICE_FIXTURES` names the folder
+    /// of the desktop voice test (docs/development.md), with either model in it.
+    #[test]
+    #[ignore = "needs Base or Small and jfk.wav in MOSHPIT_VOICE_FIXTURES"]
+    fn the_real_models_type_speech_as_it_is_spoken_and_not_noise() {
         let fixtures = PathBuf::from(std::env::var_os("MOSHPIT_VOICE_FIXTURES").expect("MOSHPIT_VOICE_FIXTURES"));
-        let mut params = WhisperContextParameters::default();
-        params.use_gpu(false);
-        let context = WhisperContext::new_with_params(fixtures.join(Model::Base.file()), params).unwrap();
+        eprintln!("{} threads; {}", threads(), whisper_rs::print_system_info());
         let wav = hound::WavReader::open(fixtures.join("jfk.wav")).unwrap();
         let jfk: Vec<f32> = wav.into_samples::<i16>().map(|s| f32::from(s.unwrap()) / 32768.0).collect();
         let at = |from: f32, to: f32| jfk[(from * 16_000.0) as usize..(to * 16_000.0) as usize].to_vec();
-        let hear = |name: &str, clip: Vec<f32>| -> Result<String, String> {
-            let result = audio::speech(&clip).and_then(|()| {
-                let mut clip = clip;
-                audio::normalize(&mut clip);
-                let heard = recognize(&context, &clip, Language::English, Abort { mode: Arc::new(AtomicU8::new(0)), live: None })?;
-                eprintln!("{name}: the model wrote {heard:?}");
-                kept(&heard)
-            });
-            eprintln!("{name}: {result:?}");
-            result
-        };
         let mut x = 7u32;
         let mut noise = || { x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223); (x >> 8) as f32 / (1 << 23) as f32 - 1.0 };
         let n = 32_000;
@@ -808,28 +1044,79 @@ mod tests {
         let breath: Vec<f32> = (0..n).map(|i| noise() * 0.01 * (std::f32::consts::PI * i as f32 / n as f32).sin()).collect();
         let white: Vec<f32> = (0..n).map(|_| noise() * 0.02).collect();
         let hum: Vec<f32> = (0..n).map(|i| 0.02 * (std::f32::consts::TAU * 50.0 * i as f32 / 16_000.0).sin()).collect();
+        let mut tested = 0;
+        for model in [Model::Base, Model::Small] {
+            let path = fixtures.join(model.file());
+            if !path.exists() {
+                continue;
+            }
+            tested += 1;
+            let mut params = WhisperContextParameters::default();
+            params.use_gpu(false);
+            let began = Instant::now();
+            let context = Arc::new(WhisperContext::new_with_params(&path, params).unwrap());
+            eprintln!("{model:?}: loaded in {} ms", began.elapsed().as_millis());
+            // A recording, as `record` finishes it: the speech check, then recognition.
+            let hear = |name: &str, clip: &[f32]| -> String {
+                let began = Instant::now();
+                let text = audio::speech(clip).map_or_else(|_| String::new(), |()| {
+                    words(&context, clip.to_vec(), Language::English, Abort { mode: Arc::new(AtomicU8::new(0)), over: None }).unwrap()
+                });
+                eprintln!("{model:?} {name}: {} ms {text:?}", began.elapsed().as_millis());
+                text
+            };
 
-        // Speech, including short phrases with no pause around them, is heard as words.
-        assert!(hear("whole sample", jfk.clone()).unwrap().contains("ask not what your country can do for you"));
-        assert!(hear("1.40-2.00", at(1.4, 2.0)).unwrap().contains("America"));
-        assert!(hear("9.60-10.20", at(9.6, 10.2)).unwrap().contains("country"));
-        assert!(hear("3.00-3.60", at(3.0, 3.6)).is_ok());
-        // Hiss and hum stop at the speech check; the model writes only sound notes for the
-        // rest of the noise, so nothing is inserted.
-        for (name, clip) in [("white", white), ("hum", hum), ("fan", fan), ("rumble", rumble), ("typing", typing), ("breath", breath)] {
-            assert!(hear(name, clip).is_err(), "{name}");
+            // Spoken, the sample is typed phrase by phrase, and little is left after stopping.
+            let (during, after, finishing) = dictate(&context, &jfk);
+            eprintln!("{model:?} streamed: typed {during:?} while speaking, {after:?} {} ms after stopping", finishing.as_millis());
+            let all = plain(&[during.clone(), after].concat().join(" "));
+            assert!(all.contains("ask not what your country can do for you"), "{all}");
+            assert!(all.contains("what you can do for your country"), "{all}");
+            assert!(during.len() >= 2, "phrases are typed at the pauses while speaking: {during:?}");
+            // All of it at once, stopped as soon as the first phrase is being settled (the
+            // desktop test's recorded fixture): everything said is still typed.
+            let mut dictation = Dictation::new(Arc::new(AtomicU8::new(0)), Language::English);
+            let mut all_at_once = Vec::new();
+            dictation.step(&context, &jfk, &mut |text| { all_at_once.push(text.to_string()); Ok(()) }).unwrap();
+            dictation.finish(&context, &jfk, &mut |text| { all_at_once.push(text.to_string()); Ok(()) }).unwrap();
+            eprintln!("{model:?} at once: {all_at_once:?}");
+            let all = plain(&all_at_once.join(" "));
+            assert!(all.contains("fellow americans") && all.contains("what you can do for your country"), "{all}");
+            // Phrases without a pause around them.
+            assert!(plain(&hear("9.60-10.20", &at(9.6, 10.2))).contains("country"));
+            assert!(plain(&hear("0-3", &at(0.0, 3.0))).contains("fellow americans"));
+            assert!(plain(&hear("3-8", &at(3.0, 8.0))).contains("ask not what your country can do for you"));
+            let fragment = hear("1.40-2.00", &at(1.4, 2.0));
+            if model == Model::Small {
+                assert!(plain(&fragment).contains("americans"), "{fragment}");
+            }
+            // Hiss and hum stop at the speech check; for the rest of the noise the model
+            // writes only sound notes, so nothing is typed.
+            for (name, clip) in [("white", &white), ("hum", &hum), ("fan", &fan), ("rumble", &rumble), ("typing", &typing), ("breath", &breath)] {
+                assert_eq!(hear(name, clip), "", "{name}");
+            }
         }
+        assert!(tested > 0, "no model in MOSHPIT_VOICE_FIXTURES");
     }
 
     #[test]
     fn sound_notes_are_not_words() {
-        for note in [" [BLANK_AUDIO]", " [APPLAUSE]", "(music)", " *sighs*", "♪ la la ♪", "[ Silence ] (wind)"] {
-            assert!(kept(&[note.into()]).is_err(), "{note:?}");
+        for note in [" [BLANK_AUDIO]", " [APPLAUSE]", "(music)", " *sighs*", "♪ la la ♪", "[ Silence ] (wind)", " [INAUDIBLE]"] {
+            assert_eq!(clean(&[note.into()]), "", "{note:?}");
         }
-        assert_eq!(kept(&[" Fix the [BLANK_AUDIO] failing test.".into()]).unwrap(), "Fix the failing test.");
-        assert_eq!(kept(&[" Hello".into(), " world.".into()]).unwrap(), "Hello world.");
+        assert_eq!(clean(&[" Fix the [BLANK_AUDIO] failing test.".into()]), "Fix the failing test.");
+        assert_eq!(clean(&[" Hello".into(), " world.".into()]), "Hello world.");
         // A bracket that never closes is not a note; a later note still goes.
-        assert_eq!(kept(&["array[0 is empty (music)".into()]).unwrap(), "array[0 is empty");
+        assert_eq!(clean(&["array[0 is empty (music)".into()]), "array[0 is empty");
+    }
+
+    #[test]
+    fn the_window_fits_the_recording_within_what_was_measured() {
+        // At least six seconds; the recording and a second more; never past thirty.
+        assert_eq!(window(audio::RATE / 2), 300);
+        assert_eq!(window(audio::RATE * 10), 550);
+        assert_eq!(window(audio::RATE * 45), 1500);
+        assert!((2..=8).contains(&threads()));
     }
 
     #[test]
@@ -844,7 +1131,7 @@ mod tests {
         assert_eq!(legacy.microphone, None);
     }
     #[test]
-    fn only_listening_can_stop_and_cancel_invalidates_every_phase() {
+    fn only_a_recording_can_stop_and_cancel_invalidates_every_phase() {
         for phase in [
             Phase::Idle,
             Phase::Preparing,
@@ -859,7 +1146,8 @@ mod tests {
                 run: 3,
             };
             state.target = Some(target.clone());
-            if phase == Phase::Listening {
+            // A shortcut released while the microphone opens stops that recording too.
+            if matches!(phase, Phase::Listening | Phase::Preparing) {
                 assert!(state.stop().is_ok());
                 assert_eq!(state.view.phase, Phase::Transcribing);
                 assert_eq!(state.mode.load(Ordering::Acquire), 1);

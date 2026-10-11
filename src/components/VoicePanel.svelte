@@ -6,7 +6,8 @@
   import { shortcutLabel, type VoiceSettings, type VoiceModel } from '../lib/voice'
   let first = $state<HTMLButtonElement>()
   onMount(() => { first?.focus(); void voice.refresh(); void voice.loadInputs() })
-  const names: Record<VoiceModel, string> = { small: 'Small · larger, slower', base: 'Base · faster, recommended' }
+  const names: Record<VoiceModel, string> = { small: 'Small · more accurate, about half a second per phrase', base: 'Base · fastest, recommended' }
+  const other = $derived(voice.view.models.find(m => m.id !== voice.settings.model && m.ready))
   const busy = $derived(voice.changing || voice.view.verifying || !!voice.view.downloading)
   const selected = $derived(voice.view.models.find(m => m.id === voice.settings.model))
   const missingMic = $derived(!!voice.settings.microphone && !voice.inputsLoading && !voice.inputs.devices.includes(voice.settings.microphone))
@@ -15,18 +16,20 @@
 <aside class="panel" aria-label="Voice input">
   <header><h2>Voice input</h2><button type="button" class="close" aria-label="Close" bind:this={first} onclick={() => office.closePanel()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></svg></button></header>
   <div class="body">
-    <p>Speak instead of typing. Stop to insert text into your terminal, review it, then press Enter to send.</p>
-    <label class="enable"><input type="checkbox" checked={voice.settings.enabled} disabled={voice.changing} onchange={e => void voice.configure({ enabled: e.currentTarget.checked })} />Enable local voice</label>
+    <p>Speak instead of typing. Your words appear as you talk, and each phrase is typed into the terminal when you pause. Review it, then press Enter to send.</p>
+    {#if voice.view.unsupported}<p class="error" role="alert">{voice.view.unsupported}</p>{/if}
+    <label class="enable"><input type="checkbox" checked={voice.settings.enabled} disabled={voice.changing || !!voice.view.unsupported} onchange={e => void voice.configure({ enabled: e.currentTarget.checked })} />Enable local voice</label>
     <div class="readiness" role="status">
       {#if !voice.settings.enabled}<p>Enable voice, then download a model to get started.</p>
       {:else if voice.view.verifying}<p>Checking your downloaded models…</p>
-      {:else if !voice.ready}<p>Download {voice.settings.model === 'base' ? 'Base' : 'Small'} to finish setup.</p>
+      {:else if !voice.ready}<p>Download {voice.settings.model === 'base' ? 'Base' : 'Small'} to finish setup{other ? `, or use ${other.id === 'base' ? 'Base' : 'Small'}, which is already downloaded` : ''}.</p>
+        {#if other && !voice.view.downloading}<button type="button" class="button" disabled={busy} onclick={() => void voice.configure({ model: other.id })}>Use {other.id === 'base' ? 'Base' : 'Small'} · downloaded</button>{/if}
         {#if selected && !voice.view.downloading}<button type="button" class="button" disabled={busy} onclick={() => void voice.download(voice.settings.model)}>Download selected model · {(selected.bytes / 1_000_000).toFixed(0)} MB</button>{/if}
       {:else if voice.inputsLoading}<p>Finding microphones…</p>
       {:else if voice.inputsProblem}<p>Refresh microphones to check your input.</p>
       {:else if missingMic}<p>Choose an available microphone to finish setup.</p>
       {:else if !voice.settings.microphone && !voice.inputs.default}<p>Choose a microphone below, or connect one and refresh.</p>
-      {:else}<p>Ready. Close setup, select a running terminal, and press Voice{voice.settings.shortcut !== 'none' ? ` or ${shortcutLabel(voice.settings.shortcut)}` : ''}.</p>{/if}
+      {:else}<p>Ready. Close setup, select a running terminal, and press Voice{voice.settings.shortcut !== 'none' ? `, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak` : ''}.</p>{/if}
     </div>
     {#if bridge.demo}<p class="note">Demo: simulated audio and downloads. No microphone or network is used.</p>{/if}
     <section>
@@ -65,11 +68,11 @@
       <p class="note">Choose your language if automatic detection gets it wrong. Both models support Hindi and English; mixed-language results vary.</p>
     </section>
     <section>
-      <label for="voice-shortcut">Start / stop shortcut</label>
+      <label for="voice-shortcut">Shortcut</label>
       <select id="voice-shortcut" value={voice.settings.shortcut} disabled={voice.changing} onchange={e => void voice.configure({ shortcut: e.currentTarget.value as VoiceSettings['shortcut'] })}>{#each ['space', 'altspace', 'none'] as shortcut}<option value={shortcut}>{shortcutLabel(shortcut as VoiceSettings['shortcut'])}</option>{/each}</select>
-      <p class="note">Works inside this window while voice is enabled. Change or turn it off if your program uses the same key.</p>
+      <p class="note">Hold it while you speak and let go to finish, or tap it to talk hands-free and tap again to finish. Works inside this window while voice is enabled; change or turn it off if your program uses the same key.</p>
     </section>
-    <p class="note">Recordings and transcripts stay in memory and are discarded after use or cancellation. Voice input leaves your clipboard alone.</p>
+    <p class="note">Recordings stay in memory and are discarded when they end. Cancelling stops the recording; phrases already typed stay in the terminal for you to keep or delete. Voice input leaves your clipboard alone.</p>
     <p class="note">Closing or minimizing the window cancels recording.</p>
     {#if voice.problem}<p class="error" role="alert">{voice.problem}</p>{/if}
   </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanVoice, DEFAULT_VOICE, voiceKey } from './voice'
+import { cleanVoice, DEFAULT_VOICE, voiceKey, voiceKeyUp } from './voice'
 
 describe('voice keys respect terminal ownership', () => {
   const key = { ctrlKey: true, shiftKey: true, altKey: false, metaKey: false, code: 'Space' }
@@ -16,6 +16,14 @@ describe('voice keys respect terminal ownership', () => {
     expect(voiceKey({ ...key, ctrlKey: false }, settings)).toBe(false)
     expect(voiceKey({ ...key, metaKey: true }, settings)).toBe(false)
   })
+})
+it('letting go of any key of the shortcut finishes a held recording, and nothing else does', () => {
+  const settings = { ...DEFAULT_VOICE, enabled: true }
+  for (const code of ['Space', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight']) expect(voiceKeyUp({ code }, settings)).toBe(true)
+  for (const code of ['KeyA', 'Enter', 'AltLeft', 'MetaLeft']) expect(voiceKeyUp({ code }, settings)).toBe(false)
+  expect(voiceKeyUp({ code: 'AltLeft' }, { ...settings, shortcut: 'altspace' })).toBe(true)
+  expect(voiceKeyUp({ code: 'Space' }, { ...settings, shortcut: 'none' })).toBe(false)
+  expect(voiceKeyUp({ code: 'Space' }, DEFAULT_VOICE)).toBe(false)
 })
 it('demo text reaches a prompt without controls, line breaks, or clipboard escape sequences', () => {
   expect(cleanVoice('Fix\r\nthe\tfile\x1b[31m\x1b[0m\x03')).toBe('Fix the file')

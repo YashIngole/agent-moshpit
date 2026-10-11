@@ -1,5 +1,5 @@
 import { bridge } from './bridge'
-import { DEFAULT_VOICE, EMPTY_VOICE, type VoiceInputs, type VoiceModel, type VoiceSettings, type VoiceView } from './voice'
+import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, type VoiceInputs, type VoiceModel, type VoiceSettings, type VoiceView } from './voice'
 import { terms } from './terms'
 import { tick } from 'svelte'
 
@@ -13,12 +13,19 @@ class Voice {
   inputsLoading = $state(false)
   inputsProblem = $state('')
   panel = false
+  /** "Inserted", shown for a moment after a recording's words are typed. */
+  notice = $state('')
   active = $derived(['preparing', 'listening', 'transcribing'].includes(this.view.phase))
   ready = $derived(this.view.models.some(m => m.id === this.settings.model && m.ready))
   #polling = false
   #alive = false
   #request = 0
   #restoreFocus = false
+  /** When the shortcut went down to start the recording, while it is held. */
+  #held: number | null = null
+  /** Let go after holding while the start was still on its way: stop once it arrives. */
+  #stopOnStart = false
+  #noticeTimer: ReturnType<typeof setTimeout> | undefined
 
   start() {
     this.#alive = true
@@ -54,8 +61,10 @@ class Voice {
     try {
       const view = await bridge.voiceView()
       if (this.#alive && request === this.#request && view.sequence >= this.view.sequence) {
-        const inserted = this.view.phase === 'transcribing' && view.phase === 'idle' && !!view.message
+        // Words are typed as they are spoken, so a short recording can end between two polls.
+        const inserted = ['preparing', 'listening', 'transcribing'].includes(this.view.phase) && view.phase === 'idle' && !!view.message
         this.view = view
+        if (inserted) this.#notify(view.message)
         // Stop is a button; return its keyboard to the same terminal after insertion.
         // A user who moved elsewhere while waiting keeps their focus.
         if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) {
@@ -93,6 +102,48 @@ class Voice {
       await this.act(() => this.view.phase === 'listening' ? bridge.voiceStop() : bridge.voiceStart(agent))
     } finally { this.acting = false }
   }
+  /** The shortcut went down: start a recording, or finish the one going. Held, it is
+   *  push-to-talk (see `release`); tapped, the recording goes on until the next tap. */
+  async press(agent: string) {
+    if (this.acting || this.changing) return
+    if (this.view.phase === 'listening' || this.view.phase === 'preparing') return this.finish()
+    if (this.active || this.view.busy) return
+    this.#held = Date.now()
+    this.#stopOnStart = false
+    await this.toggle(agent)
+    if (this.#stopOnStart) {
+      this.#stopOnStart = false
+      await this.finish()
+    }
+  }
+  /** The shortcut came up, or the window lost the keyboard. After a hold, that finishes. */
+  release() {
+    if (this.#held === null) return
+    const held = Date.now() - this.#held
+    this.#held = null
+    if (held < HOLD_MS) return
+    if (this.acting) this.#stopOnStart = true
+    else void this.finish()
+  }
+  /** Finish the recording: the words since the last pause are typed. A recording that has
+   *  already ended (its time ran out) needs nothing, and says nothing. */
+  async finish() {
+    if (this.acting || !['listening', 'preparing'].includes(this.view.phase)) return
+    this.#restoreFocus = !!document.activeElement?.closest('.voice-status, .mic')
+    this.acting = true
+    try { await bridge.voiceStop() } catch { /* It ended on its own; the view shows how. */ }
+    finally { this.acting = false }
+    await this.refresh()
+  }
+  #notify(message: string) {
+    clearTimeout(this.#noticeTimer)
+    this.notice = message
+    this.#noticeTimer = setTimeout(() => { this.notice = '' }, 2500)
+  }
+  dismissNotice() {
+    clearTimeout(this.#noticeTimer)
+    this.notice = ''
+  }
   async loadInputs() {
     if (this.inputsLoading) return
     this.inputsLoading = true
@@ -103,6 +154,8 @@ class Voice {
   }
   cancel() {
     this.#restoreFocus = false
+    this.#held = null
+    this.#stopOnStart = false
     this.#request += 1
     this.view = { ...this.view, phase: 'idle', agent: null, started_ms: null, message: '', level: 0, transcribing_ms: null }
     void bridge.voiceCancel().then(() => this.refresh()).catch(() => {

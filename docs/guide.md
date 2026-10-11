@@ -2,11 +2,11 @@
 
 Everything the window does, in the order you meet it. For installing it, see the [README](../README.md); for the programs it can run and adding your own, [programs.md](programs.md).
 
-![The floor: two rooms of agents at desks, each tagged with its program. One has a hand up, and an amber band across the top names them and offers to open their terminal](office.png)
+![The floor: three rooms of agents at desks, each with a name, a status and how long. One has a hand up, and an amber band across the top names them and offers to open their terminal](office.png)
 
 | Terminals beside the floor | The floor as a strip | New agent |
 | --- | --- | --- |
-| ![Three terminals in a grid to the right of the floor, each headed by its agent's face, name, status and program](terminals.png) | ![The floor narrowed to a list of names, with a "waiting" group on top, beside four terminals. One agent is away and its pane offers Carry on](strip.png) | ![The New agent panel: a choice of program, a task, a folder, a tick box for a separate copy, and a name](new-agent.png) |
+| ![Three terminals in a grid to the right of the floor, each headed by its agent's face, name, status and program](terminals.png) | ![The floor narrowed to a list of names, with a "waiting" group on top, beside four terminals. One agent is away and its pane offers Carry on](strip.png) | ![The New agent panel: a choice of program, a task, a folder already filled in, a tick box for a separate copy, and More options folded into one line](new-agent.png) |
 
 The pictures show the built-in demo data, not a real session. The people and their status are drawn by the app; what is in the terminals is typed by hand to stand in for a program.
 
@@ -24,16 +24,19 @@ Agent Moshpit starts the agent programs you already have, each in a pseudo-termi
 
 ## Start an agent
 
-Press **+ new agent** (`n` on the floor, `Ctrl+Shift+N` anywhere, or **New agent…** in the tray menu). An empty desk in a room, or the **+** on a room's sign, opens the same form on that room's folder.
+Press **+ new agent** (`n` on the floor, `Ctrl+Shift+N` anywhere, or **New agent…** in the tray menu). The **+** on a room's sign opens the same form on that room's folder.
+
+The form asks who, what and where, in that order. The folder is filled in with the one you most likely mean: the terminal you are in, else where you last started an agent, else the room with the most people. Everything with a good default is folded into one **More options** line that says what it is set to.
 
 - **Who should take it?** The programs found on this computer. Ones the office can install sit behind **+N to install**. Choosing one shows the exact command, and the button becomes **Install … and start**: the install runs in a pane where you can watch it, and the agent then starts in that pane.
-- **Model and Effort**, for Claude Code and Codex. The model picker reads your installed CLI's catalog, including each model's supported effort levels. It checks again when the form opens after the 15-minute cache expires, and every 15 minutes while the form stays visible. **Refresh** checks immediately. Newly available models and effort levels need no app update; availability follows your CLI and account. **Custom model…** accepts a model ID or alias, even when discovery fails. **Use CLI settings** passes no override.
-- **Permissions.** Claude offers Manual, Auto, Accept edits, Plan, Don't ask and Bypass permissions when the installed version supports them. Codex offers workspace and read-only sandboxes, automatic approval review, YOLO and custom sandbox/approval settings. Each choice explains its behavior; the choices are not interchangeable between programs.
-- **Advanced launch settings.** Additional folders; Codex profiles and live search; or Claude tool allow/deny rules, Chrome integration and extra instructions. Options appear when the installed CLI exposes them. **Reset to CLI settings** clears this program's overrides.
 - **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Antigravity CLI, Gemini CLI). Leave it empty and say it in their terminal. Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
-- **Folder.** Type it, browse for it, or pick one used before.
+- **Folder.** Filled in for you; type another, browse for it, or pick one used before.
 - **Work on a separate copy**, where the program can (Claude Code, Codex, Hermes). The program is asked to make a git worktree of its own (`--worktree`), so several agents can change one project without colliding.
-- **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2".
+- **More options:**
+  - **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2".
+  - **Model and Effort**, for Claude Code and Codex. The model picker reads your installed CLI's catalog, including each model's supported effort levels. It checks again when the form opens after the 15-minute cache expires, and every 15 minutes while the form stays visible. **Refresh** checks immediately. Newly available models and effort levels need no app update; availability follows your CLI and account. **Custom model…** accepts a model ID or alias, even when discovery fails. **Use CLI settings** passes no override.
+  - **Permissions.** Claude offers Manual, Auto, Accept edits, Plan, Don't ask and Bypass permissions when the installed version supports them. Codex offers workspace and read-only sandboxes, automatic approval review, YOLO and custom sandbox/approval settings. Each choice explains its behavior; the choices are not interchangeable between programs.
+  - **Advanced launch settings.** Additional folders; Codex profiles and live search; or Claude tool allow/deny rules, Chrome integration and extra instructions. Options appear when the installed CLI exposes them. **Reset to CLI settings** clears this program's overrides.
 
 `Ctrl+Enter` starts the agent from anywhere in the form. Closing the form keeps what you typed in it. Each program keeps its own launch draft when you switch between them. Explicit launch settings are saved with the desk and reused on restart, Carry on and **Start another like this**. They describe how the desk starts; the CLI can change settings later in its terminal.
 
@@ -56,21 +59,22 @@ One room per project (the git repository's name, or the folder's), a desk per ag
 
 A status is always a word and a pose as well as a colour. Four colours carry meaning and are used for nothing else: amber for needs you, green for done, red for trouble, and blue for the light of a screen at work.
 
-- A small dot before a name means their terminal has printed something since you last had it in front of you.
-- The counts in the top bar (`1 needs you`, `2 working`, `1 quiet`, `1 done`, `1 in trouble`) are buttons: a click shows the next desk in that state. In a narrow window, one status button opens the same actions in the menu.
+- Under the name, a line appears only when there is something the status does not say: what the agent reported it is doing (agents can tell the office through its MCP tools), what the program asked, or what went wrong. The program's name shows when you run more than one program.
+- A small dot before a name means their terminal has printed something since you last had it in front of you. Someone at work prints all the time, so they do not get one.
+- The top bar counts only what wants a look (`1 done`, `1 in trouble`); each count is a button that shows the next desk in that state. In a narrow window, one button opens the same actions in the menu.
 - With more than ten agents and no terminals open, desks are drawn smaller so a crowd fits.
 - The floor is one stop for `Tab`. The arrow keys walk from desk to desk and `Enter` opens one.
 
 ## Terminals
 
-Click a desk and their terminal opens to the right of the floor, with the keyboard in it. A click on another desk shows that one in the same pane. Hold `Ctrl` as you click, or press `Ctrl+Enter` on a desk, to open it beside the others instead: two sit side by side, more make a grid, as many as you like. Do the same on a desk that is already open and its pane is put away again, with its program still running.
+Click a desk and their terminal opens to the right of the floor, with the keyboard in it. A click on another desk shows that one in the same pane, except that a pane whose agent needs you or is in trouble is never the one put away, and on a screen wide enough for both the new one opens beside it. Hold `Ctrl` as you click, or press `Ctrl+Enter` on a desk, to open it beside the others instead: two sit side by side, more make a grid, as many as you like. Do the same on a desk that is already open and its pane is put away again, with its program still running.
 
-- **Each pane is headed by its agent**: face, name, status, project and branch, and program.
+- **Each pane is headed by its agent**: face, name, status, what the agent says it is doing (else project and branch), and program.
 - **The grid stays as you made it.** A new pane goes beside its neighbour, and a closed one gives its room to a neighbour; nothing else moves. Drag any edge between two panes, or double-click one to make them all even. Drag a pane by its header onto another to swap the two.
 - **Give one pane the room** with `Ctrl+Shift+Enter`, the button in its header, or a double-click on the header. A **+N** chip lists the ones waiting behind it and puts them back.
 - **Put a pane away** with its × or `Ctrl+Shift+W`. The program keeps running at its desk.
-- **Back to the floor, and back again,** with `Ctrl` + `` ` ``. The same panes return. Pick a desk while you are on the floor and they return with that desk among them. `Esc` is not used for this, because the programs use it themselves.
-- **The floor beside the terminals** keeps the width you drag it to. Two or more panes start with a compact floor on a laptop-sized window, until you choose a width yourself. Below 300 pixels it becomes a strip: a list of names, each with its status and program, with whoever needs you, is in trouble or is done gathered on top under **waiting**. Double-click that edge, or choose **Compact floor** in the menu, to switch between the strip and the usual width.
+- **Hide the terminals, and bring them back,** with `Ctrl` + `` ` `` or the button in the bar. The same panes return. Pick a desk while you are on the floor and they return with that desk among them. `Esc` is not used for this, because the programs use it themselves.
+- **The floor beside the terminals** keeps the width you drag it to. Two or more panes, more than ten agents, or a laptop-sized window start with the strip, until you choose a width yourself. Below 300 pixels it becomes a strip: a list of names, each with its status and program, with whoever needs you, is in trouble or is done gathered on top under **waiting**. Double-click that edge, or choose **Compact floor** in the menu, to switch between the strip and the usual width.
 - In a window narrower than 760 pixels the terminals take the whole window and the floor waits behind them.
 
 ## In a terminal
@@ -91,7 +95,7 @@ Each terminal keeps 5,000 lines of scrollback, and the core keeps the last half 
 
 ## Voice input
 
-Voice starts off. Press **Voice** in the top bar (or **⋯ → Voice input**), enable **local voice**, and press **Download selected model**. The panel shows what is needed to finish setup and identifies **Hugging Face** as the model host before download; no account or payment is needed. Downloads go into the app's data folder, separate from the installer, and are checked for their exact size and SHA-256 before becoming usable. An interrupted or failed download is never used. **Remove** deletes a downloaded model.
+Voice starts off. Press the microphone in the top bar (or **⋯ → Voice input**), enable **local voice**, and press **Download selected model**. The panel shows what is needed to finish setup and identifies **Hugging Face** as the model host before download; no account or payment is needed. Downloads go into the app's data folder, separate from the installer, and are checked for their exact size and SHA-256 before becoming usable. An interrupted or failed download is never used. **Remove** deletes a downloaded model.
 
 - **Base**, recommended, the fastest: 59,707,625 bytes (59.7 MB). About 0.15 s per phrase on a six-core laptop.
 - **Small**, more accurate on short or unclear phrases: 190,085,487 bytes (190.1 MB). About 0.6 s per phrase on the same laptop. Existing model choices are preserved, and if the chosen model is not downloaded but the other is, setup offers to use that one.
@@ -111,8 +115,9 @@ Audio and transcripts are kept only in memory and discarded when the recording e
 Amber means one thing here: someone needs you.
 
 - Their hand goes up at their desk, with a line saying what for when the office knows.
-- A band across the top names whoever has waited longest and has one button, **Open their terminal**, which opens it beside whatever is already open. Anyone else waiting is listed on the band. It stays until the question is answered, including when that terminal is open.
-- The top bar counts them, the window's title becomes `Agent Moshpit (2 need you)`, the taskbar button flashes if the window is behind, and the tray icon changes.
+- On the floor, a band across the top names whoever has waited longest, what they asked when the program said, and has one button, **Open their terminal**, which opens it beside whatever is already open. Anyone else waiting is listed on the band; a click on a name opens theirs.
+- While terminals are open the band is an amber chip in the top bar instead, so your terminals never move when a hand goes up. Click it, or press `Ctrl+Shift+A` from anywhere, even inside a terminal, to go to whoever has waited longest; press it again for the next.
+- The window's title becomes `Agent Moshpit (2 need you)`, the taskbar button flashes if the window is behind, and the tray icon changes.
 - You get a notification, unless you are looking at that terminal.
 
 The hand stays up until the question is answered in their terminal. Going back to the floor, or opening another pane, does not lower it.
@@ -140,7 +145,7 @@ Right-click a desk on the floor, in the strip or on a pane's header, press `Shif
 - **Restart their program** and **Stop their program.** Stop ends the program and keeps the desk, away. Both ask first if the agent is working, quiet, starting or waiting for you, and the menu says which conversation it can resume or whether it starts afresh.
 - **Carry on**, **Continue in folder**, **Continue latest** or **Start again**, for a desk whose program is not running. The hint explains what it resumes.
 - **Open the folder in** your editor, **Show their folder**, **Copy the folder path**.
-- **Remove this desk.** Also the × that appears on a desk under the pointer, a middle-click, or `Delete`. The desk leaves the floor at once and can be brought back with **Undo** for eight seconds; after that its program is ended and the desk is gone. Consecutive removals share **Undo all**, and the timer pauses while the pointer or keyboard focus is on the notice. Closing the notice finishes the removals. If the agent is busy you are asked first. The program keeps the conversation in its own history, and nothing of yours is deleted: the folder, and a worktree a program made for a separate copy, are left as they are.
+- **Remove this desk.** Also a middle-click, `Delete`, or the × on a row of the strip beside the terminals. The desk leaves the floor at once and can be brought back with **Undo** for eight seconds; after that its program is ended and the desk is gone. Consecutive removals share **Undo all**, and the timer pauses while the pointer or keyboard focus is on the notice. Closing the notice finishes the removals. If the agent is busy you are asked first. The program keeps the conversation in its own history, and nothing of yours is deleted: the folder, and a worktree a program made for a separate copy, are left as they are.
 
 ## Closing the window, and quitting
 
@@ -177,7 +182,8 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | | |
 | --- | --- |
 | **Anywhere** | |
-| `Ctrl` + `` ` `` | Back to the floor, and back to the terminals |
+| `Ctrl+Shift+A` | To whoever needs you, in their terminal; again for the next |
+| `Ctrl` + `` ` `` | Hide the terminals, and bring them back |
 | `Ctrl+Shift+N` | New agent (`n` on the floor) |
 | `Ctrl+Shift+Q` | Quit, asking first if anyone is busy |
 | `Ctrl+Q` | The same, when the keyboard is not in a terminal (there it is the program's) |

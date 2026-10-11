@@ -29,6 +29,13 @@ try {
   const model = page.getByLabel('Model', { exact: true })
   const effort = page.getByLabel('Effort', { exact: true })
   const permission = page.getByLabel('Permissions', { exact: true })
+  // Launch settings are folded into More options until asked for; once opened they stay open.
+  const unfold = async () => {
+    const options = page.locator('details.options')
+    await options.waitFor()
+    if ((await options.getAttribute('open')) === null) await options.locator('> summary').click()
+  }
+  await unfold()
   await page.locator('#new-model option[value="opus"]').waitFor({ state: 'attached', timeout: 5000 }).catch(async error => {
     console.error(JSON.stringify({ errors, page: (await page.locator('body').innerText()).slice(-1600) }))
     throw error
@@ -61,6 +68,7 @@ try {
 
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'New agent' }).first().click()
+  await unfold()
   assert.equal(await model.inputValue(), 'newly-released-model')
   assert.equal(await effort.inputValue(), 'new-effort')
   await page.getByLabel('Folder', { exact: true }).fill('C:/code/catalog-project')
@@ -70,6 +78,7 @@ try {
   await fresh.waitFor()
   await fresh.click({ button: 'right' })
   await page.getByRole('menuitem', { name: /Start another like this/ }).click()
+  await unfold()
   assert.equal(await model.inputValue(), 'newly-released-model')
   assert.equal(await effort.inputValue(), 'new-effort')
   assert.equal(await permission.inputValue(), 'auto')
@@ -91,13 +100,12 @@ try {
   await page.screenshot({ path: path.join(review, 'desktop.png'), fullPage: true })
   await page.getByRole('radiogroup').getByText('Codex', { exact: true }).click()
   await page.locator('#new-model option[value="codex-demo"]').waitFor({ state: 'attached' })
-  await page.getByText('Models come from your CLI. Refresh to check for new releases.', { exact: true }).waitFor()
   await page.locator('aside.panel form').evaluate(form => { form.scrollTop = 0 })
   await page.screenshot({ path: path.join(review, 'desktop-codex.png'), fullPage: true })
   await permission.selectOption('custom')
   await page.getByLabel('Sandbox', { exact: true }).selectOption('workspace-write')
   await page.getByLabel('Approval policy', { exact: true }).selectOption('never')
-  assert.equal(await page.locator('details').getAttribute('open'), '')
+  assert.equal(await page.locator('details:not(.options)').getAttribute('open'), '')
   await page.setViewportSize({ width: 390, height: 760 })
   await permission.selectOption('workspace')
   await page.getByText('Advanced launch settings', { exact: true }).click()
@@ -108,6 +116,7 @@ try {
   console.log('ok   advanced controls, reset, custom sandbox and narrow-window layout')
 
   await page.goto(`${base}?demo=empty&still&new-agent&catalog-fails`)
+  await unfold()
   await page.getByText(/The model catalog could not be read/).waitFor()
   await model.selectOption('__custom__')
   await page.getByLabel('Model ID', { exact: true }).fill('a-model-released-today')
@@ -125,6 +134,7 @@ try {
   ]) {
     await page.goto(`${base}?demo=empty&still&new-agent`)
     await page.getByLabel('Folder', { exact: true }).fill('C:/code/keyboard-launch')
+    await unfold()
     await page.getByText('Advanced launch settings', { exact: true }).click()
     const field = page.getByLabel(label, { exact: false })
     await field.fill(value)
@@ -133,6 +143,7 @@ try {
     await desk.waitFor()
     await desk.click({ button: 'right' })
     await page.getByRole('menuitem', { name: /Start another like this/ }).click()
+    await unfold()
     await page.getByText('Advanced launch settings', { exact: true }).click()
     assert.equal(await field.inputValue(), value, `${label} must be committed when Ctrl+Enter starts the agent`)
   }

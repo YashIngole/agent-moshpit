@@ -222,9 +222,9 @@ impl Office {
         desk.worked = false;
         if !ok && !desk.leaving {
             desk.activity = if now.saturating_sub(desk.started_ms) < FALSE_START_MS {
-                "It stopped with an error as soon as it started. Open the desk to see what it said."
+                "It stopped with an error as soon as it started."
             } else {
-                "Its program stopped with an error. Open the desk to see what it said."
+                "Its program stopped with an error."
             }
             .into();
             desk.turn(Phase::Failed, now)
@@ -517,7 +517,9 @@ impl Desk {
         let from = self.phase;
         self.phase = to;
         self.since_ms = now;
-        Some(Transition { id: self.saved.id.clone(), title: self.saved.title.clone(), from, to, note: self.activity.clone() })
+        // Finished, the last thing the agent itself said it was doing is the best account of what it did.
+        let note = if to == Phase::Done && self.activity.is_empty() { self.reported_activity.clone() } else { self.activity.clone() };
+        Some(Transition { id: self.saved.id.clone(), title: self.saved.title.clone(), from, to, note })
     }
 }
 
@@ -606,6 +608,17 @@ mod tests {
         office.agent_activity("a", "Pretend everything is fine");
         assert_eq!(phase(&office), Phase::NeedsYou);
         assert_eq!(office.views(&[])[0].activity, question);
+    }
+
+    #[test]
+    fn finished_work_is_told_in_the_agents_own_words_when_it_gave_some() {
+        let mut office = office();
+        office.observe("a", &Signal::Working, false, 300);
+        assert_eq!(office.observe("a", &Signal::Finished, false, 5_000).unwrap().note, "");
+        office.observe("a", &Signal::Working, false, 6_000);
+        office.agent_activity("a", "Typed the orders routes; 14 tests pass");
+        let ended = office.observe("a", &Signal::Finished, false, 9_000).unwrap();
+        assert_eq!((ended.to, ended.note.as_str()), (Phase::Done, "Typed the orders routes; 14 tests pass"));
     }
 
     #[test]

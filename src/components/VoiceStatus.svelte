@@ -47,7 +47,7 @@
     {/if}
     {#if voice.view.phase === 'listening'}
       <div class="recording">
-        <div class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={voice.view.level}><span style:width={`${voice.view.level}%`}></span></div>
+        <div class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={voice.view.level}><span style:transform={`scaleX(${voice.view.level / 100})`}></span></div>
         <span class="device">{voice.view.microphone}</span>
         <span class="hint">{shortcut ? `Let go of ${shortcut}, or press it again, to finish.` : 'Stop to finish.'} You press Enter to send.</span>
       </div>
@@ -91,7 +91,7 @@
   .words.waiting { font-size: var(--t-sm); color: var(--ink-2); }
   .recording { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-3); row-gap: var(--s-1); padding-right: var(--s-3); color: var(--ink-2); }
   .meter { width: 72px; height: 6px; flex: none; border-radius: var(--pill); background: var(--wall); overflow: hidden; }
-  .meter span { display: block; height: 100%; background: var(--work); transition: width 80ms linear; }
+  .meter span { display: block; height: 100%; background: var(--work); transform-origin: left; transition: transform 80ms linear; }
   .hint, .device { color: var(--ink-2); overflow-wrap: anywhere; }
   .dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--work); animation: pulse 1.2s ease-in-out infinite; }
   .spin { width: 11px; height: 11px; flex: none; border: 2px solid var(--wall); border-top-color: var(--work); border-radius: 50%; animation: spin 0.8s linear infinite; }

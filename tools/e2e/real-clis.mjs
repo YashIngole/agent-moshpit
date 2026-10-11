@@ -68,6 +68,8 @@ try {
     }
     await choice.click()
     await page.getByRole('textbox', { name: 'Folder' }).fill(folder)
+    // The name is folded into More options until asked for.
+    if ((await page.locator('details.options').getAttribute('open')) === null) await page.locator('details.options > summary').click()
     await page.getByLabel(/^Name/).fill(name)
     await page.getByRole('button', { name: 'Start agent' }).click()
     await page.locator('.pane', { hasText: name }).waitFor()

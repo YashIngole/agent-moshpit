@@ -9,7 +9,7 @@
   import { terms } from '../lib/terms'
   import { elapsed } from '../lib/time'
   import type { Agent, Job } from '../lib/types'
-  import { STATUS_WORD, place, resumeAction, resumeHint } from '../lib/words'
+  import { STATUS_WORD, doing, place, resumeAction, resumeHint } from '../lib/words'
   import Person from './Person.svelte'
   const terminalView = import('./TerminalView.svelte')
 
@@ -247,13 +247,15 @@
           <span class="face"><Person look={agent.look} phase={agent.phase} portrait /></span>
           <div class="title">
             <h2 title={agent.title}>{agent.title}</h2>
-            <p class="status">
+            <!-- What the agent says it is doing, when it said; else where it is working. -->
+            <p class="status" title={place(agent)}>
               <span class="chip {agent.phase}"><i class="dot {agent.phase}"></i>{STATUS_WORD[agent.phase]}</span>
               <span class="since">{elapsed(office.now - agent.since_ms)}</span>
-              {#if place(agent)}<span class="meta">{place(agent)}</span>{/if}
+              {#if doing(agent) && agent.running}<span class="meta said">{doing(agent)}</span>
+              {:else if place(agent)}<span class="meta">{place(agent)}</span>{/if}
             </p>
           </div>
-          <span class="tag" title={agent.harness_name}>{agent.harness_tag}</span>
+          {#if office.mixed}<span class="tag" title={agent.harness_name}>{agent.harness_tag}</span>{/if}
           {#if zoomed && behind > 0}
             <button
               type="button"

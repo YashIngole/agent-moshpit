@@ -14,7 +14,8 @@
     {
       title: 'Anywhere',
       keys: [
-        ['Ctrl+`', 'Back to the floor, and back to the terminals'],
+        ['Ctrl+Shift+A', 'To whoever needs you, in their terminal; again for the next one'],
+        ['Ctrl+`', 'Hide the terminals, and bring them back'],
         ['Ctrl+Shift+N', 'New agent (n on the floor)'],
         ['Ctrl+Shift+Q', 'Quit, asking first if anyone is busy'],
         ['Ctrl+Q', 'The same, when the keyboard is not in a terminal (there it is the program’s)'],

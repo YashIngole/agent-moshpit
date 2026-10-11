@@ -740,7 +740,10 @@ impl Handle {
                 let body = if change.note.is_empty() { "Is waiting for you in their terminal." } else { change.note.as_str() };
                 self.say(Out::Notify(format!("{} needs you", change.title), body.to_string(), change.id.clone()));
             }
-            Phase::Done => self.say(Out::Notify(format!("{} is done", change.title), "Open their terminal to see what they did.".to_string(), change.id.clone())),
+            Phase::Done => {
+                let body = if change.note.is_empty() { "Open their terminal to see what they did." } else { change.note.as_str() };
+                self.say(Out::Notify(format!("{} is done", change.title), body.to_string(), change.id.clone()));
+            }
             Phase::Failed => {
                 let body = if change.note.is_empty() { "Something went wrong." } else { change.note.as_str() };
                 self.say(Out::Notify(format!("{} hit a problem", change.title), body.to_string(), change.id.clone()));

@@ -94,6 +94,7 @@
     else if (ctrl && shift && code === 'KeyW') pane && office.closePane(pane)
     else if (ctrl && shift && code === 'Enter') pane && office.toggleZoom(pane)
     else if (ctrl && shift && code === 'KeyF') pane && (office.finding = pane)
+    else if (ctrl && shift && code === 'KeyA') office.nextWaiting()
     else if (ctrl && shift && code === 'KeyN') office.openNew()
     else if (ctrl && shift && code === 'KeyQ') bridge.quit()
     else if (ctrl && shift && code === 'Slash') office.openKeys()

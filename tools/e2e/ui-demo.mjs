@@ -86,7 +86,10 @@ try {
   // ── the floor and the keyboard ──
   let page = await open('demo=office&still')
   check('the floor offers one tab stop, not one per desk', (await page.locator('.floor button[tabindex="0"]').count()) === 1)
-  check('every desk can still be reached', (await page.locator('.floor button[data-desk]').count()) === 10)
+  check('every desk can still be reached', (await page.locator('.floor button[data-desk]').count()) === 7)
+  check('a desk on the floor has no × of its own: the menu, Delete and a middle click take it away', (await page.locator('.seat .remove').count()) === 0)
+  check('a room seats someone new from the + on its sign, not from an empty desk', (await page.locator('.floor .spare').count()) === 0 && (await page.getByRole('button', { name: 'Add an agent in shop' }).count()) === 1)
+  check('a desk says nothing its status already says', (await desk(page, 5).locator('.doing').count()) === 0 && ((await desk(page, 2).locator('.doing').textContent()) ?? '') === 'Moving the session check into middleware')
   await page.keyboard.press('Tab')
   for (let i = 0; i < 8 && !(await focused(page)).startsWith('demo-'); i++) await page.keyboard.press('Tab')
   check('focus reaches the first desk', (await focused(page)) === 'demo-1')
@@ -160,13 +163,14 @@ try {
   check('and offers the terminals again', (await page.getByRole('button', { name: /terminals/i }).count()) === 1)
   await page.keyboard.press('Control+Backquote')
   check('Ctrl+` again brings them back', await until(async () => (await panes(page)) === 1))
-  await page.getByRole('button', { name: /back to the floor/i }).click()
+  await page.getByRole('button', { name: /hide terminals/i }).click()
   await until(async () => (await panes(page)) === 0)
 
   // ── someone waiting ──
   await page.getByRole('button', { name: 'Open their terminal' }).click()
   check('the band opens the terminal of whoever is waiting', await until(async () => (await page.locator('.pane h2', { hasText: 'Fix the checkout total' }).count()) === 1))
-  check('the waiting cue stays until the question is answered', (await page.locator('.band').count()) === 1)
+  check('the waiting cue stays until the question is answered, as a chip in the bar', (await page.locator('.bar .attention').count()) === 1)
+  check('and the band leaves the terminals where they are', (await page.locator('.band').count()) === 0)
   await page.keyboard.press('Control+Backquote')
   check('back on the floor, it does again', await until(async () => (await page.locator('.band').count()) === 1))
 
@@ -286,7 +290,6 @@ try {
   check('with a moment to bring it back', (await page.getByRole('button', { name: 'Undo' }).count()) === 1)
   await page.getByRole('button', { name: 'Undo' }).click()
   check('and Undo does', await until(async () => (await desk(page, 3).count()) === 1))
-  check('a desk on the floor can be taken away from its corner', (await page.getByRole('button', { name: 'Remove Flaky test hunt' }).count()) === 1)
 
   await desk(page, 6).focus()
   await page.keyboard.press('F2')
@@ -322,7 +325,8 @@ try {
   })
   check('a file dropped on a pane is pasted into it as its path', await until(async () => ((await page.locator('.pane', { hasText: targetTitle }).locator('.xterm-accessibility-tree').innerText()) ?? '').replace(/\n/g, '').includes('"C:/Users/you/Desktop/screenshot 1.png"')), JSON.stringify(await page.evaluate(() => window.__demo.typed.slice(-3))))
 
-  await page.locator('.grip').dblclick()
+  // Two terminals or more: the strip of names unless a width was chosen.
+  if ((await page.locator('.seat.listed').count()) === 0) await page.locator('.grip').dblclick()
   check('the strip beside the terminals is a list of names', await until(async () => (await page.locator('.seat.listed').count()) > 0))
   check('with nothing cut to a few letters', await page.locator('.seat.listed .name').evaluateAll(names => names.every(n => n.scrollWidth <= n.clientWidth + 1)))
 
@@ -341,7 +345,7 @@ try {
   await desk(page, 2).click()
   await until(async () => (await panes(page)) === 1)
   check('a narrow window still reaches the menu', ((await page.getByRole('button', { name: 'More', exact: true }).boundingBox())?.x ?? 999) + 32 <= 420)
-  check('and its band is one line', ((await page.locator('.band').boundingBox())?.height ?? 999) < 70)
+  check('and whoever needs you is a chip that keeps the bar one line', (await page.locator('.bar .attention').count()) === 1 && ((await page.locator('.bar').boundingBox())?.height ?? 999) <= 53)
   await page.context().close()
 
   // ── the second sweep (docs/reviews/ux-sweep-2026-10-09.md) ──
@@ -420,8 +424,7 @@ try {
   check('a clicked notification opens that desk’s terminal', await until(async () => (await page.locator('.pane h2', { hasText: 'Type the orders API' }).count()) === 1))
   // The strip gathers whoever wants a look above the rooms, and says which program each row is.
   await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
-  await page.locator('.grip').dblclick()
-  await until(async () => (await page.locator('.seat.listed').count()) > 0)
+  check('two terminals bring the strip of names by themselves', await until(async () => (await page.locator('.seat.listed').count()) > 0))
   const waitingRows = await page.locator('.room.waiting .desk').evaluateAll(rows => rows.map(r => r.className.split(' ').find(c => ['needs_you', 'failed', 'done'].includes(c))))
   check('the strip puts a Waiting group above the rooms: needs you, then trouble, then done', JSON.stringify(waitingRows) === JSON.stringify(['needs_you', 'failed']) || JSON.stringify(waitingRows) === JSON.stringify(['needs_you', 'failed', 'done']), JSON.stringify(waitingRows))
   check('above every room', await page.evaluate(() => document.querySelector('.floor .room')?.classList.contains('waiting')))
@@ -450,7 +453,7 @@ try {
 
   // The small batch.
   page = await open('demo=office&still')
-  check('an away desk says opening it shows where they left off', ((await desk(page, 3).locator('.doing').textContent()) ?? '') === 'Not running. Open to see where they left off.')
+  check('an away desk says away, and nothing more', (await desk(page, 3).locator('.doing').count()) === 0 && ((await desk(page, 3).locator('.chip').textContent()) ?? '').trim() === 'Away')
   check('and its label promises nothing opening does not do', !/start again|carry on/i.test((await desk(page, 3).getAttribute('aria-label')) ?? ''))
   await desk(page, 2).click({ button: 'right' })
   check('every hint in a desk’s menu can be read whole', await page.locator('.menu-sheet [role="menuitem"] span').evaluateAll(hints => hints.length > 0 && hints.every(h => h.scrollHeight <= h.clientHeight + 1 && h.scrollWidth <= h.clientWidth + 1)))
@@ -502,11 +505,12 @@ try {
 
   // The next list.
   page = await open('demo=office&still')
-  check('a desk with something new in its terminal wears a dot', (await desk(page, 5).locator('.unread').count()) === 1 && (await desk(page, 3).locator('.unread').count()) === 0)
-  await desk(page, 5).click()
+  check('a finished desk with something new in its terminal wears a dot', (await desk(page, 4).locator('.unread').count()) === 1 && (await desk(page, 3).locator('.unread').count()) === 0)
+  check('a desk at work, which prints all the time, does not', (await desk(page, 5).locator('.unread').count()) === 0)
+  await desk(page, 4).click()
   await until(async () => (await panes(page)) === 1)
   await page.keyboard.press('Control+Backquote')
-  check('and loses it once its terminal has been looked at', await until(async () => (await desk(page, 5).locator('.unread').count()) === 0))
+  check('and loses it once its terminal has been looked at', await until(async () => (await desk(page, 4).locator('.unread').count()) === 0))
   await desk(page, 2).click({ button: 'right' })
   await page.getByRole('menuitem', { name: /^Start another like this/ }).click()
   check('Start another like this opens the form on the same program', await until(async () => (await page.getByRole('radio', { name: 'Codex' }).isChecked().catch(() => false)) === true))
@@ -556,7 +560,7 @@ try {
   await page.getByRole('button', { name: 'More', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: /Closing the window quits/ }).click()
   await page.getByRole('button', { name: 'More', exact: true }).click()
-  check('closing the window can be made to quit', (await page.getByRole('menuitemcheckbox', { name: /Closing the window quits/ }).getAttribute('aria-checked')) === 'true' && ((await page.locator('.about').textContent()) ?? '').includes('closing the window quits'))
+  check('closing the window can be made to quit', (await page.getByRole('menuitemcheckbox', { name: /Closing the window quits/ }).getAttribute('aria-checked')) === 'true' && ((await page.locator('.about').textContent()) ?? '').startsWith('agent moshpit'))
   await page.keyboard.press('Escape')
 
   // The +N chip lists the terminals behind and switches to one.
@@ -603,14 +607,13 @@ try {
 
   // The flow extras.
   page = await open('demo=office&still')
-  const working = async () => ((await page.locator('.bar .count', { hasText: 'working' }).textContent()) ?? '').trim()
-  const workingBefore = await working()
+  const counted = async () => (await page.locator('.bar .count').allTextContents()).map(t => t.trim()).join(' | ')
   await page.getByRole('button', { name: 'New agent' }).first().click()
   await page.getByRole('radiogroup').getByText('Claude Code').click()
   await page.getByRole('textbox', { name: 'Folder' }).fill('C:/code/shop')
   await page.getByRole('button', { name: 'Start agent' }).click()
   await until(async () => ((await page.locator('.floor button[data-desk^="demo-new-"]').getAttribute('class')) ?? '').includes('starting'))
-  check('someone still starting is not counted as working', (await working()) === workingBefore, `${workingBefore} / ${await working()}`)
+  check('the bar counts only what wants a look, never who is starting or at work', /^(\d+ (done|in trouble)( \| )?)+$/.test(await counted()), await counted())
   await page.locator('.pane').getByRole('button', { name: 'Put this terminal away' }).click()
   await until(async () => (await panes(page)) === 0)
 
@@ -777,13 +780,16 @@ try {
   for (const [width, height] of [[1024, 700], [340, 420]]) {
     page = await open('demo=office&still', width, height)
     await page.getByRole('button', { name: 'New agent', exact: true }).click()
-    await page.getByRole('button', { name: 'Start agent', exact: true }).click()
     const folder = page.locator('#new-cwd')
+    check(`the folder is filled in with where they most likely work at ${width}`, (await folder.inputValue()) === 'C:/code/shop')
+    await folder.fill('')
+    await page.getByRole('button', { name: 'Start agent', exact: true }).click()
     const fieldError = page.locator('#new-cwd-error')
     check(`missing Folder receives focus at ${width}`, await folder.evaluate(el => document.activeElement === el))
     check(`Folder error is linked and visible at ${width}`, await folder.getAttribute('aria-invalid') === 'true' && await folder.getAttribute('aria-describedby') === 'new-cwd-error' && await fieldError.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight }))
     await folder.fill('C:/code/shop')
     check(`correcting Folder clears its error at ${width}`, await fieldError.count() === 0)
+    await page.locator('details.options > summary').click()
     await page.locator('#new-title').focus()
     check(`focused Name is clear of the actions at ${width}`, await page.locator('#new-title').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.panel footer').getBoundingClientRect().top))
     await page.context().close()
@@ -792,11 +798,11 @@ try {
   page = await open('demo=office&still', 640, 700)
   await page.getByRole('button', { name: 'Open their terminal', exact: true }).click()
   await page.getByRole('button', { name: 'New agent', exact: true }).click()
-  check('covering a waiting terminal does not remove its attention cue', await page.locator('.band').count() === 1)
+  check('covering a waiting terminal does not remove its attention cue', await page.locator('.bar .attention').count() === 1)
   check('covered terminals are not reported as watched', await until(async () => (await page.evaluate(() => window.__demo.watched.length)) === 0))
   check('covered terminals are not available for voice insertion', await page.evaluate(() => window.__demo.visible.length === 0))
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: /Show agent statuses/ }).click()
+  await page.getByRole('button', { name: /Show them/ }).click()
   await page.getByRole('menuitem', { name: /in trouble/ }).click()
   check('compact keyboard-accessible status control opens the trouble terminal', await until(async () => (await page.locator('.pane[data-pane="demo-7"]').count()) === 1))
   await page.context().close()
@@ -852,7 +858,41 @@ try {
   await desk(page, 6).click({ button: 'right' })
   await page.getByRole('menuitem', { name: /Stop their program/ }).click()
   await desk(page, 6).click({ button: 'right' })
-  check('latest-conversation menu hint is readable in full', await page.getByRole('menuitem', { name: /Continue latest/ }).locator('span').evaluate(el => el.scrollHeight <= el.clientHeight))
+  check('latest-conversation menu hint is readable in full', await page.getByRole('menuitem', { name: /Continue latest/ }).locator('.hint').evaluate(el => el.scrollHeight <= el.clientHeight))
+  await page.context().close()
+
+  // ── the smart office: attention, plain clicks and wide screens ──
+  page = await open('demo=crowd&still')
+  await page.keyboard.press('Control+Shift+KeyA')
+  check('Ctrl+Shift+A opens whoever has waited longest', await until(async () => ((await page.locator('.pane h2').first().textContent()) ?? '') === 'Task 13 in infra'))
+  check('and the bar says who else is waiting', ((await page.locator('.bar .attention .more').textContent()) ?? '') === '+1')
+  await page.locator('.pane .term-host').first().click()
+  await page.keyboard.press('Control+Shift+KeyA')
+  check('again, from inside a terminal, the next one', await until(async () => (await page.locator('.pane h2', { hasText: 'Task 5 in mobile' }).count()) === 1))
+  await page.context().close()
+
+  page = await open('demo=crowd&still')
+  await page.locator('.band .queue button', { hasText: 'Task 5 in mobile' }).click()
+  check('an "also waiting" name opens their terminal in one click', await until(async () => (await page.locator('.pane h2', { hasText: 'Task 5 in mobile' }).count()) === 1))
+  await page.context().close()
+
+  page = await open('demo=office&still')
+  await page.getByRole('button', { name: 'Open their terminal' }).click()
+  await until(async () => (await panes(page)) === 1)
+  await desk(page, 2).click()
+  check('a plain click never puts away someone who needs you', await until(async () => (await panes(page)) === 2 && (await page.locator('.pane h2', { hasText: 'Fix the checkout total' }).count()) === 1))
+  await page.context().close()
+
+  page = await open('demo=office&still', 2400, 1000)
+  await desk(page, 2).click()
+  await until(async () => (await panes(page)) === 1)
+  await desk(page, 5).click()
+  check('in a window wide enough for both, a plain click opens a terminal beside the other', await until(async () => (await panes(page)) === 2))
+  await page.context().close()
+
+  page = await open('demo=office&still')
+  await page.getByRole('button', { name: 'New agent', exact: true }).click()
+  check('New agent folds its options into one line until asked', !(await page.locator('#new-model').isVisible()) && (await page.locator('details.options > summary').textContent())?.includes('More options'))
   await page.context().close()
 
   check('nothing went wrong on the page', errors.length === 0, errors.join(' | '))

@@ -57,6 +57,8 @@ try {
   await page.getByRole('button', { name: 'New agent' }).first().click()
   await page.getByRole('radiogroup').getByText('Voice Fake', { exact: true }).click()
   await page.getByRole('textbox', { name: 'Folder' }).fill(data)
+  // The name is folded into More options until asked for.
+  if ((await page.locator('details.options').getAttribute('open')) === null) await page.locator('details.options > summary').click()
   await page.getByLabel(/^Name/).fill('Voice fixture terminal')
   await page.getByRole('button', { name: 'Start agent' }).click()
   await page.locator('.pane').waitFor()

@@ -102,8 +102,9 @@
     </div>
   {/if}
   {#if selected?.description}<p class="hint">{selected.description}</p>{/if}
+  <!-- Said only when there is something to say: models come from the CLI, and Refresh is beside the field. -->
   {#if problem}<p class="catalog-problem" role="status">{problem}</p>
-  {:else}<p class="hint" role="status">{!kind.installed ? 'Model discovery is available after installation. You can enter a model ID now.' : catalog ? 'Models come from your CLI. Refresh to check for new releases.' : 'You can keep your CLI settings or enter a model ID while the catalog loads.'}</p>{/if}
+  {:else if !kind.installed}<p class="hint" role="status">Model discovery is available after installation. You can enter a model ID now.</p>{/if}
 
   <div class="permission">
     <label class="label" for="new-permission">Permissions</label>
@@ -113,7 +114,7 @@
     </select>
     {#if options.permission === 'auto' && selected?.auto_mode === false}
       <p class="catalog-problem">Auto is unavailable for this model. Choose another permission mode.</p>
-    {:else}<p class="hint">{permission?.description ?? 'This saved setting will be passed to your CLI.'}</p>{/if}
+    {:else if options.permission}<p class="hint">{permission?.description ?? 'This saved setting will be passed to your CLI.'}</p>{/if}
   </div>
 
   <details bind:open={advanced}>

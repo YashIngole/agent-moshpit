@@ -25,7 +25,7 @@ OWN-WORLD: The office after hours, in flat vector. Graphite rooms on a faint gri
 
 STORY: You glance over and the room is dark and calm, except one person waving under an amber "?". The same amber runs across the top of the window with their name and one button. You press it, their terminal opens beside the floor, and you answer the program itself; the hand goes down and they type again. Later someone leans back under a green tick, and you open their terminal to see what they did.
 
-FIRST VIEWPORT: 1280 by 800. A 52-pixel bar: the mark and "agent moshpit", a line of counts with their dots, "+ new agent" and a menu at the right. When someone needs you, a full-width amber band under the bar with their face, their name, which program is waiting and where, and "open their terminal". The floor fills the rest: one room per project with its folder name as a sign, desks in columns at least 196 wide, each with its person, a name, a status line with a program tag and a line about what is going on, and a dashed empty desk at the end. Opening a desk puts its terminal to the right of a 420-pixel floor; several open as a grid of panes, and the floor can be dragged down to a strip of names. The New agent form is a 380-pixel panel on the right. Under 760 wide the terminals or the panel take the window.
+FIRST VIEWPORT: 1280 by 800. A 52-pixel bar: the mark and "agent moshpit", counts of only what wants a look (done, in trouble) with their dots, and "+ new agent", the microphone and a menu at the right. When someone needs you, a full-width amber band under the bar with their face, their name, which program is waiting and where, and "open their terminal". The floor fills the rest: one room per project with its folder name as a sign and a + beside it, desks in columns at least 180 wide, each with its person, a name, a status line, and a line only when the agent or its program said something the status does not. Opening a desk puts its terminal to the right of a 420-pixel floor; several open as a grid of panes, and the floor can be dragged down to a strip of names. The New agent form is a 380-pixel panel on the right. Under 760 wide the terminals or the panel take the window.
 
 FORM: The category standard for the floor, named by the owner as "a virtual office like Gather", and BridgeSpace's sidebar of sessions beside a grid of terminals for the rest (kind: canon, the standing exit). Signature interaction: the hand goes up. An agent that needs you raises an arm and waves, an amber tag pops over its desk, its screen turns amber and the band drops in from above in the same colour. Motion grammar: state changes take 180 to 240 ms on an exponential ease-out; people loop in two to four fixed poses on a shared 320 ms beat; a new agent walks in once.
 
@@ -49,13 +49,24 @@ Known and left as they are:
 
 - Button labels are lowercase in the bar, on the band and in Agent programs, and in sentence case in the New agent form, in menus and in notices.
 - The title of the New agent panel is weight 750; the other two panels' titles are 650.
-- The band's first line ("needs you · 48 sec") is a small uppercase line above the name. `DESIGN.md` describes it on the band and does not make it a pattern for other headings.
+
+## The smart office (2026-10-12)
+
+A critique on 2026-10-12 (`.impeccable/critique/2026-10-11T18-49-30Z__src-app-svelte.md`) found the drawings carrying the status and the words around them repeating it. The owner asked for a smarter, calmer office and chose every change offered. Version 0.6.0 is the result:
+
+- A desk's line under its name appears only when it says something new; the time comes before the program tag, and the tag only when more than one program is at work.
+- The empty desk in each room became a + on the room's sign; head counts went.
+- While terminals are open the band is an amber chip in the bar, so terminals never move when a hand goes up. Ctrl+Shift+A, or the chip, goes to whoever needs you, then the next.
+- A plain click never puts away a pane whose agent needs you or is in trouble, and opens beside the others when they are wide enough. Two terminals or more, or a crowd, bring the strip of names by themselves.
+- New agent asks who, what and where, with the folder filled in, and folds name, model and permissions into one line.
+- Menus are one line an item, with keys at the end and hints only where something ends or is kept; settings are tick boxes.
+- The microphone is an icon at rest.
 
 ## Open decisions
 
 From `PRODUCT.md`, where they touch this window:
 
-- What a desk says while its agent is working. Today it says only "Working".
+- What a desk says while its agent is working. Since 0.6.0 it says what the agent reported through the office's MCP tools (`set_activity`), and nothing when it reported nothing.
 - Whether to show sessions the office did not start, and offer to carry them on here.
 
 Carried over from the first version's brief and not looked at again since:

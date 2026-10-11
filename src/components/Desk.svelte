@@ -19,8 +19,13 @@
 
   /** Its terminal is on screen. */
   const open = $derived(office.open.has(agent.id))
-  /** It printed something since you last looked, and is not in front of you now. */
-  const unread = $derived(agent.unread && !open)
+  /**
+   * It printed something since you last looked, and is not in front of you now. Someone at
+   * work prints all the time and someone with a hand up has the hand: the dot is for the rest.
+   */
+  const unread = $derived(agent.unread && !open && !['working', 'starting', 'needs_you'].includes(agent.phase))
+  /** What the status word, the pose and the screen do not already say; often nothing. */
+  const said = $derived(doing(agent))
   const since = $derived(elapsed(office.now - agent.since_ms))
   /**
    * The programs do not say what kind of work they are at, so someone working changes
@@ -77,7 +82,7 @@
     tabindex={home ? 0 : -1}
     aria-label={describe(agent) + (unread ? ' Something new in their terminal.' : '')}
     aria-current={open ? 'true' : undefined}
-    title="Open their terminal. Ctrl and a click: beside the others, or put away again. Right-click for more."
+    title={office.listed ? agent.title : undefined}
     bind:this={button}
     onclick={event => (event.ctrlKey || event.metaKey ? office.toggleBeside(agent.id) : office.show(agent.id))}
     onauxclick={event => {
@@ -102,27 +107,39 @@
       <span class="status">
         <span class="chip"><i class="dot {agent.phase}"></i>{STATUS_WORD[agent.phase]}</span>
         <span class="since">{since}</span>
-        <span class="tag">{agent.harness_tag}</span>
+        {#if office.mixed}<span class="tag" title={agent.harness_name}>{agent.harness_tag}</span>{/if}
       </span>
-      <span class="doing">{doing(agent)}</span>
+      {#if said}<span class="doing">{said}</span>{/if}
     </span>
   </button>
-  <button
-    type="button"
-    class="remove"
-    tabindex="-1"
-    aria-label="Remove {agent.title}"
-    title="Take {agent.title} off the floor and end their program. It can be undone for a moment."
-    onclick={event => askToRemove(agent.id, event.clientX - 260, event.clientY + 8)}
-  >
-    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
-  </button>
+  <!-- In the list beside the terminals a row can be closed like a tab; on the floor the menu, Delete and a middle click do it. -->
+  {#if office.listed}
+    <button
+      type="button"
+      class="remove"
+      tabindex="-1"
+      aria-label="Remove {agent.title}"
+      title="Take {agent.title} off the floor and end their program. It can be undone for a moment."
+      onclick={event => askToRemove(agent.id, event.clientX - 260, event.clientY + 8)}
+    >
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+    </button>
+  {/if}
 </div>
 
 <style>
   .seat {
     position: relative;
     min-width: 0;
+  }
+  /* Every desk is drawn about the same size: a room of one that fills a row keeps its carpet, not a giant. */
+  .seat:not(.listed) {
+    max-width: 236px;
+  }
+  @container floor (max-width: 560px) {
+    .seat:not(.listed) {
+      max-width: none;
+    }
   }
   .desk {
     display: grid;
@@ -203,19 +220,28 @@
     padding: 0 var(--s-1);
     container: plate / inline-size;
   }
-  /* Too narrow for how long, how they are and which program: how long gives way, whole, never cut to "1…". */
+  /*
+   * Too narrow for how they are, how long and which program. On the floor the program
+   * gives way, whole, never cut to "clau…"; in the list beside the terminals, which reads
+   * like a terminal's tabs, how long does.
+   */
   @container plate (max-width: 210px) {
-    .since {
+    .seat:not(.listed) .tag,
+    .listed .since {
       display: none;
     }
   }
+  /* A name is read whole: two lines rather than cut short. */
   .name {
+    display: -webkit-box;
     overflow: hidden;
     font-size: var(--t-md);
     font-weight: 600;
     line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
   /* Something new in their terminal: a small mark in ink, not a status colour. */
   .unread {

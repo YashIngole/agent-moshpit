@@ -58,7 +58,7 @@ Confirmed by the owner:
 What follows from running real CLIs instead of a backend:
 
 - Status is read, not reported. Claude Code says whether it is busy, idle or waiting in a file it keeps about each running session. Every other program is read from how its terminal behaves: printing, quiet, ringing the bell, or sending a completion notice. Silence after work means Quiet, because completion is still unconfirmed, until a full minute of it counts as finished. The office never reads the words on a screen, so a program is free to change them.
-- The office cannot say what an agent is working on, only that it is.
+- The office cannot read what an agent is working on from its screen. An agent can say it through the office's MCP tools (`set_activity`), and the desk, the pane's header and a done notification show what it said.
 - Whether a stopped agent carries on its conversation depends on the program: Claude Code, Codex and Hermes can, the others start afresh.
 - The CLIs are children of the app. Closing the window leaves them running; quitting the app ends them.
 - Only agents started from the office are shown.
@@ -89,7 +89,6 @@ Open decisions:
 
 - Whether to show sessions the office did not start (one typed into another terminal, or one inside a desktop app) and offer to carry them on here. It is in the plan (`docs/plan-cli-office.md`, step 6) and is not built.
 - Whether an agent should outlive the app. Today quitting ends every program.
-- What a desk says while its agent is working. Today it says only "Working".
 - macOS and Linux: built and checked by CI since 2026-10-09, not yet used by hand.
 
 ## Brand Commitments
@@ -105,7 +104,7 @@ As built, the office is drawn after hours: dark graphite rooms, people at desks 
 - `spikes/cli-office/pty-proof/`: the proof program and its result from 2026-10-08.
 - `docs/plan-cli-office.md` and `docs/mockups/`: the plan for the CLI office and the mockups drawn for it before it was built. They are not pictures of the built app, and the plan differs from what was built in places.
 - `docs/reviews/ux-sweep-2026-10-08.md` and `docs/reviews/ux-sweep-2026-10-09.md`, with their screenshots: two walks through the built app, flow by flow, each ending with what was changed and what was not checked.
-- `docs/office.png`, `docs/terminals.png`, `docs/strip.png` and `docs/new-agent.png`: the built window showing its demo data, taken on 2026-10-09 for the README.
+- `docs/office.png`, `docs/terminals.png`, `docs/strip.png` and `docs/new-agent.png`: the built window showing its demo data, taken on 2026-10-09 for the README and taken again on 2026-10-12 for 0.6.0.
 - `docs/first-real-terminals.png`: the first real Claude Code and Codex in panes, in an earlier, light look.
 - `DESIGN.md`: the look as built, rewritten on 2026-10-09 from `src/styles/tokens.css` and the components. `.impeccable/design.json` is made from it by `tools/make-design-json.mjs`.
 - From the first version, kept for the record and no longer describing the app: `docs/reviews/codebase-review-2026-10-06.md`, and the pictures `docs/office-day.png`, `docs/office-night.png`, `docs/room.png` and `docs/models.png`.

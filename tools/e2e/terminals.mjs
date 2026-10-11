@@ -119,6 +119,9 @@ try {
     await page.getByRole('radiogroup').getByText(program).click()
     if (task) await page.getByLabel(/What should they do/).fill(task)
     await page.getByRole('textbox', { name: 'Folder' }).fill(folder)
+    // The name is folded into More options until asked for.
+    const options = page.locator('details.options')
+    if ((await options.getAttribute('open')) === null) await options.locator('> summary').click()
     await page.getByLabel(/^Name/).fill(name)
     await page.getByRole('button', { name: 'Start agent' }).click()
   }
@@ -142,7 +145,8 @@ try {
   check('their terminal opens in the window', await until(async () => (await page.locator('.pane').count()) === 1))
   check('the program runs in it, in the folder chosen', await shows('First', `FAKE AGENT READY in ${work}`), await screen('First').catch(e => String(e)))
   check('the task reached it whole, as one word', await shows('First', 'TASK: say hello & goodbye'))
-  check('they have a desk on the floor, tagged with their program', (await desk('First').locator('.tag').textContent()) === 'Fake')
+  // One program in the office: a tag saying which would tell nobody anything, so the desk has none, and still names it aloud.
+  check('they have a desk on the floor, which names their program without a tag while it is the only one', (await desk('First').locator('.tag').count()) === 0 && ((await desk('First').getAttribute('aria-label')) ?? '').includes('Fake'))
   check('while it prints, they are working', await until(async () => (await state('First')).includes('working'), 4000))
   // Release the fixture only after observing its working state, so a busy
   // machine cannot finish the short turn before the assertion gets to read it.
@@ -165,7 +169,7 @@ try {
   check('the program knows the size of its pane', size !== null && Number(size[1]) > 40 && Number(size[2]) > 10, size?.[0])
   await type('First', 'ask')
   check('a bell from the program raises a hand', await until(async () => (await state('First')).includes('needs_you'), 6000))
-  check('the waiting band stays visible even with their terminal open', (await page.locator('.band').count()) === 1)
+  check('the waiting cue stays visible even with their terminal open, as a chip in the bar', (await page.locator('.bar .attention').count()) === 1)
   // Going back to the floor is not an answer: the pane losing focus must not lower the hand.
   await page.keyboard.press('Control+Backquote')
   await sleep(2500)
@@ -202,8 +206,10 @@ try {
   // ── a second agent; panes split, close and come back ─────────────────────
   await page.getByRole('button', { name: 'New agent' }).first().click()
   await page.getByRole('radiogroup').getByText('Fake Agent').click()
-  // The folder used a moment ago is offered as a button.
-  await page.getByRole('group', { name: 'Folders used before' }).getByRole('button').first().click()
+  // The folder of the terminal in use is filled in already.
+  check('New agent fills in the folder of the terminal in use', (await page.getByRole('textbox', { name: 'Folder' }).inputValue()) === work, await page.getByRole('textbox', { name: 'Folder' }).inputValue())
+  // The name is folded into More options until asked for.
+  if ((await page.locator('details.options').getAttribute('open')) === null) await page.locator('details.options > summary').click()
   await page.getByLabel(/^Name/).fill('Second')
   await page.getByRole('button', { name: 'Start agent' }).click()
   check('a second agent gets a pane beside the first', await until(async () => (await page.locator('.pane').count()) === 2))

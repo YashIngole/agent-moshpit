@@ -71,7 +71,7 @@
     if (voiceKey(event, voice.settings)) return true
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     if (ctrl && code === 'Backquote') return true
-    if (ctrl && shift && ['BracketLeft', 'BracketRight', 'KeyW', 'KeyN', 'KeyQ', 'KeyF', 'Enter', 'Slash'].includes(code)) return true
+    if (ctrl && shift && ['BracketLeft', 'BracketRight', 'KeyA', 'KeyW', 'KeyN', 'KeyQ', 'KeyF', 'Enter', 'Slash'].includes(code)) return true
     if (ctrl && !shift && !alt && ['Equal', 'Minus', 'Digit0', 'NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(code)) return true
     if (alt && !ctrl && !shift && /^Digit[1-9]$/.test(code)) return true
     return false

@@ -6,6 +6,7 @@ import { bridge } from './bridge'
 import { groupProjects } from './projects'
 import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
 import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
+import { mixed as manyPrograms } from './words'
 
 /** The side panel, when there is one. Terminals are not a panel: they are the room. */
 export type Panel = { kind: 'new'; cwd: string; harness: string; launch?: LaunchOptions } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | null
@@ -26,8 +27,10 @@ export interface NewAgentDraft {
 /** One choice in a small menu. */
 export interface MenuItem {
   label: string
-  /** A second line saying what it does. */
+  /** A second line, for what it does when that is not plain from its name: what is kept, what ends. */
   hint?: string
+  /** The key that does the same, written at the end of its line. */
+  keys?: string
   run: () => void
   /** Ends something: drawn in the trouble colour. */
   danger?: boolean
@@ -65,6 +68,10 @@ const HINTS_KEY = 'moshpit.hints'
 export const FLOOR_WIDTH = { least: 200, strip: 264, usual: 420, terminals: 420 }
 /** Below this the floor beside the terminals is a list of names rather than a room of desks. */
 export const LIST_BELOW = 300
+/** More agents than this, and the floor draws them smaller, so a crowd fits on a screen or two. */
+export const CROWD = 10
+/** A terminal this wide holds a CLI's usual 80 columns and more: a plain click opens one beside another when both get this. */
+const ROOMY_PANE = 720
 /** The terminals' text size, in pixels. */
 export const FONT_SIZE = { least: 9, usual: 13, most: 24 }
 /** How long a removed desk can be brought back. */
@@ -213,6 +220,8 @@ class Office {
   // Closing a panel must not throw away what was being typed in it: a stray Escape
   // is easy. Half-written work is kept here until it is started or the window closes.
   newDraft: NewAgentDraft = { ...NO_DRAFT, worktree: REMEMBERED.worktree }
+  /** More options in the New agent form, once unfolded, stays so while the window is open. */
+  newOptionsOpen = $state(false)
 
   clearNewDraft() {
     // Which program, and whether to work on a copy, are kept for the next agent: people start several alike.
@@ -249,6 +258,17 @@ class Office {
   })
   /** Agents with a hand up, longest wait first. */
   waiting = $derived(this.agents.filter(a => a.phase === 'needs_you').sort((a, b) => a.since_ms - b.since_ms))
+  /** Whether more than one program is at work here; a tag naming the program only helps when it is. */
+  mixed = $derived(manyPrograms(this.agents))
+  /**
+   * Where a new agent most likely works: beside the terminal in use, else where the
+   * last one was started, else the room with the most people in it.
+   */
+  get likelyFolder(): string {
+    const focused = this.terminals ? this.agents.find(a => a.id === this.focused)?.cwd : ''
+    const busiest = [...this.rooms].sort((a, b) => b.agents.length - a.agents.length)[0]?.agents[0]?.cwd
+    return focused || this.#remembered[0] || busiest || ''
+  }
   /** One room per project, in the order the core sends them. */
   rooms = $derived(groupProjects(this.agents))
   /** Whether any terminal is on screen. */
@@ -451,11 +471,12 @@ class Office {
     // Back from the floor: the terminals that were open come back, with this one among them.
     if (layout.rows.length === 0 && this.stowed.rows.length > 0) layout = this.stowed
     if (!has(layout, id)) {
-      const from = has(layout, this.focused) ? this.focused : (ids(layout).at(-1) ?? '')
-      if (beside || !from) layout = open(layout, id, from || undefined)
+      const near = has(layout, this.focused) ? this.focused : (ids(layout).at(-1) ?? '')
+      const from = beside || !near || this.#roomBeside(layout) ? '' : this.#makesRoom(layout, near)
+      if (!from) layout = open(layout, id, near || undefined)
       else {
-        // A grid someone built: one of its panes making room is said, with a way back.
-        if (ids(layout).length > 1) this.#sayMadeRoom(from, id, layout)
+        // A grid someone built, or a pane other than the one in use: which made room is said, with a way back.
+        if (ids(layout).length > 1 || from !== near) this.#sayMadeRoom(from, id, layout)
         layout = swap(layout, from, id)
       }
     }
@@ -464,9 +485,33 @@ class Office {
     this.#lay(layout)
   }
 
+  /**
+   * The pane a plain click puts away to show another: the one in use, unless its agent
+   * needs you or is in trouble, then the calmest other one. None when every pane is
+   * someone who needs you: the new one opens beside them instead.
+   */
+  #makesRoom(layout: Layout, near: string): string {
+    const urgent = (id: string) => {
+      const phase = this.agents.find(a => a.id === id)?.phase
+      return phase === 'needs_you' || phase === 'failed'
+    }
+    if (!urgent(near)) return near
+    const calm = ids(layout).filter(id => !urgent(id))
+    return calm.at(-1) ?? ''
+  }
+
+  /** Whether the terminals are wide enough for one more beside them, each still a usual terminal's width. */
+  #roomBeside(layout: Layout): boolean {
+    if (layout.rows.length !== 1 || this.zoomed) return false
+    const width = window.innerWidth - (window.innerWidth <= 760 ? 0 : Math.min(this.floorWidth, window.innerWidth - 420))
+    return width / (layout.rows[0]!.panes.length + 1) >= ROOMY_PANE
+  }
+
   #sayMadeRoom(from: string, to: string, before: Layout) {
     const name = (id: string) => this.agents.find(a => a.id === id)?.title ?? 'A terminal'
-    this.say(`${name(from)} made room for ${name(to)}. Ctrl and a click opens one beside the others.`, {
+    // How to keep both is said the first time only.
+    const lesson = this.#once('beside') ? ' Ctrl and a click opens one beside the others.' : ''
+    this.say(`${name(from)} made room for ${name(to)}.${lesson}`, {
       label: 'Undo',
       run: () => {
         if (!this.agents.some(a => a.id === from)) return
@@ -572,9 +617,15 @@ class Office {
     if (keep) { this.#floorChosen = true; this.keepView() }
   }
 
+  /**
+   * Until a width has been chosen, the floor beside the terminals is the strip of names
+   * whenever the terminals need the room: two or more of them, a crowd, or a window
+   * too small for desks and a terminal both.
+   */
   #adaptFloor() {
     if (this.#floorChosen) return
-    this.floorWidth = ids(this.layout).length > 1 && window.innerWidth < 1180 ? FLOOR_WIDTH.strip : FLOOR_WIDTH.usual
+    const strip = ids(this.layout).length > 1 || this.agents.length > CROWD || window.innerWidth < 1180
+    this.floorWidth = strip ? FLOOR_WIDTH.strip : FLOOR_WIDTH.usual
   }
 
   toggleCompactFloor() {
@@ -848,6 +899,22 @@ class Office {
     bridge.rename(id, title.trim())
   }
 
+  /**
+   * Whoever needs you, in their terminal, beside whatever is open: the one who has waited
+   * longest and is not already in front of you. Asked again, the next one; then round.
+   */
+  nextWaiting() {
+    const waiting = this.waiting
+    if (waiting.length === 0) {
+      this.say('Nobody needs you right now.')
+      return
+    }
+    const here = this.terminals && this.open.has(this.focused) ? this.focused : ''
+    const at = waiting.findIndex(a => a.id === here)
+    const next = waiting.find((a, i) => i > at && a.id !== here) ?? waiting.find(a => a.id !== here) ?? waiting[0]!
+    this.#openBeside(next.id)
+  }
+
   /** Bring the next desk in one of these states into view, and give it the keyboard. */
   findPhase(phases: Phase[]) {
     const desks = [...document.querySelectorAll<HTMLElement>('.floor button[data-desk]')].filter(desk => {
@@ -880,14 +947,19 @@ class Office {
 
   /** A hint said once, the first time it applies, and never again. */
   hint(key: string, text: string) {
-    if (this.#hints.has(key)) return
+    if (this.#once(key)) this.say(text, undefined, 9000)
+  }
+
+  /** True the first time it is asked about a key, and never again. */
+  #once(key: string): boolean {
+    if (this.#hints.has(key)) return false
     this.#hints.add(key)
     try {
       localStorage.setItem(HINTS_KEY, JSON.stringify([...this.#hints]))
     } catch {
       // No storage: the hint may be said again next time.
     }
-    this.say(text, undefined, 9000)
+    return true
   }
 
   openMenu(menu: Menu) {

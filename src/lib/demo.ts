@@ -60,20 +60,20 @@ function agent(n: number, title: string, harness: string, repo: string, branch: 
     resumable: harness !== 'gemini',
     resume_scope: harness === 'gemini' ? 'none' : harness === 'antigravity' ? 'folder' : harness === 'hermes' ? 'latest' : 'desk',
     resume_note: '',
-    // Busy and out of sight: something new in their terminal.
-    unread: phase === 'working' && n % 2 === 1
+    // Out of sight since it printed: something new in their terminal. On a desk at work it is not drawn.
+    unread: (phase === 'working' && n % 2 === 1) || (phase === 'done' && n % 2 === 0)
   }
 }
 
 function scene(name: string): Agent[] {
   const office = [
     agent(1, 'Fix the checkout total', 'claude', 'shop', 'fix/checkout-total', 'needs_you', 48_000, 'Waiting for your answer in the terminal'),
-    agent(2, 'Refactor auth middleware', 'codex', 'shop', 'refactor/auth', 'working', 12 * MIN),
+    agent(2, 'Refactor auth middleware', 'codex', 'shop', 'refactor/auth', 'working', 12 * MIN, 'Moving the session check into middleware'),
     agent(3, 'Flaky test hunt', 'claude', 'shop', 'main', 'asleep', 26 * 60 * MIN),
-    agent(4, 'Type the orders API', 'codex', 'api', 'types/orders', 'done', 3 * MIN),
+    agent(4, 'Type the orders API', 'codex', 'api', 'types/orders', 'done', 3 * MIN, 'Typed the orders routes; 14 tests pass'),
     agent(5, 'Docs pass for the API', 'antigravity', 'api', 'main', 'working', 9 * MIN),
     agent(6, 'Bump dependencies', 'hermes', 'api', 'main', 'idle', 4 * MIN),
-    agent(7, 'Seed the staging data', 'claude', 'infra', 'main', 'failed', 2 * MIN, 'It stopped with an error as soon as it started. Open the desk to see what it said.')
+    agent(7, 'Seed the staging data', 'claude', 'infra', 'main', 'failed', 2 * MIN, 'It stopped with an error as soon as it started.')
   ]
   if (name === 'empty') return []
   if (name === 'calm') return office.slice(1, 4).map(a => (a.phase === 'done' ? { ...a, phase: 'idle' as Phase } : a))

@@ -1,17 +1,13 @@
 <script lang="ts">
   // The office floor: one room per project, a desk per agent.
-  import { office } from '../lib/office.svelte'
+  import { CROWD, office } from '../lib/office.svelte'
   import Desk from './Desk.svelte'
   import SpareDesk from './SpareDesk.svelte'
 
   import type { Phase } from '../lib/types'
 
   const spareKey = (repo: string) => `spare:${repo}`
-  /** More agents than this, and the floor draws them smaller, so a crowd fits on a screen or two. */
-  const CROWD = 10
   const dense = $derived(!office.terminals && office.agents.length > CROWD)
-  /** A room's empty desk to add someone at. The list and a crowd have a + in the room's sign instead. */
-  const spares = $derived(!office.listed && !dense)
 
   /**
    * In the strip beside the terminals, whoever wants a look is gathered above the rooms,
@@ -30,7 +26,7 @@
   // The floor is one stop for the Tab key, like a grid of icons: Tab lands on one desk and
   // the arrow keys walk to the rest. That desk is the last one visited, else the first.
   const home = $derived.by(() => {
-    const keys = [...waiting.map(a => a.id), ...rooms.flatMap(room => [...room.agents.map(a => a.id), ...(spares ? [spareKey(room.key)] : [])])]
+    const keys = [...waiting.map(a => a.id), ...rooms.flatMap(room => room.agents.map(a => a.id))]
     return keys.includes(office.homeDesk) ? office.homeDesk : (keys[0] ?? spareKey(''))
   })
 
@@ -95,11 +91,9 @@
         <div class="words">
           <p class="lead">Nobody is in yet.</p>
           <p>
-            Give an agent a folder and a task, and they get a desk here with their own terminal: Claude Code, Codex, or
-            whichever you use. They put a hand up when they need you, and lean back when they are done.
+            Give an agent a folder and a task. They get a desk here and their own Claude Code, Codex or other CLI in a
+            terminal beside the floor, and they put a hand up when they need you.
           </p>
-          <p>Click a desk for their terminal. Hold Ctrl as you click to open another beside it, as many as you like.</p>
-          <button type="button" class="button" onclick={() => office.openNew()}>+ new agent <kbd>n</kbd></button>
         </div>
       </div>
     </section>
@@ -108,7 +102,6 @@
       <section class="room waiting" aria-label="Waiting for you, {count(waiting.length)}">
         <header class="sign">
           <h2>waiting</h2>
-          <span>{count(waiting.length)}</span>
         </header>
         <div class="desks">
           {#each waiting as agent (agent.id)}
@@ -118,30 +111,18 @@
       </section>
     {/if}
     {#each rooms as room (room.key)}
-      <section
-        class="room"
-        aria-label="{room.label}, {count(room.agents.length)}"
-        style:--desks={Math.min(room.agents.length + (spares ? 1 : 0), 5)}
-      >
+      <!-- A room's sign is its folder; the + beside it seats someone else there. -->
+      <section class="room" aria-label="{room.label}, {count(room.agents.length)}" style:--desks={Math.min(room.agents.length, 5)}>
         <header class="sign">
           <h2 title={room.key}>{room.label}<span class="slash">/</span></h2>
-          <span>{count(room.agents.length)}</span>
-          {#if !spares}
-            <button type="button" class="add" aria-label="Add an agent in {room.label}" title="Add an agent in {room.label}" onclick={() => office.openNew(room.agents[0]?.cwd ?? '')}>+</button>
-          {/if}
+          <button type="button" class="add" aria-label="Add an agent in {room.label}" title="Add an agent in {room.label}" onclick={() => office.openNew(room.agents[0]?.cwd ?? '')}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
+          </button>
         </header>
         <div class="desks">
           {#each room.agents as agent (agent.id)}
             <Desk {agent} home={home === agent.id} />
           {/each}
-          {#if spares}
-            <SpareDesk
-              label="Add an agent"
-              key={spareKey(room.key)}
-              home={home === spareKey(room.key)}
-              onchoose={() => office.openNew(room.agents[0]?.cwd ?? '')}
-            />
-          {/if}
         </div>
       </section>
     {/each}
@@ -165,8 +146,9 @@
   }
 
   /* A room: a graphite floor on a faint grid, edged by one line. */
+  /* A room asks for the width of its desks, so two rooms of three share a row in a 1240-pixel window. */
   .room {
-    flex: 1 1 calc(var(--desks, 2) * 204px + 2 * var(--s-4));
+    flex: 1 1 calc(var(--desks, 2) * 176px + (var(--desks, 2) - 1) * var(--s-3) + 30px);
     min-width: 0;
     max-width: 100%;
     padding: var(--s-3) 14px 14px;
@@ -179,7 +161,7 @@
   }
   .sign {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--s-3);
     margin-bottom: 6px;
     padding: 0 6px;
@@ -198,8 +180,9 @@
   }
   .add {
     display: grid;
-    width: 22px;
-    height: 22px;
+    flex: none;
+    width: 24px;
+    height: 24px;
     margin-left: auto;
     padding: 0;
     place-items: center;
@@ -212,19 +195,22 @@
     line-height: 1;
   }
   .add:hover {
+    border-color: var(--field-line);
     background: var(--inset);
     color: var(--ink);
   }
-  .sign span:not(.slash) {
-    flex: none;
-    font-family: var(--mono);
-    font-size: var(--t-xs);
-    color: var(--ink-3);
+  .add svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
   }
 
   .desks {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
     gap: 6px var(--s-3);
   }
 

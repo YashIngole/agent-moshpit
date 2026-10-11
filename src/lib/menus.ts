@@ -1,5 +1,6 @@
 // What the small menus offer: a desk's (on the floor, in the strip, on its pane's
 // header) and a terminal's (a right-click in it).
+import { tick } from 'svelte'
 import { bridge } from './bridge'
 import { office, type MenuItem } from './office.svelte'
 import { terms } from './terms'
@@ -10,12 +11,12 @@ import { resumeAction, resumeHint } from './words'
 export function deskItems(agent: Agent): MenuItem[] {
   const items: MenuItem[] = []
   const shown = office.open.has(agent.id)
-  if (!shown) items.push({ label: 'Open their terminal', hint: 'Enter, or a click', run: () => office.show(agent.id) })
+  if (!shown) items.push({ label: 'Open their terminal', keys: 'Enter', run: () => office.show(agent.id) })
   if (!shown && (office.terminals || office.stowed.rows.length > 0)) {
-    items.push({ label: 'Open beside the others', hint: 'Ctrl+Enter, or Ctrl and a click', run: () => office.show(agent.id, true) })
+    items.push({ label: 'Open beside the others', keys: 'Ctrl+Enter', run: () => office.show(agent.id, true) })
   }
-  items.push({ label: 'Start another like this', hint: `${agent.harness_name} in ${agent.repo || agent.cwd}, with a task of its own`, run: () => office.openNew(agent.cwd, agent.harness, agent.launch) })
-  items.push({ label: 'Rename', hint: 'F2', run: () => office.startRename(agent.id) })
+  items.push({ label: 'Rename', keys: 'F2', run: () => office.startRename(agent.id) })
+  items.push({ label: 'Start another like this', run: () => office.openNew(agent.cwd, agent.harness, agent.launch) })
   if (agent.running) {
     // A right-click away from Paste: someone in the middle of something is asked about first.
     const busy = office.busy(agent.id) ? `${agent.title} is ${agent.phase === 'needs_you' ? 'waiting for you' : agent.phase === 'starting' ? 'starting' : agent.phase === 'quiet' ? 'quiet and may still be working' : 'working'}.` : ''
@@ -43,12 +44,11 @@ export function deskItems(agent: Agent): MenuItem[] {
   }
   if (office.editor) {
     const editor = office.editor.name
-    items.push({ label: `Open the folder in ${editor}`, hint: agent.cwd, divided: true, run: () => office.openFolder(agent.id) })
+    items.push({ label: `Open the folder in ${editor}`, divided: true, run: () => office.openFolder(agent.id) })
   }
   items.push({
     label: 'Show their folder',
     divided: !office.editor,
-    hint: agent.cwd,
     run: () => void bridge.showFolder(agent.id).catch(error => (office.problem = typeof error === 'string' ? error : 'That folder could not be shown.'))
   })
   items.push({
@@ -61,7 +61,8 @@ export function deskItems(agent: Agent): MenuItem[] {
   })
   items.push({
     label: 'Remove this desk',
-    hint: 'Ends their program; Undo for a moment. Delete',
+    hint: 'Ends their program. Undo brings it back for a moment.',
+    keys: 'Delete',
     danger: true,
     divided: true,
     // Someone in the middle of something is asked about first; anyone else can be brought back for a moment.
@@ -95,10 +96,10 @@ export function termItems(id: string): MenuItem[] {
   const term = terms.get(id)
   if (!term) return []
   const items: MenuItem[] = []
-  if (term.hasSelection()) items.push({ label: 'Copy', hint: 'Ctrl+C', run: () => void term.copy() })
+  if (term.hasSelection()) items.push({ label: 'Copy', keys: 'Ctrl+C', run: () => void term.copy() })
   items.push({
     label: 'Paste',
-    hint: 'Ctrl+V',
+    keys: 'Ctrl+V',
     run: () =>
       void term.pasteClipboard().then(
         () => term.focus(),
@@ -109,13 +110,13 @@ export function termItems(id: string): MenuItem[] {
       )
   })
   items.push({ label: 'Select all', run: () => term.selectAll() })
-  items.push({ label: 'Find…', hint: 'Ctrl+Shift+F', run: () => (office.finding = id) })
+  items.push({ label: 'Find…', keys: 'Ctrl+Shift+F', run: () => (office.finding = id) })
   items.push({ label: 'Clear the scrollback', hint: 'The program’s own screen stays', run: () => term.clear() })
+  // The desk's own menu is one step away, rather than all of it again under the terminal's.
   const agent = office.agents.find(a => a.id === id)
   if (agent) {
-    const desk = deskItems(agent).filter(item => item.label !== 'Open their terminal')
-    desk[0] = { ...desk[0]!, divided: true }
-    items.push(...desk)
+    const at = office.placeOf(id)
+    items.push({ label: `More for ${agent.title}…`, divided: true, run: () => void tick().then(() => openDeskMenu(id, at.x, at.y)) })
   }
   return items
 }

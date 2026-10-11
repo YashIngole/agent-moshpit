@@ -6,7 +6,7 @@
 
 Run multiple Claude Code, Codex and other coding agents side by side in one desktop window. Each is the real command-line program in its own terminal, drawn as a person at a desk. One look tells you who is working, who is done, and which agent is waiting for you.
 
-![The Agent Moshpit window: agents at their desks on the left, three of their terminals in a grid beside them, and an amber band across the top naming the agent who needs you](docs/terminals.png)
+![The Agent Moshpit window: agents at their desks on the left, three of their terminals in a grid beside them, and an amber chip in the bar naming the agent who needs you](docs/terminals.png)
 
 **[Download](https://agentmoshpit.com)** · [Guide](docs/guide.md) · [Parallel-agent guides](https://agentmoshpit.com/guides/) · [Release notes](https://github.com/YashIngole/agent-moshpit/releases)
 
@@ -45,7 +45,7 @@ You also need at least one agent CLI, installed and signed in the way its makers
 
 1. Press **+ new agent** (or `n`), pick a program and a folder, and give it a task if you like. For Claude and Codex, choose a model, effort and permissions, or inherit your CLI settings. The model picker reads the CLI's catalog; **Refresh** finds new releases.
 2. The agent takes a desk and its terminal opens beside the floor. Type to it as you would in any terminal.
-3. Hold `Ctrl` and click another desk to open it beside the first. `Ctrl` + `` ` `` goes back to the floor.
+3. Hold `Ctrl` and click another desk to open it beside the first. `Ctrl` + `` ` `` hides the terminals, and `Ctrl+Shift+A` goes to whoever needs you.
 4. When a hand goes up, press **open their terminal** on the amber band and answer the question.
 
 The [guide](docs/guide.md) covers the rest: the floor, terminals, the desk menu, notifications and every key.

@@ -2,39 +2,40 @@
   // The amber band: whoever has a hand up, and the way to their terminal.
   // The question itself is on their screen, so the band only points at it.
   // It stays until the program confirms that the question has been answered.
+  // While terminals are open the bar carries it as a chip instead (TopBar), so they
+  // never move under the keyboard when a hand goes up.
   import { office } from '../lib/office.svelte'
   import { elapsed } from '../lib/time'
-  import { place } from '../lib/words'
+  import { doing, place } from '../lib/words'
   import Person from './Person.svelte'
 
-  let chosen = $state<string | null>(null)
-
-  const waiting = $derived(office.waiting)
-  // The one picked here, else whoever has waited longest.
-  const current = $derived(waiting.find(a => a.id === chosen) ?? waiting[0])
-  const others = $derived(waiting.filter(a => a.id !== current?.id))
+  const waiting = $derived(office.terminals ? [] : office.waiting)
+  // Whoever has waited longest.
+  const current = $derived(waiting[0])
+  const others = $derived(waiting.slice(1))
   const waited = $derived(current ? elapsed(office.now - current.since_ms) : '')
+  /** What they asked, when the program said; nothing when it only said that it is waiting. */
+  const asked = $derived(current ? doing(current) : '')
+  const open = (id: string) => office.show(id, office.terminals || office.stowed.rows.length > 0)
 </script>
 
 {#if current}
   <section class="band" aria-label="Needs you">
     <span class="face"><Person look={current.look} phase="needs_you" portrait /></span>
     <div class="who">
-      <p class="kicker">needs you · {waited}</p>
       <h2 title={current.title}>{current.title}</h2>
+      <p class="meta">
+        <strong>needs you</strong> · {waited} · {current.harness_tag.toLowerCase()}{#if place(current)}<span class="where">{` · ${place(current)}`}</span>{/if}
+      </p>
     </div>
-    <p class="what">
-      <code>{current.harness_tag.toLowerCase()}</code>
-      {current.activity && current.activity !== 'Waiting for your answer in the terminal' ? current.activity : 'is waiting for your answer'}
-      {#if place(current)}<span class="where">in {place(current)}</span>{/if}
-    </p>
+    <p class="what" title={asked}>{asked}</p>
     <!-- Beside the terminals that are open, so nobody else's is taken from under them. -->
-    <button type="button" class="answer" onclick={() => office.show(current.id, office.terminals || office.stowed.rows.length > 0)}>Open their terminal</button>
+    <button type="button" class="answer" title="Open their terminal (Ctrl+Shift+A)" onclick={() => open(current.id)}>Open their terminal</button>
     {#if others.length > 0}
       <div class="queue">
         <span>also waiting</span>
         {#each others as agent (agent.id)}
-          <button type="button" title={agent.title} onclick={() => (chosen = agent.id)}>{agent.title}</button>
+          <button type="button" title="Open {agent.title}'s terminal" onclick={() => open(agent.id)}>{agent.title}</button>
         {/each}
       </div>
     {/if}
@@ -71,15 +72,7 @@
     display: grid;
     gap: 2px;
     min-width: 0;
-    max-width: 34ch;
-  }
-  .kicker {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    opacity: 0.75;
+    max-width: 52ch;
   }
   h2 {
     overflow: hidden;
@@ -89,26 +82,27 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .meta {
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: var(--t-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meta strong {
+    font-weight: 600;
+  }
+  .where {
+    opacity: 0.75;
+  }
+  /* What they asked, when the program said it. */
   .what {
-    flex: 1 1 260px;
+    flex: 1 1 200px;
     min-width: 0;
     overflow: hidden;
     font-size: var(--t-md);
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .what code {
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(20, 14, 0, 0.12);
-    font-family: var(--mono);
-    font-size: var(--t-sm);
-  }
-  .where {
-    margin-left: 6px;
-    font-family: var(--mono);
-    font-size: var(--t-xs);
-    opacity: 0.7;
   }
   .answer {
     flex: none;

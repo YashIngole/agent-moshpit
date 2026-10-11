@@ -114,9 +114,9 @@
   {:else}
     {#each menu.items as item (item.label)}
       {#if item.divided}<hr />{/if}
-      <button type="button" role="menuitem" class:danger={item.danger} onclick={() => choose(item)}>
-        {item.label}
-        {#if item.hint}<span>{item.hint}</span>{/if}
+      <button type="button" role="menuitem" class:danger={item.danger} aria-keyshortcuts={item.keys} onclick={() => choose(item)}>
+        <span class="line">{item.label}{#if item.keys}<kbd>{item.keys}</kbd>{/if}</span>
+        {#if item.hint}<span class="hint">{item.hint}</span>{/if}
       </button>
     {/each}
   {/if}
@@ -150,6 +150,7 @@
   }
   button[role='menuitem'] {
     display: grid;
+    gap: 1px;
     padding: 6px var(--s-3);
     border: 0;
     border-radius: var(--r-1);
@@ -166,8 +167,24 @@
     outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
+  /* The name, and the key that does the same at the end of the line, as menus everywhere write it. */
+  .line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+  }
+  .line kbd {
+    flex: none;
+    padding: 0;
+    border: 0;
+    font-size: var(--t-xs);
+    font-weight: 400;
+    color: var(--ink-3);
+    opacity: 1;
+  }
   /* Read hints whole; long paths wrap and the sheet scrolls within the window. */
-  button[role='menuitem'] span {
+  .hint {
     font-size: var(--t-xs);
     font-weight: 400;
     line-height: 1.35;

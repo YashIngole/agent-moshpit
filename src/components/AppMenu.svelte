@@ -84,90 +84,48 @@
           }}
         >
           Update to {office.newer.version}
-          <span>{office.updating ? 'On its way' : `You have ${version}. The office starts again; agents carry on where their programs can`}</span>
+          <span>{office.updating ? 'On its way' : `You have ${version}. The office restarts; agents carry on`}</span>
         </button>
+        <hr />
       {/if}
-      <button
-        type="button"
-        role="menuitem" tabindex="-1"
-        onclick={() => {
-          close(true)
-          office.openPrograms()
-        }}
-      >
+      <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openPrograms() }}>
         Agent programs
-        <span>{office.outdated.length > 0 ? `${office.outdated.length} update${office.outdated.length === 1 ? '' : 's'} out: ${office.outdated.map(h => h.name).join(', ')}` : 'Install, update, see versions'}</span>
+        {#if office.outdated.length > 0}<span>{`${office.outdated.length} update${office.outdated.length === 1 ? '' : 's'} out: ${office.outdated.map(h => h.name).join(', ')}`}</span>{/if}
       </button>
-      <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openVoice() }}>
-        Voice input
-        <span>Local dictation, model downloads and language</span>
-      </button>
+      <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openVoice() }}>Voice input</button>
       {#if office.healthProblem}
-        <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.showHealthProblem() }}>Configuration warning<span>Open the file or dismiss the warning</span></button>
+        <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.showHealthProblem() }}>Configuration warning</button>
       {/if}
       {#if panes > 0}
-        <button type="button" role="menuitemcheckbox" tabindex="-1" aria-checked={office.listed} onclick={() => { close(true); office.toggleCompactFloor() }}>Compact floor<span>{office.listed ? 'Use the larger desks' : 'Give terminals more room'}</span></button>
-      {/if}
-      {#if panes > 1}
-        <button
-          type="button"
-          role="menuitem" tabindex="-1"
-          onclick={() => {
-            close(true)
-            office.evenOut()
-          }}
-        >
-          Make the terminals even
-          <span>{panes} open, each an equal share</span>
+        <hr />
+        <button type="button" role="menuitemcheckbox" tabindex="-1" aria-checked={office.listed} onclick={() => { close(true); office.toggleCompactFloor() }}>
+          <span class="line">Compact floor<i class="tick" aria-hidden="true"></i></span>
         </button>
       {/if}
-      <button
-        type="button"
-        role="menuitemcheckbox" tabindex="-1"
-        aria-checked={office.copyOnSelect}
-        onclick={() => {
-          close(true)
-          office.setCopyOnSelect(!office.copyOnSelect)
-        }}
-      >
-        Copy on select
-        <span>{office.copyOnSelect ? 'On · selecting text in a terminal copies it' : 'Off · Ctrl+C copies what is selected'}</span>
+      {#if panes > 1}
+        <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.evenOut() }}>Make the terminals even</button>
+      {/if}
+      <hr />
+      <button type="button" role="menuitemcheckbox" tabindex="-1" aria-checked={office.copyOnSelect} onclick={() => { close(true); office.setCopyOnSelect(!office.copyOnSelect) }}>
+        <span class="line">Copy on select<i class="tick" aria-hidden="true"></i></span>
       </button>
       <button
         type="button"
         role="menuitemcheckbox" tabindex="-1"
         aria-checked={office.closeQuits}
-        onclick={() => {
-          close(true)
-          office.setCloseQuits(!office.closeQuits)
-        }}
+        title={office.closeQuits ? 'Closing the window ends the agents, asking first if anyone is busy' : 'Closing the window leaves the office watching from the tray'}
+        onclick={() => { close(true); office.setCloseQuits(!office.closeQuits) }}
       >
-        Closing the window quits
-        <span>{office.closeQuits ? 'On · asking first if anyone is busy' : 'Off · the office keeps watching from the tray'}</span>
+        <span class="line">Closing the window quits<i class="tick" aria-hidden="true"></i></span>
       </button>
-      <button
-        type="button"
-        role="menuitem" tabindex="-1"
-        onclick={() => {
-          close(true)
-          office.openKeys()
-        }}
-      >
-        Keys
-        <span>Every shortcut, in one list. Ctrl+Shift+/</span>
+      <hr />
+      <button type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+Shift+/" onclick={() => { close(true); office.openKeys() }}>
+        <span class="line">Keys<kbd>Ctrl+Shift+/</kbd></span>
       </button>
-      <button
-        type="button"
-        role="menuitem" tabindex="-1"
-        onclick={() => {
-          close(true)
-          bridge.quit()
-        }}
-      >
-        Quit Agent Moshpit
-        <span>Ends the agents' programs, asking first if anyone is busy. Ctrl+Shift+Q</span>
+      <button type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+Shift+Q" onclick={() => { close(true); bridge.quit() }}>
+        <span class="line">Quit Agent Moshpit<kbd>Ctrl+Shift+Q</kbd></span>
       </button>
-      <p class="about selectable">agent moshpit {version} · {office.closeQuits ? 'closing the window quits' : 'closing the window leaves it running in the tray'}</p>
+      <p class="about selectable">agent moshpit {version}</p>
     </div>
   {/if}
 </div>
@@ -228,22 +186,56 @@
   .sheet > button {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    padding: var(--s-2) var(--s-3);
+    padding: 7px var(--s-3);
     border: 0;
     border-radius: var(--r-1);
     background: transparent;
     font-size: var(--t-md);
-    font-weight: 650;
+    font-weight: 600;
     text-align: left;
   }
   .sheet > button:hover:not(:disabled) {
     background: var(--inset);
   }
-  /* The second line under a menu item: what it does. */
-  .sheet > button span {
+  /* The second line under a menu item, only where there is news: an update, what it will do. */
+  .sheet > button > span:not(.line) {
     font-size: var(--t-sm);
     font-weight: 400;
     color: var(--ink-2);
+  }
+  /* A name, and at the end of its line its key or whether it is on. */
+  .line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+  }
+  .line kbd {
+    padding: 0;
+    border: 0;
+    font-size: var(--t-xs);
+    font-weight: 400;
+    color: var(--ink-3);
+    opacity: 1;
+  }
+  /* On or off, as a box that is ticked: the same mark as a tick box in a form. */
+  .tick {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--field-line);
+    border-radius: 4px;
+  }
+  [aria-checked='true'] .tick {
+    border-color: var(--button);
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2l2.3 2.3 4.7-5' fill='none' stroke='%230a0c0f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat,
+      var(--button);
+  }
+  hr {
+    margin: 2px var(--s-1);
+    border: 0;
+    border-top: 1px solid var(--line);
   }
   .about {
     margin-top: var(--s-1);

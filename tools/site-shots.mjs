@@ -127,7 +127,8 @@ if (process.argv.includes('--serve')) {
     await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
     await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 3)
-    await page.locator('.grip').dblclick()
+    // Three terminals bring the strip by themselves; the edge's double-click is only needed if not.
+    if ((await page.locator('.seat.listed').count()) === 0) await page.locator('.grip').dblclick()
     await page.locator('.seat.listed').first().waitFor()
     await page.waitForTimeout(800)
     await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
@@ -155,6 +156,8 @@ if (process.argv.includes('--serve')) {
     await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
     await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 3)
+    // Three terminals start beside the strip of names; the opening shows the people at their desks.
+    if ((await page.locator('.seat.listed').count()) > 0) await page.locator('.grip').dblclick()
     await page.waitForTimeout(600)
     // The floor follows the desk opened last; the picture starts at its first room.
     await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))

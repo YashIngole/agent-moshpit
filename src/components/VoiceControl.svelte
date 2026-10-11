@@ -17,11 +17,12 @@
     {:else}
       <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3" /><path d="M4 9v1a6 6 0 0 0 12 0V9M10 16v2M7 18h6" /></svg>
     {/if}
-    <span>{voice.view.phase === 'listening' ? 'Stop' : voice.active ? 'Working…' : 'Voice'}</span>
+    <!-- At rest the microphone says it all; words only while it is listening or writing. -->
+    {#if voice.view.phase === 'listening' || voice.active}<span>{voice.view.phase === 'listening' ? 'Stop' : 'Working…'}</span>{/if}
   </button>
 
 <style>
-  .mic { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-1); background: transparent; color: var(--ink-2); font-family: var(--mono); font-size: var(--t-sm); }
+  .mic { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 32px; height: 32px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-1); background: transparent; color: var(--ink-2); font-family: var(--mono); font-size: var(--t-sm); }
   .mic:hover:not(:disabled) { background: var(--inset); color: var(--ink); }
   .mic:disabled { opacity: 0.55; }
   .mic.listening { color: var(--work); border-color: var(--work); }

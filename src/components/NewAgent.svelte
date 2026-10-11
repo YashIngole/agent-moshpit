@@ -13,7 +13,9 @@
   // Escape costs nothing. It is emptied when the agent starts.
   const kept = office.newDraft
   let harness = $state(untrack(() => initialHarness) || kept.harness || office.lastHarness)
-  let cwd = $state(untrack(() => initialCwd) || kept.cwd)
+  // The folder is filled in with where they most likely work: the room asked from, what was
+  // typed before, the terminal in use, or where the last agent started.
+  let cwd = $state(untrack(() => initialCwd) || kept.cwd || office.likelyFolder)
   let task = $state(kept.task)
   let title = $state(kept.title)
   let worktree = $state(kept.worktree)
@@ -34,6 +36,15 @@
   const kind = $derived(choices.find(h => h.id === harness) ?? office.installed[0] ?? choices[0])
   /** Not here, and not something the office installs: the user does that themselves. */
   const missing = $derived(office.harnesses.filter(h => !h.installed && !h.install_line))
+  /** Whether the program takes a model and permissions when it starts. */
+  const launchable = $derived(Boolean(kind?.launch && kind.launch !== 'none'))
+  /** What More options is set to, said on its folded line; empty while everything is the program's own. */
+  const chosen = $derived.by(() => {
+    const options = kind ? (launches[kind.id] ?? {}) : {}
+    const parts = launchable ? [options.model, options.effort && `${options.effort} effort`, options.permission && options.permission !== '' ? options.permission : ''] : []
+    const rest = launchable && (options.profile || options.sandbox || options.approval || options.search != null || options.chrome != null || options.instructions || options.additional_dirs?.length || options.allowed_tools?.length || options.disallowed_tools?.length)
+    return [title.trim() && `“${title.trim()}”`, ...parts, rest ? 'and more' : ''].filter((part): part is string => Boolean(part))
+  })
   /** Folders used before, to pick with one click. */
   const folders = $derived(office.folders.filter(f => f !== cwd.trim()).slice(0, 4))
   const baseName = (folder: string) => folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || folder
@@ -146,21 +157,15 @@
             <button type="button" class="more" onclick={() => (everything = true)}>+{more} to install</button>
           {/if}
         </div>
-        {#if kind && kind.installed}
-          <p class="hint">
-            Your own {kind.name}{kind.version ? ` ${kind.version}` : ''}, with its sign-in and tools.
-            {#if kind.launch && kind.launch !== 'none'}Choose launch settings below, or keep its defaults.{:else}It uses its own settings and model.{/if}
-            {#if kind.outdated}
-              <span class="newer">{kind.latest} is out.</span>
-              <button type="button" class="link" onclick={() => office.update(kind.id)}>Update it</button>
-            {/if}
-          </p>
-        {:else if kind}
+        {#if kind && !kind.installed}
           <p class="hint">
             {kind.name} is not on this computer yet. It is installed in a terminal here, where you can watch it, and then
             the agent starts:
           </p>
           <code class="line">{kind.install_line}</code>
+        {/if}
+        {#if everything && missing.length > 0}
+          <p class="hint">Also known, but installed their own way: {missing.map(h => h.name).join(', ')}. Once one is, it is offered here.</p>
         {/if}
       {:else}
         <p class="todo">
@@ -169,10 +174,6 @@
         </p>
       {/if}
     </div>
-
-    {#if kind?.launch && kind.launch !== 'none'}
-      {#key kind.id}<LaunchSettings {kind} {cwd} bind:options={() => launches[kind.id] ?? {}, value => { launches[kind.id] = value }} />{/key}
-    {/if}
 
     {#if kind?.takes_task}
       <div>
@@ -185,7 +186,6 @@
           bind:value={task}
           bind:this={taskField}
         ></textarea>
-        <p class="hint">Leave it empty to start them with nothing to do, and say it in their terminal.</p>
       </div>
     {:else if kind}
       <p class="heads-up">{kind.name} takes its task in its own terminal. They start in the folder and wait for you there.</p>
@@ -205,29 +205,30 @@
           {/each}
         </div>
       {/if}
-    </div>
-
-    {#if kind?.worktree}
-      <div>
-        <label class="check">
+      {#if kind?.worktree}
+        <label class="check" title="{kind.name} makes a git worktree on a new branch, so several agents can change one project without colliding.">
           <input type="checkbox" bind:checked={worktree} />
-          Work on a separate copy
+          Work on a separate copy <span class="optional">git worktree</span>
         </label>
-        <p class="hint">
-          {kind.name} makes a git worktree on a new branch, so several agents can change one project without colliding.
-        </p>
-      </div>
-    {/if}
-
-    <div>
-      <label class="label" for="new-title">Name <span class="optional">optional</span></label>
-      <input id="new-title" class="field" placeholder="Taken from the task if you leave it empty" bind:value={title} />
+      {/if}
     </div>
 
-    {#if missing.length > 0}
-      <p class="heads-up">Also known, but installed their own way: {missing.map(h => h.name).join(', ')}. Once one is, it is offered here.</p>
-    {/if}
-
+    <!-- Everything with a good default, folded into one line that says what it is set to. -->
+    <details class="options" bind:open={office.newOptionsOpen}>
+      <summary>
+        <span class="summary-title">More options</span>
+        <span class="summary-now" class:set={chosen.length > 0}>{chosen.length > 0 ? chosen.join(' · ') : launchable ? 'name, model, permissions' : 'name'}</span>
+      </summary>
+      <div class="option-fields">
+        <div>
+          <label class="label" for="new-title">Name <span class="optional">optional</span></label>
+          <input id="new-title" class="field" placeholder="Taken from the task if you leave it empty" bind:value={title} />
+        </div>
+        {#if kind && launchable}
+          {#key kind.id}<LaunchSettings {kind} {cwd} bind:options={() => launches[kind.id] ?? {}, value => { launches[kind.id] = value }} />{/key}
+        {/if}
+      </div>
+    </details>
   </form>
   <footer>
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
@@ -368,19 +369,6 @@
   .pick label.on .get {
     opacity: 0.8;
   }
-  .newer {
-    color: var(--ink);
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ink);
-    font: inherit;
-    font-weight: 600;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
   .line {
     display: block;
     margin-top: var(--s-2);
@@ -397,8 +385,14 @@
     display: flex;
     align-items: center;
     gap: var(--s-2);
-    font-size: var(--t-md);
+    width: fit-content;
+    margin-top: var(--s-3);
+    font-size: var(--t-sm);
     font-weight: 650;
+  }
+  .check .optional {
+    font-family: var(--mono);
+    font-size: var(--t-xs);
   }
   .check input {
     width: 16px;
@@ -446,6 +440,44 @@
   }
   .more:hover {
     color: var(--ink);
+  }
+
+  /* More options, folded: its line says what it is set to. */
+  .options {
+    border-top: 1px solid var(--line);
+    padding-top: var(--s-3);
+  }
+  .options summary {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-width: 0;
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+  .summary-title {
+    flex: none;
+    font-weight: 650;
+  }
+  .summary-now {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: var(--t-xs);
+    color: var(--ink-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .summary-now.set {
+    color: var(--ink-2);
+  }
+  .options[open] .summary-now {
+    display: none;
+  }
+  .option-fields {
+    display: grid;
+    gap: var(--s-4);
+    padding-top: var(--s-3);
   }
 
   /* Folders used before: one click instead of typing a path. */

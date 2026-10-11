@@ -12,33 +12,34 @@ export const STATUS_WORD: Record<Phase, string> = {
   asleep: 'Away'
 }
 
-/** One line under the nameplate: what is going on at this desk right now. */
+/**
+ * What programs say that only repeats their status: a desk that needs you is waiting
+ * for an answer, so "Waiting for your input" tells nobody anything new.
+ */
+const SAID_BY_STATUS = new Set(['Waiting for your answer in the terminal', 'Waiting for your input', 'Asked you a question'])
+
+/**
+ * One line under the nameplate, only when it says something the status word, the pose
+ * and the screen do not: what the agent reported it is doing, the question it asked, or
+ * what went wrong. Empty otherwise, and the desk shows no line at all.
+ */
 export function doing(agent: Agent): string {
-  switch (agent.phase) {
-    case 'needs_you':
-      return agent.activity || 'Waiting for you in their terminal'
-    case 'working':
-      return agent.activity || 'Working'
-    case 'quiet':
-      return 'No recent output. It may still be working.'
-    case 'starting':
-      return agent.activity || 'Getting set up'
-    case 'done':
-      return agent.activity || 'Finished. Open their terminal to see what they did.'
-    case 'failed':
-      return agent.activity || 'Something went wrong'
-    case 'asleep':
-      // Opening the desk shows where they left off; starting them again is a button there.
-      return 'Not running. Open to see where they left off.'
-    case 'idle':
-      return agent.activity || 'Waiting for something to do'
-  }
+  const said = agent.activity.trim()
+  // Someone away is shown asleep, and opening their desk shows where they left off.
+  if (agent.phase === 'asleep' || SAID_BY_STATUS.has(said)) return ''
+  return said
 }
 
 /** A sentence for screen readers: the whole desk in one go. */
 export function describe(agent: Agent): string {
   const where = agent.repo ? `, in ${agent.repo}` : ''
-  return `${agent.title}, ${agent.harness_name}${where}. ${STATUS_WORD[agent.phase]}. ${doing(agent)}`
+  const said = doing(agent)
+  return `${agent.title}, ${agent.harness_name}${where}. ${STATUS_WORD[agent.phase]}.${said ? ` ${said}` : ''}`
+}
+
+/** Whether the office runs more than one program, so a tag saying which one tells anybody anything. */
+export function mixed(agents: Agent[]): boolean {
+  return new Set(agents.map(a => a.harness)).size > 1
 }
 
 export function resumeAction(agent: Agent): string {

@@ -4,15 +4,15 @@
 
 Node 22 (22.12 or later) or Node 24, Rust 1.89 or later, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your system.
 
-Local voice adds **CMake and a C++ toolchain** for pinned `whisper-rs = 0.16.0` / `whisper-rs-sys = 0.15.0` (vendored whisper.cpp 1.8.3), and native `cpal = 0.15.3`. GPU features and OpenMP are off. `.cargo/config.toml` disables host-native tuning and SSE4.2/AVX/AVX2/FMA/F16C/AVX512/AVX-VNNI options for distributable CPU builds. Do not replace these with `-march=native` or local-only flags. The actual CMake cache is included in the Windows verification record; old-CPU hardware has not been tested.
+Voice adds **CMake and a C++ toolchain** for the local speech engine, pinned `transcribe-cpp = 0.3.1` (transcribe.cpp with its own ggml, built statically, CPU only), and native `cpal = 0.15.3` for the microphone. `.cargo/config.toml` passes the engine's CMake flags in `TRANSCRIBE_CMAKE_ARGS`: host-native tuning off; SSE4.2, AVX, AVX2, FMA, F16C and BMI2 on; AVX-512 and AVX-VNNI off, so one x86-64 build runs on any processor from 2013 on (Apple Silicon uses NEON, and Metal). Do not replace these with `-march=native` or local-only flags. Cloud voice adds nothing to build: `tungstenite` over the app's own rustls, and `keyring` for the system keychain.
 
-- **Windows:** Visual Studio C++ tools, CMake, and a discoverable `libclang.dll` (`LIBCLANG_PATH` can name its folder). Without LLVM installed, the Python `libclang` wheel has one: `py -m pip install --target <folder> libclang`, then set `LIBCLANG_PATH` to `<folder>\clang\native`. The pinned crate's packaged bindings include glibc layout assertions that fail on Windows, so bindings are generated for this target. Existing LLVM/libclang can be reused; no audio SDK is installed separately. The x64 target uses static Rust/C++ runtime linkage; CI inspects DLL imports to reject an unbundled Microsoft C++ runtime dependency. Raw desktop tests also check the hosted runner's WebView2 Runtime.
-- **Linux:** add `libasound2-dev` and `cmake` to Tauri's build packages. `WHISPER_DONT_GENERATE_BINDINGS=1` uses the packaged bindings on 64-bit Linux and avoids libclang. Runtime capture requires working ALSA libraries/default input (PipeWire/PulseAudio systems commonly expose an ALSA route).
-- **macOS:** macOS 10.15 or newer, CMake, Xcode command-line tools and libclang for target bindings. Tauri and direct Cargo builds both set the deployment minimum to 10.15 for the pinned engine's C++17 filesystem dependency. Native capture uses CoreAudio. `src-tauri/Info.plist` supplies the microphone usage description and `Entitlements.plist` the audio-input entitlement. The CI/release workflow retains both ARM and Intel Mac targets; permission behavior requires a bundled app smoke test.
+- **Windows:** Visual Studio C++ tools and CMake. No libclang: the engine's bindings come pregenerated. The x64 target links the C and C++ runtimes statically (`+crt-static`, and `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded` for the engine); CI inspects DLL imports to reject an unbundled Microsoft C++ runtime dependency. Raw desktop tests also check the hosted runner's WebView2 Runtime.
+- **Linux:** add `libasound2-dev`, `libdbus-1-dev` and `cmake` to Tauri's build packages. Capture needs a working ALSA input (PipeWire and PulseAudio systems commonly expose an ALSA route). Keeping a cloud key needs a running Secret Service (GNOME Keyring or KWallet); without one, the panel offers to keep the key for the session only.
+- **macOS:** macOS 10.15 or newer, CMake and the Xcode command-line tools. Tauri and direct Cargo builds both set the deployment minimum to 10.15. Native capture uses CoreAudio. `src-tauri/Info.plist` supplies the microphone usage description and `Entitlements.plist` the audio-input entitlement. Keys go to the login keychain. The CI/release workflow retains both ARM and Intel Mac targets; permission behavior requires a bundled app smoke test.
 
-CI uses the runner's existing LLVM on Windows/macOS and packaged Linux bindings. The release workflow requires the cross-platform checks before building installers. Model weights are never bundled or fetched during a build. See the [voice validation record](reviews/voice-validation-2026-10-09.md) for actual platform results and outstanding microphone checks.
+The release workflow requires the cross-platform checks before building installers. Model weights are never bundled or fetched during a build. CI and the release workflow start the speech worker (`agent-moshpit --voice-worker --self-test`) on every system they can run it on. See the [engine decision](research/voice-engines-2026-10.md) for why this engine and model, with the numbers measured.
 
-After changing native CMake flags, run `cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys` in this checkout's target directory before rebuilding. Add `--release` for release artifacts and `--target <triple>` when the build uses an explicit target. The pinned build script does not track every forwarded flag as a Cargo rebuild input. On Windows, `CMAKE_POLICY_DEFAULT_CMP0091=NEW` is required for its older CMake minimum to honor the static runtime setting; CI refreshes the native package and checks the executable's DLL imports.
+The engine's build script reruns when `TRANSCRIBE_CMAKE_ARGS` changes, but not for a changed macOS deployment target or compiler. After changing those, run `cargo clean --manifest-path src-tauri/Cargo.toml -p transcribe-cpp-sys` in this checkout's target directory before rebuilding, with `--release` for release artifacts and `--target <triple>` when the build uses an explicit target. On Windows, `CMAKE_POLICY_DEFAULT_CMP0091=NEW` makes CMake honour the static runtime setting; CI refreshes the native package and checks the executable's DLL imports.
 
 ## Build and run
 
@@ -56,8 +56,9 @@ src-tauri/src/   the core, in Rust
   link.rs          the agent-moshpit:// address that opens a desk
   toast.rs         Windows notifications that can be clicked
   model.rs         what the window is told about the office: plain data
-  voice/           bounded device PCM conversion, local CPU recognition, pinned verified model downloads,
-                   cancellation generations, and no-Enter terminal delivery
+  voice/           dictation: the microphone, pause detection, settled words typed with no Enter, cancellation;
+    local/         the speech worker (`--voice-worker`, a child process) and its framed protocol
+    cloud/         the four providers over one WebSocket each, keys in the system keychain
 src/             the window, in Svelte 5
   App.svelte       the frame, the office's own keys, dropped files
   components/      the floor, a desk, a person, the amber band, the top bar and its menu,
@@ -108,27 +109,22 @@ The Windows debug build accepts `MOSHPIT_TEST_DEBUG_PORT` only for a named offic
 
 ### Voice checks without a microphone
 
-Unit tests cover actual PCM formats/channel boundaries, 60-second bounds, silence/short rejection, ANSI/control sanitization, state cancellation, pinned file size/hash, atomic completion, hidden panes, restarted PTY generations, and excluding voice echo from saved screens. `npm run test:ui` adds deterministic demo listening/transcribing/failure/download/remove/cancel tests; it stubs clipboard writes and never uses a microphone or downloads a model.
+Unit tests cover PCM formats and bounds, pause detection, joining settled words, ANSI/control sanitization, state cancellation, settings read leniently (and by 0.6), the pinned model's size, hash and check stamp, resumed downloads, the worker's framing, each cloud provider's messages (recorded from their documentation and probes), and that a socket read comes back at once after the handshake. `npm run test:ui` and `node tools/e2e/voice-ux.mjs` (after `npm run build`) drive the demo office: setup for both engines, keys (saved, session-only, unchecked, rejected), word hints, silence, failures (`?voice=auth`, `quota`, `offline`, `worker-crash`, `store-unavailable`, `unsupported` and others), narrow layouts and terminal focus. The demo never uses a microphone, the network or a real key. On Windows, `node tools/e2e/voice-setup-app.mjs` checks the desktop IPC, input listing, saved settings and that 0.6 settings carry over; set `MOSHPIT_APP` when the executable is outside the default debug target folder. CI runs the browser suites on all three systems and the native setup check on Windows. `cargo test --manifest-path src-tauri/Cargo.toml voice:: -- --ignored` runs the two tests that touch this machine: listing its microphones without recording, and keeping a key in the real system keychain.
 
-After `npm run build`, `node tools/e2e/voice-ux.mjs` checks setup, input selection, silence feedback, retry, narrow layouts and terminal focus in a browser. On Windows, `node tools/e2e/voice-setup-app.mjs` checks the desktop IPC, native input enumeration and persisted settings; set `MOSHPIT_APP` when the executable is outside the default debug target folder. Both run in isolated test data and never start microphone capture. CI runs the browser suite on all three platforms and the native setup check on Windows.
+The debug build accepts **`MOSHPIT_VOICE_WAV` only with a named `MOSHPIT_INSTANCE` and explicit `MOSHPIT_DATA_DIR`**. It requires PCM16 WAV, no longer than the five-minute cap, and feeds the same path a microphone does; a bad fixture fails without opening a microphone. `MOSHPIT_VOICE_WAV_PACED=1` releases it as fast as it was spoken, as a microphone would. Under the same conditions `MOSHPIT_VOICE_ENDPOINT` (say `ws://127.0.0.1:9301`) sends a cloud engine's socket to a test server instead of the provider, with the provider's own path and query; plain `ws://` is accepted only to this computer, and only by a debug build. Release builds read none of these. They are test hooks, not features.
 
-The debug build accepts **`MOSHPIT_VOICE_WAV` only with a named `MOSHPIT_INSTANCE` and explicit `MOSHPIT_DATA_DIR`**. It requires PCM16 WAV, no longer than 60 seconds, and feeds the same conversion/recognition path. A bad fixture fails without opening a microphone. Release builds never read this variable. This is a test hook, not an audio-file feature.
-
-For the opt-in real-app fixture test, provide isolated storage with whisper.cpp v1.8.3's `samples/jfk.wav` and the pinned models, then:
+For the opt-in real-app test, put whisper.cpp's `samples/jfk.wav` and the model file (`nemotron-speech-streaming-en-0.6b-Q8_0.gguf`) in a fixture folder, then:
 
 ```powershell
-$env:CARGO_TARGET_DIR = 'D:/rust/target/voice-to-text'
-$env:MOSHPIT_INSTANCE = 'voicebuild'
-$env:MOSHPIT_DATA_DIR = 'D:/rust/target/voice-to-text/test-data'
+$env:CARGO_TARGET_DIR = 'D:/rust/target/voice-engines'
 npm run tauri build -- --debug --no-bundle
+$env:MOSHPIT_APP = 'D:/rust/target/voice-engines/debug/agent-moshpit.exe'
 $env:MOSHPIT_VOICE_FIXTURES = 'D:/rust/target/voice-fixtures'
-node tools/e2e/voice-app.mjs             # requires existing model fixtures
-node tools/e2e/voice-app.mjs --download  # explicitly exercise production model downloads if absent
+node tools/e2e/voice-app.mjs             # requires the model fixture
+node tools/e2e/voice-app.mjs --download  # explicitly exercise the production download if absent
 ```
 
-The helper supplies its own named instance and temporary data folder, starts only the fake agent, verifies both stored model hashes/sizes, checks WAV recognition without Enter, and closes/reopens the window to verify cancellation. It leaves model fixtures in the supplied test storage for reuse; nothing is installed or copied into the user's office. Fixture latency is one recorded clip, not a performance or accent-quality benchmark. Real desktop microphone smoke checks need separate explicit permission. [Results and remaining checks](reviews/voice-validation-2026-10-09.md).
-
-With `MOSHPIT_VOICE_FIXTURES` set, `cargo test --manifest-path src-tauri/Cargo.toml voice:: -- --ignored --nocapture` runs the real models through the path the app uses: the sample fed in as a microphone delivers it, phrases typed at the pauses, the rest on stopping, and noise that must type nothing. It prints how long each step took; add `--release` to see what users get. `the_engine_is_built_for_speed` fails if the speech engine was built without AVX2 (NEON on Apple Silicon), which made it ten times slower. The `GGML_*` settings in `.cargo/config.toml` take effect only after `cargo clean -p whisper-rs-sys` (with `--release` for release builds), because its build script does not rerun for them.
+It starts its own named office with the fake agent, checks the model's size and hash, dictates the clip at speaking pace, and checks that words are typed before Stop and that Enter is never pressed. It kills the speech worker mid-sentence and dictates again. Then it runs cloud recordings against `tools/e2e/voice-mock.mjs`, a pretend Deepgram on this computer: words typed while listening, what the provider was asked for (English, Nova-3, no training, the word hints, the key in its header), a rejected key, a lost connection, and a key kept in and removed from Windows Credential Manager. Last, it checks that no key was written to any file in the office's folder. Numbers from one clip are not a benchmark; the [engine decision](research/voice-engines-2026-10.md) has those. Real microphone checks need separate explicit permission.
 
 ## The site
 

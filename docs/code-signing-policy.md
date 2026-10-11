@@ -23,7 +23,7 @@ Agent Moshpit has no telemetry and no analytics, and keeps no account.
 
 It makes two requests of its own, both about versions, when it starts and every 12 hours: it asks npm for the newest version of each agent program you have installed, and it asks this repository's releases on GitHub for a newer version of itself. Setting `MOSHPIT_NO_UPDATE_CHECK` turns both off. An update is fetched only when you choose it in the menu.
 
-Optional local voice input downloads a selected model from Hugging Face only when you choose Download. The host sees that model request. Microphone audio and recognized text stay on this computer; there is no hosted recognition or telemetry.
+Optional voice input is off until you turn it on. On this computer, it downloads its model from Hugging Face only when you choose Download; the host sees that request, and microphone audio and recognized text then stay on this computer. If you choose a cloud provider instead (Deepgram, OpenAI, AssemblyAI or ElevenLabs), your microphone's audio goes to that provider while you dictate, and at no other time, under your own account and key and that provider's terms. The key is kept in your system's keychain and goes only to that provider. There is no telemetry either way.
 
 The agent programs it starts (Claude Code, Codex and the rest) are other people's software, started at your request with your own sign-ins. They talk to their own services as they do in any terminal, under their own privacy policies.
 

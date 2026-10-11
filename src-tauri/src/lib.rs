@@ -25,6 +25,8 @@ mod voice;
 
 /// Run the lightweight MCP subprocess without opening a desktop or another office.
 pub fn run_mcp_stdio() -> Result<(), String> { mcp::run_stdio() }
+/// The speech worker process (`--voice-worker`): the local speech engine, apart from the app.
+pub fn run_voice_worker() -> i32 { voice::run_worker() }
 
 use engine::{Handle, Shell};
 use model::{NewAgent, Phase, Snapshot};
@@ -207,11 +209,15 @@ fn titled(instance: Option<&str>, need: usize) -> String {
 struct DataDir(PathBuf);
 
 /// What the user chose that the core has to know, kept beside the desks (`settings.json`).
+/// Each setting is read on its own: one that cannot be read (say, from a newer version)
+/// takes its default and leaves the others as the user chose them.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 struct Settings {
     /// Closing the window quits the office, as in most apps, instead of leaving it in the tray.
+    #[serde(deserialize_with = "voice::lenient")]
     close_quits: bool,
+    #[serde(deserialize_with = "voice::lenient")]
     voice: voice::Settings,
 }
 
@@ -869,7 +875,9 @@ fn voice_start(app: AppHandle, handle: State<'_, Handle>, voice: State<'_, voice
     if !app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(true)) {
         return Err("Open the office window before recording.".into());
     }
-    voice.start(handle.inner().clone(), agent, chosen.now.lock().unwrap().voice.clone())
+    // Read before starting: the settings lock is not held while voice takes its own.
+    let settings = chosen.now.lock().unwrap().voice.clone();
+    voice.start(handle.inner().clone(), agent, settings)
 }
 
 #[tauri::command]
@@ -877,11 +885,28 @@ fn voice_stop(voice: State<'_, voice::Voice>) -> Result<(), String> { voice.stop
 #[tauri::command]
 fn voice_cancel(voice: State<'_, voice::Voice>) { voice.cancel(); }
 #[tauri::command]
-fn voice_download(voice: State<'_, voice::Voice>, model: voice::Model) -> Result<(), String> { voice.download(model) }
+fn voice_download(voice: State<'_, voice::Voice>, model: String) -> Result<(), String> { voice.download(&model) }
 #[tauri::command]
 fn voice_cancel_download(voice: State<'_, voice::Voice>) { voice.cancel_download(); }
 #[tauri::command]
-fn voice_remove(voice: State<'_, voice::Voice>, model: voice::Model) -> Result<(), String> { voice.remove(model) }
+fn voice_remove(voice: State<'_, voice::Voice>, model: String) -> Result<(), String> { voice.remove(&model) }
+/// Keeps a provider's key in the system keychain (or for this session), checked first unless
+/// `check` is false. The key goes no further than the core.
+#[tauri::command]
+async fn voice_key_set(voice: State<'_, voice::Voice>, provider: String, key: String, session_only: bool, check: bool) -> Result<(), String> {
+    let voice = voice.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || voice.set_key(&provider, &key, session_only, check)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn voice_key_check(voice: State<'_, voice::Voice>, provider: String) -> Result<(), String> {
+    let voice = voice.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || voice.check_key(&provider)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn voice_key_remove(voice: State<'_, voice::Voice>, provider: String) -> Result<(), String> {
+    let voice = voice.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || voice.remove_key(&provider)).await.map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 async fn pick_folder(window: WebviewWindow) -> Result<Option<String>, String> {
@@ -961,7 +986,7 @@ pub fn run() {
             app_version,
             pick_folder,
             voice_view, voice_inputs, voice_config, voice_start, voice_stop, voice_cancel,
-            voice_download, voice_cancel_download, voice_remove
+            voice_download, voice_cancel_download, voice_remove, voice_key_set, voice_key_check, voice_key_remove
         ])
         .on_window_event(|window, event| {
             if window.label() != WINDOW {
@@ -1042,7 +1067,10 @@ pub fn run() {
             app.manage(handle);
             clear_old_pastes(&dir);
             app.manage(DataDir(dir.clone()));
-            app.manage(voice::Voice::new(dir.join("voice-models")));
+            let shown = app.handle().clone();
+            app.manage(voice::Voice::new(dir.join("voice-models"), dir.join("voice-keys.json"), move |view| {
+                let _ = shown.emit("office:voice", view);
+            }));
 
             app.manage(update::Latest::default());
             update::watch(app.handle());

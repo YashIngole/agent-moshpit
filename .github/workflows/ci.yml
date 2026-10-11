@@ -36,18 +36,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential libasound2-dev cmake
-
-      - name: Use packaged Whisper bindings on Linux
-        if: runner.os == 'Linux'
-        run: echo "WHISPER_DONT_GENERATE_BINDINGS=1" >> "$GITHUB_ENV"
-
-      # The pinned packaged bindings contain glibc layouts. Windows and macOS
-      # generate target bindings using LLVM already installed on these runners.
-      - name: Windows libclang
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Add-Content $env:GITHUB_ENV 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential libasound2-dev libdbus-1-dev cmake
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -66,12 +55,11 @@ jobs:
 
       - run: npm ci
 
-      # The pinned native build script forwards CMake flags but does not track
-      # every flag as a Cargo rebuild input. Never reuse an older MSVC runtime,
-      # macOS deployment target, or speech engine instruction set (the GGML_*
-      # flags in .cargo/config.toml), which a cached Linux build kept too.
+      # The speech engine's build script tracks TRANSCRIBE_CMAKE_ARGS, but not the
+      # macOS deployment target or the compiler a cached build used. Never reuse
+      # an older MSVC runtime or instruction set (.cargo/config.toml).
       - name: Refresh platform native build configuration
-        run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys
+        run: cargo clean --manifest-path src-tauri/Cargo.toml -p transcribe-cpp-sys
 
       - name: Interface types
         run: npm run check
@@ -105,6 +93,12 @@ jobs:
 
       - name: Desktop build
         run: npx tauri build --debug --no-bundle
+
+      # The speech engine runs in a child process of the same program: it must start,
+      # and say which engine and protocol it speaks, on every system.
+      - name: Speech worker starts
+        shell: bash
+        run: src-tauri/target/debug/agent-moshpit --voice-worker --self-test
 
       - name: Windows runtime linkage
         if: runner.os == 'Windows'

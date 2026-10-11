@@ -1,32 +1,17 @@
 # Distributable CPU baseline: never inherit the builder's instruction set.
-# Linux CI uses packaged bindings; Windows/macOS generate target bindings.
 [env]
-# The pinned native engine uses C++17 filesystem (available since macOS 10.15).
+# The native speech engine uses C++17 filesystem (available since macOS 10.15).
 # Match Tauri's bundle minimum for direct Cargo builds as well.
 MACOSX_DEPLOYMENT_TARGET = "10.15"
-# On x86-64 the speech engine is built for AVX2, FMA, F16C and BMI2 (Intel from 2013,
-# AMD from 2015). Without them it runs scalar code: Small took 49 s for 11 s of speech,
-# against under 2 s with them. Voice checks the processor before it loads the engine,
-# so an older one is told so instead of crashing (voice::processor_problem). Every
-# option is set here: with GGML_NATIVE off, ggml turns on any left unset. These change
-# nothing on Apple Silicon. A change here needs `cargo clean -p whisper-rs-sys`: its
-# build script does not rerun for them.
-GGML_NATIVE = "OFF"
-GGML_SSE42 = "ON"
-GGML_AVX_VNNI = "OFF"
-GGML_AVX = "ON"
-GGML_AVX2 = "ON"
-GGML_BMI2 = "ON"
-GGML_FMA = "ON"
-GGML_F16C = "ON"
-GGML_AVX512 = "OFF"
-GGML_AVX512_VBMI = "OFF"
-GGML_AVX512_VNNI = "OFF"
-GGML_AVX512_BF16 = "OFF"
-CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
-# whisper.cpp declares an old CMake minimum; explicitly enable the policy
-# that makes MSVC_RUNTIME_LIBRARY effective.
-CMAKE_POLICY_DEFAULT_CMP0091 = "NEW"
+# The local speech engine (transcribe.cpp on ggml) is configured through this one variable;
+# its build script reruns whenever it changes. On x86-64 it is built for AVX2, FMA, F16C and
+# BMI2 (Intel from 2013, AMD from 2015): without them ggml runs scalar code several times
+# slower. Voice checks the processor before it starts the engine, so an older one is told
+# so instead of crashing (voice::processor_problem). With GGML_NATIVE off, ggml turns on any
+# option left unset, so every one is set. The x86 options change nothing on Apple Silicon or
+# Arm Linux. The static MSVC runtime matches `+crt-static` below: the CI checks that the app
+# imports no Microsoft C++ runtime DLL.
+TRANSCRIBE_CMAKE_ARGS = "-DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_BMI2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_AVX_VNNI=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX512_BF16=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW"
 
 # Keep the native C++ and Rust runtime consistent and avoid requiring an
 # unbundled Microsoft C++ runtime DLL on a clean Windows installation.

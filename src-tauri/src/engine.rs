@@ -481,12 +481,29 @@ impl Handle {
         self.voice_target(&target.agent).as_ref() == Some(target)
     }
 
-    /// Types dictated words as plain text. `more` puts a space before them: they follow
-    /// words this recording already typed.
-    pub fn voice_write(&self, target: &crate::voice::Target, data: &[u8], more: bool) -> Result<(), String> {
+    /// Words a dictation into this desk is likely to contain, for a cloud provider to expect:
+    /// the desk's name, its folder, project and branch, and the names of the programs here.
+    pub fn voice_context(&self, id: &str, desk: bool) -> Vec<String> {
+        let state = self.inner.state.lock().unwrap();
+        let mut words = Vec::new();
+        if desk {
+            if let Some(d) = state.office.get(id) {
+                let folder = std::path::Path::new(&d.saved.cwd).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+                words.extend([d.saved.title.clone(), folder, d.repo.clone(), d.branch.clone()]);
+            }
+        }
+        for kind in self.inner.table.iter() {
+            words.extend([kind.name.clone(), kind.tag.clone()]);
+        }
+        words
+    }
+
+    /// Types dictated words as plain text. `space` puts a space before them, between words
+    /// this recording already typed and these.
+    pub fn voice_write(&self, target: &crate::voice::Target, data: &[u8], space: bool) -> Result<(), String> {
         let text = crate::voice::sanitize(std::str::from_utf8(data).map_err(|_| "The voice text was invalid and discarded.")?);
         if text.is_empty() || text.len() > 32 * 1024 { return Err("The voice text was empty or too long and discarded.".into()); }
-        let text = if more { format!(" {text}") } else { text };
+        let text = if space { format!(" {text}") } else { text };
         let mut state = self.inner.state.lock().unwrap();
         if !state.visible.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
             return Err("The recording's pane closed or its program stopped. Its text was discarded.".into());

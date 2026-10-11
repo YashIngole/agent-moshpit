@@ -124,14 +124,41 @@ pub struct DeviceCapture {
     pub name: String,
 }
 
-/// Give quiet speech usable amplitude after the silence check, with bounded gain.
-pub fn normalize(pcm: &mut [f32]) {
-    let peak = pcm.iter().fold(0.0f32, |peak, v| peak.max(v.abs()));
-    if peak > 0.0 && peak < 0.5 {
-        let gain = (0.5 / peak).min(20.0);
-        for sample in pcm {
-            *sample *= gain;
+/// 16-bit little-endian samples, as the cloud providers take them.
+pub fn pcm16(pcm: &[f32]) -> Vec<u8> {
+    pcm.iter().flat_map(|v| ((v.clamp(-1.0, 1.0) * 32767.0).round() as i16).to_le_bytes()).collect()
+}
+
+/// 16 kHz to 24 kHz (OpenAI takes only 24 kHz): three out for every two in, interpolated, and
+/// continuous across calls.
+#[derive(Default)]
+pub struct Upsampler {
+    /// The last sample of the previous call.
+    previous: f32,
+    /// Where the next output falls, in input samples after `previous`.
+    at: f64,
+}
+
+impl Upsampler {
+    pub fn push(&mut self, input: &[f32]) -> Vec<f32> {
+        if self.at == 0.0 {
+            self.at = 1.0;
         }
+        let sample = |k: usize| if k == 0 { self.previous } else { input[k - 1] };
+        let total = input.len() as f64;
+        let mut out = Vec::with_capacity(input.len() * 3 / 2 + 2);
+        while self.at <= total {
+            let i = self.at.floor() as usize;
+            let fraction = (self.at - i as f64) as f32;
+            let (a, b) = (sample(i), if i < input.len() { sample(i + 1) } else { sample(i) });
+            out.push(a + (b - a) * fraction);
+            self.at += 2.0 / 3.0;
+        }
+        self.at -= total;
+        if let Some(last) = input.last() {
+            self.previous = *last;
+        }
+        out
     }
 }
 
@@ -275,7 +302,7 @@ mod tests {
         assert!(unsigned.pcm.iter().all(|s| s.abs() < 0.001));
     }
     #[test]
-    fn bounded_at_sixty_seconds_and_bad_samples_are_safe() {
+    fn bounded_at_the_longest_recording_and_bad_samples_are_safe() {
         let mut capture = Capture::new(1, 16_000).unwrap();
         capture.push(&vec![0.5f32; MAX_SAMPLES + RATE]);
         assert_eq!(capture.pcm.len(), MAX_SAMPLES);
@@ -325,11 +352,8 @@ mod tests {
             assert!(speech(&pcm).is_ok(), "{} samples", pcm.len());
         }
         // Quiet speech too: a quiet microphone previously failed a fixed 0.008 RMS cutoff.
-        let mut quiet: Vec<f32> = spoken(NO_PAUSE).iter().map(|v| v * 0.03).collect();
+        let quiet: Vec<f32> = spoken(NO_PAUSE).iter().map(|v| v * 0.03).collect();
         assert!(speech(&quiet).is_ok());
-        normalize(&mut quiet);
-        assert!(quiet.iter().any(|v| v.abs() > 0.4));
-        assert!(quiet.iter().all(|v| v.abs() <= 1.0));
     }
 
     #[test]
@@ -357,5 +381,22 @@ mod tests {
             "default: {:?}; microphones: {:?}",
             inputs.default, inputs.devices
         );
+    }
+
+    #[test]
+    fn pcm16_clamps_and_is_little_endian() {
+        assert_eq!(pcm16(&[0.0, 1.0, -1.0, 2.0]), [0, 0, 0xff, 0x7f, 0x01, 0x80, 0xff, 0x7f]);
+    }
+
+    #[test]
+    fn upsampling_gives_three_for_two_and_keeps_a_tone() {
+        let mut up = Upsampler::default();
+        let tone: Vec<f32> = (0..16_000).map(|i| (std::f32::consts::TAU * 440.0 * i as f32 / 16_000.0).sin() * 0.5).collect();
+        let out: Vec<f32> = tone.chunks(320).flat_map(|chunk| up.push(chunk)).collect();
+        assert!((23_998..=24_001).contains(&out.len()), "{}", out.len());
+        // The same tone at the new rate, within interpolation error.
+        let worst = out.iter().enumerate().take(23_000).map(|(i, v)| (v - (std::f32::consts::TAU * 440.0 * i as f32 / 24_000.0).sin() * 0.5).abs()).fold(0.0f32, f32::max);
+        assert!(worst < 0.03, "{worst}");
+        assert!(out.iter().all(|v| v.is_finite()));
     }
 }

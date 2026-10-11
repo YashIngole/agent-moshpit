@@ -81,7 +81,9 @@ Decided while building the CLI office (2026-10-08 and 09), also the builder's de
 - Closing the window leaves the office in the tray. A setting makes it quit instead, added after the owner asked in the first review how to close the whole office.
 - The × on a pane puts the pane away and leaves the program running. Ending a program is Stop, and taking a desk away is Remove, which can be undone for a few seconds instead of asking first, unless the agent is busy.
 - Opening the desk of an agent that is not running shows where they left off and starts nothing.
-- The office asks npm for newer versions of the installed programs, and GitHub for a newer version of itself, unless told not to. Optional voice models download from Hugging Face only when the user chooses; microphone audio and transcription stay local.
+- The office asks npm for newer versions of the installed programs, and GitHub for a newer version of itself, unless told not to. Voice is local by default: its model downloads from Hugging Face only when the user chooses, and audio and transcription stay on the computer. A cloud provider hears the audio only when the user picks one and adds their own key (decided 2026-10-12, see below).
+
+Voice engines (decided 2026-10-12): the owner found Whisper's recognition "damn bad" and its streaming not seamless, and chose English only, NVIDIA's Parakeet family (or similar) on the computer, and bring-your-own-key cloud with all four of Deepgram, OpenAI, AssemblyAI and ElevenLabs. Whisper and the language setting went. Keys live in the system keychain, never in the window or a file. Cloud is never chosen for the user and never a fallback. [Decision record](docs/research/voice-engines-2026-10.md).
 
 No longer true: connecting models from inside the app (asked for by the owner on 2026-10-06 and built for the Hermes client) went with that client. Each program is signed in and set up its own way.
 

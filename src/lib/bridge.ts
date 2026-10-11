@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
 import type { Editor, ModelCatalog, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
-import type { VoiceInputs, VoiceModel, VoiceSettings, VoiceView } from './voice'
+import type { VoiceInputs, VoiceProvider, VoiceSettings, VoiceView } from './voice'
 
 /**
  * What a terminal sends. `kept` is true for the first piece only: the screen as
@@ -97,14 +97,20 @@ export interface Bridge {
    */
   updateNow(): Promise<boolean>
   voiceView(): Promise<VoiceView>
+  /** Every change to the voice view, as it happens. */
+  onVoiceView(fn: (view: VoiceView) => void): () => void
   voiceInputs(): Promise<VoiceInputs>
   voiceConfig(settings: VoiceSettings): Promise<void>
   voiceStart(agent: string): Promise<void>
   voiceStop(): Promise<void>
   voiceCancel(): Promise<void>
-  voiceDownload(model: VoiceModel): Promise<void>
+  voiceDownload(model: string): Promise<void>
   voiceCancelDownload(): Promise<void>
-  voiceRemove(model: VoiceModel): Promise<void>
+  voiceRemove(model: string): Promise<void>
+  /** Errors start `keychain:` when the system keychain is missing, `unreached:` when the provider could not be reached to check the key. */
+  voiceKeySet(provider: VoiceProvider, key: string, sessionOnly: boolean, check: boolean): Promise<void>
+  voiceKeyCheck(provider: VoiceProvider): Promise<void>
+  voiceKeyRemove(provider: VoiceProvider): Promise<void>
 }
 
 function subscribe<T>(name: string, fn: (payload: T) => void, ready?: () => void): () => void {
@@ -200,6 +206,7 @@ function tauriBridge(): Bridge {
     onNewer: fn => subscribe<Newer | null>('office:newer', fn),
     updateNow: () => invoke<boolean>('update_now'),
     voiceView: () => invoke<VoiceView>('voice_view'),
+    onVoiceView: fn => subscribe<VoiceView>('office:voice', fn),
     voiceInputs: () => invoke<VoiceInputs>('voice_inputs'),
     voiceConfig: settings => invoke('voice_config', { settings }),
     voiceStart: agent => invoke('voice_start', { agent }),
@@ -207,7 +214,10 @@ function tauriBridge(): Bridge {
     voiceCancel: () => invoke('voice_cancel'),
     voiceDownload: model => invoke('voice_download', { model }),
     voiceCancelDownload: () => invoke('voice_cancel_download'),
-    voiceRemove: model => invoke('voice_remove', { model })
+    voiceRemove: model => invoke('voice_remove', { model }),
+    voiceKeySet: (provider, key, sessionOnly, check) => invoke('voice_key_set', { provider, key, sessionOnly, check }),
+    voiceKeyCheck: provider => invoke('voice_key_check', { provider }),
+    voiceKeyRemove: provider => invoke('voice_key_remove', { provider })
   }
 }
 

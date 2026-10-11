@@ -1,7 +1,7 @@
 <script lang="ts">
   import { office } from '../lib/office.svelte'
   import { voice } from '../lib/voice.svelte'
-  import { shortcutLabel } from '../lib/voice'
+  import { engineName, shortcutLabel } from '../lib/voice'
   let now = $state(Date.now())
   $effect(() => {
     if (!voice.active) return
@@ -22,8 +22,8 @@
     <div class="head">
       <p class="state" role="status" aria-live="polite">
         {#if voice.problem}{voice.problem}
-        {:else if voice.view.phase === 'preparing'}<span class="dot"></span>Starting the microphone for {target}…
-        {:else if voice.view.phase === 'listening'}<span class="dot"></span>Listening to {target}
+        {:else if voice.view.phase === 'preparing'}<span class="dot"></span>{voice.view.detail || `Starting the microphone for ${target}…`}
+        {:else if voice.view.phase === 'listening'}<span class="dot"></span>Listening to {target}{#if voice.view.engine !== 'local'}<span class="via">· {engineName(voice.view.engine)}</span>{/if}
         {:else if voice.view.phase === 'transcribing'}<span class="spin"></span>Typing the last words into {target}…
         {:else if error}{voice.view.message}
         {:else}{voice.notice}{/if}
@@ -43,7 +43,7 @@
     </div>
     {#if voice.view.phase === 'listening' || voice.view.phase === 'transcribing'}
       <!-- The phrase being spoken; phrases already finished are in the terminal. -->
-      <p class="words" class:waiting={!voice.view.partial}>{voice.view.partial || (voice.view.phase === 'listening' ? (seconds >= 2 && voice.view.level < 3 ? 'No sound detected. Check that your microphone is unmuted, or cancel and choose another input.' : 'Speak. Each phrase is typed into the terminal when you pause.') : '')}</p>
+      <p class="words" class:waiting={!voice.view.partial}>{voice.view.partial || (voice.view.phase === 'listening' ? (voice.view.detail ? `${voice.view.detail} Start speaking; nothing is lost.` : seconds >= 2 && voice.view.level < 3 ? 'No sound detected. Check that your microphone is unmuted, or cancel and choose another input.' : 'Speak. Your words are typed into the terminal as they settle.') : '')}</p>
     {/if}
     {#if voice.view.phase === 'listening'}
       <div class="recording">
@@ -86,6 +86,7 @@
   p { overflow-wrap: anywhere; }
   .state { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--s-2); color: var(--work); font-weight: 650; }
   .error .state { color: var(--trouble-ink); }
+  .via { color: var(--ink-2); font-weight: 400; white-space: nowrap; }
   .time { flex: none; font-family: var(--mono); color: var(--ink-2); white-space: nowrap; }
   .words { padding-right: var(--s-3); font-size: var(--t-lg); line-height: 1.35; color: var(--ink); max-height: 4.1em; overflow: hidden; display: flex; flex-direction: column-reverse; }
   .words.waiting { font-size: var(--t-sm); color: var(--ink-2); }

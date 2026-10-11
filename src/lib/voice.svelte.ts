@@ -1,5 +1,5 @@
 import { bridge } from './bridge'
-import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, type VoiceInputs, type VoiceModel, type VoiceSettings, type VoiceView } from './voice'
+import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, keyProblem, type VoiceInputs, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
 import { terms } from './terms'
 import { tick } from 'svelte'
 
@@ -16,7 +16,10 @@ class Voice {
   /** "Inserted", shown for a moment after a recording's words are typed. */
   notice = $state('')
   active = $derived(['preparing', 'listening', 'transcribing'].includes(this.view.phase))
-  ready = $derived(this.view.models.some(m => m.id === this.settings.model && m.ready))
+  /** The chosen engine can be used: its model is downloaded, or its provider has a key. */
+  ready = $derived(this.settings.engine === 'local'
+    ? !this.view.unsupported && this.view.models.some(m => m.id === this.settings.local_model && m.ready)
+    : this.view.providers.some(p => p.id === this.settings.engine && p.configured))
   #polling = false
   #alive = false
   #request = 0
@@ -32,10 +35,12 @@ class Voice {
     void bridge.settings().then(s => { if (this.#alive) this.settings = { ...DEFAULT_VOICE, ...s.voice } }).catch(() => {
       if (this.#alive) this.problem = 'Voice settings could not load. Reopen the window to try again.'
     })
+    // The core says when anything changes; a slow poll covers an event lost on the way.
+    const pushed = bridge.onVoiceView(view => this.#show(view))
     void this.refresh()
     const poll = setInterval(() => {
       if (this.panel || this.active || this.view.busy || this.view.verifying || this.view.downloading) void this.refresh()
-    }, 200)
+    }, bridge.demo ? 200 : 1000)
     const hide = () => { if (document.hidden) this.cancel() }
     const leave = () => this.cancel()
     const focus = (event: FocusEvent) => {
@@ -48,6 +53,7 @@ class Voice {
       this.#alive = false
       this.#request += 1
       clearInterval(poll)
+      pushed()
       this.cancel()
       document.removeEventListener('visibilitychange', hide)
       window.removeEventListener('pagehide', leave)
@@ -60,22 +66,25 @@ class Voice {
     const request = this.#request
     try {
       const view = await bridge.voiceView()
-      if (this.#alive && request === this.#request && view.sequence >= this.view.sequence) {
-        // Words are typed as they are spoken, so a short recording can end between two polls.
-        const inserted = ['preparing', 'listening', 'transcribing'].includes(this.view.phase) && view.phase === 'idle' && !!view.message
-        this.view = view
-        if (inserted) this.#notify(view.message)
-        // Stop is a button; return its keyboard to the same terminal after insertion.
-        // A user who moved elsewhere while waiting keeps their focus.
-        if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) {
-          const target = view.agent
-          await tick()
-          if (this.#alive && request === this.#request && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) terms.get(target)?.focus()
-          this.#restoreFocus = false
-        }
-      }
+      if (request === this.#request) await this.#show(view)
     } catch { /* A destroyed window has nothing to update. Actions surface failures. */ }
     finally { this.#polling = false }
+  }
+  async #show(view: VoiceView) {
+    if (!this.#alive || view.sequence < this.view.sequence) return
+    const request = this.#request
+    // A recording can end between two updates; the one that says it ended says so once.
+    const inserted = ['preparing', 'listening', 'transcribing'].includes(this.view.phase) && view.phase === 'idle' && !!view.message
+    this.view = view
+    if (inserted) this.#notify(view.message)
+    // Stop is a button; return its keyboard to the same terminal after insertion.
+    // A user who moved elsewhere while waiting keeps their focus.
+    if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) {
+      const target = view.agent
+      await tick()
+      if (this.#alive && request === this.#request && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) terms.get(target)?.focus()
+      this.#restoreFocus = false
+    }
   }
   async act(action: () => Promise<unknown>) {
     this.problem = ''
@@ -162,8 +171,24 @@ class Voice {
       if (this.#alive) this.problem = 'Voice cancellation could not be confirmed. Close the window to stop capture.'
     })
   }
-  download(model: VoiceModel) { return this.act(() => bridge.voiceDownload(model)) }
-  remove(model: VoiceModel) { return this.act(() => bridge.voiceRemove(model)) }
+  download(model: string) { return this.act(() => bridge.voiceDownload(model)) }
+  remove(model: string) { return this.act(() => bridge.voiceRemove(model)) }
   cancelDownload() { return this.act(() => bridge.voiceCancelDownload()) }
+  /** Keeps a provider's key: checked with the provider first unless `check` is false, in the
+   *  keychain unless `sessionOnly`. The key goes to the core and is never sent back. */
+  async setKey(provider: VoiceProvider, key: string, sessionOnly: boolean, check: boolean) {
+    try {
+      await bridge.voiceKeySet(provider, key, sessionOnly, check)
+      return null
+    } catch (error) { return keyProblem(error) }
+    finally { void this.refresh() }
+  }
+  async checkKey(provider: VoiceProvider) {
+    try {
+      await bridge.voiceKeyCheck(provider)
+      return null
+    } catch (error) { return keyProblem(error) }
+  }
+  removeKey(provider: VoiceProvider) { return this.act(() => bridge.voiceKeyRemove(provider)) }
 }
 export const voice = new Voice()

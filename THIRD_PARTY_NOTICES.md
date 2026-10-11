@@ -1,29 +1,43 @@
 # Third-party voice notices
 
-This feature uses CPU whisper.cpp 1.8.3 / ggml (MIT), whisper-rs 0.16.0 and
-whisper-rs-sys 0.15.0 (Unlicense), and CPAL 0.15.3 (Apache-2.0).
+Voice input uses transcribe.cpp and its Rust bindings, transcribe-cpp and
+transcribe-cpp-sys 0.3.1 (MIT), which build ggml (MIT) for the processor, and
+CPAL 0.15.3 (Apache-2.0) for the microphone.
 
-Optional multilingual Small/Base Q5_1 Whisper weights are distributed under
-OpenAI's MIT licence. They are downloaded from ggerganov/whisper.cpp on
-Hugging Face at revision 5359861c739e955e79d9a303bcbc70fb988958b1, outside the
-installer. The original app MIT licence does not replace these licences.
+The optional local model, NVIDIA Nemotron Speech Streaming EN 0.6B in the GGUF
+conversion handy-computer/nemotron-speech-streaming-en-0.6b-gguf, is Licensed
+by NVIDIA Corporation under the NVIDIA Open Model License. It is downloaded from
+Hugging Face at revision 9789e0ebf77277911272f0d9a35e1646b5aa6004 when you
+choose to, outside the installer; Agent Moshpit does not distribute it. The
+app's MIT licence does not replace that agreement:
+https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
 
-Other voice dependencies: reqwest (MIT OR Apache-2.0), rustls (Apache-2.0 OR
-ISC OR MIT), sha2 (MIT OR Apache-2.0), and debug WAV fixture reader hound
-(Apache-2.0). Cargo.lock records exact versions, including transitive native
-platform/build dependencies. Upstream dependency sources retain their notices.
+Cloud voice, with your own key, uses tungstenite 0.30 (MIT OR Apache-2.0) for
+the WebSocket, rustls (Apache-2.0 OR ISC OR MIT) with rustls-platform-verifier
+(MIT OR Apache-2.0) to check the provider's certificate against the system's
+own, and keyring 3.6 (MIT OR Apache-2.0) to keep keys in the system keychain.
+
+Other voice dependencies: reqwest (MIT OR Apache-2.0), sha2 (MIT OR
+Apache-2.0), base64 and url (MIT OR Apache-2.0), and the debug WAV fixture
+reader hound (Apache-2.0). Cargo.lock records exact versions, including
+transitive native platform/build dependencies. Upstream dependency sources
+retain their notices.
 
 Sources:
-- https://github.com/ggml-org/whisper.cpp/tree/v1.8.3
-- https://codeberg.org/tazz4843/whisper-rs
+- https://github.com/handy-computer/transcribe.cpp
+- https://github.com/ggml-org/ggml
+- https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b
+- https://huggingface.co/handy-computer/nemotron-speech-streaming-en-0.6b-gguf
 - https://github.com/RustAudio/cpal/tree/v0.15.3
-- https://github.com/openai/whisper/blob/main/LICENSE
-- https://huggingface.co/ggerganov/whisper.cpp
+- https://github.com/snapview/tungstenite-rs
+- https://crates.io/crates/keyring
+- https://github.com/rustls/rustls-platform-verifier
 
-## whisper.cpp / ggml — MIT
+## transcribe.cpp — MIT
+
 MIT License
 
-Copyright (c) 2023-2024 The ggml authors
+Copyright (c) 2026 The transcribe.cpp authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,11 +57,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Whisper model weights — MIT
+## ggml — MIT
 
 MIT License
 
-Copyright (c) 2022 OpenAI
+Copyright (c) 2023-2026 The ggml authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -67,32 +81,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## whisper-rs / whisper-rs-sys — Unlicense
-
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
-
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <https://unlicense.org>
 ## CPAL / hound — Apache-2.0
 
                                  Apache License

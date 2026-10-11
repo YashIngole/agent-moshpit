@@ -145,8 +145,8 @@ jobs:
 
       - run: npm ci
 
+      # Every system: a cached speech engine keeps the instruction set it was built for.
       - name: Refresh platform native build configuration
-        if: runner.os != 'Linux'
         run: cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys --release --target ${{ matrix.target }}
 
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1

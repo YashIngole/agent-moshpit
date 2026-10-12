@@ -100,6 +100,16 @@ jobs:
         shell: bash
         run: src-tauri/target/debug/agent-moshpit --voice-worker --self-test
 
+      # The release profile links differently (LTO): on Apple Silicon it once failed only
+      # there, after this check had passed. Link it as the release does, before a tag.
+      - name: Release link on Apple Silicon
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        shell: bash
+        run: |
+          cargo clean --manifest-path src-tauri/Cargo.toml -p transcribe-cpp-sys --release --target aarch64-apple-darwin
+          npx tauri build --no-bundle --target aarch64-apple-darwin
+          src-tauri/target/aarch64-apple-darwin/release/agent-moshpit --voice-worker --self-test
+
       - name: Windows runtime linkage
         if: runner.os == 'Windows'
         shell: pwsh

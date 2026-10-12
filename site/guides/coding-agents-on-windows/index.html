@@ -122,8 +122,7 @@
           <p class="checked"><span class="tag">checked 9 October 2026</span><span class="tag">Windows 11</span><span class="tag">Agent Moshpit 0.3.0</span></p>
         </header>
 
-        <section class="room" aria-labelledby="short">
-          <p class="sign"><b>the short answer<span class="slash">/</span></b><span>read 9 October 2026</span></p>
+        <section aria-labelledby="short">
           <div class="text">
             <h2 id="short">What runs on Windows, and how</h2>
             <p>
@@ -156,8 +155,7 @@
           </div>
         </section>
 
-        <section class="room" aria-labelledby="native">
-          <p class="sign"><b>windows itself<span class="slash">/</span></b><span>nothing to install</span></p>
+        <section aria-labelledby="native">
           <div class="text">
             <h2 id="native">What Windows already gives you</h2>
             <p>
@@ -176,8 +174,7 @@
           </div>
         </section>
 
-        <section class="room" aria-labelledby="one-window">
-          <p class="sign"><b>one window<span class="slash">/</span></b><span>Agent Moshpit</span></p>
+        <section aria-labelledby="one-window">
           <div class="text">
             <h2 id="one-window">Agent Moshpit on Windows</h2>
             <p>
@@ -204,7 +201,7 @@
               Or paste this into PowerShell, which asks nothing:
             </p>
           </div>
-          <div class="line"><code>irm https://agentmoshpit.com/install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" hidden>copy</button></div>
+          <div class="line"><code>irm https://<wbr />agentmoshpit.com/<wbr />install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" aria-label="Copy the PowerShell command" hidden>copy</button></div>
           <div class="text">
             <p>The <a href="/install.ps1">script</a> is short, if you want to read it first. Windows 10 is untried.</p>
             <h3>What it is not</h3>
@@ -220,8 +217,7 @@
           </div>
         </section>
 
-        <section class="room" aria-labelledby="asked">
-          <p class="sign"><b>asked<span class="slash">/</span></b></p>
+        <section aria-labelledby="asked">
           <div class="text"><h2 id="asked">Questions people ask</h2></div>
           <dl class="asked">
             <dt>Is there a cmux for Windows?</dt>
@@ -237,8 +233,7 @@
           </dl>
         </section>
 
-        <section class="room" aria-labelledby="more">
-          <p class="sign"><b>guides<span class="slash">/</span></b><span>read next</span></p>
+        <section aria-labelledby="more">
           <div class="text"><h2 id="more">Read next</h2></div>
           <ul class="guides">
             <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways, from more terminal tabs to one window made for it.</span></a></li>
@@ -247,16 +242,15 @@
           </ul>
         </section>
 
-        <section class="room" id="get" aria-labelledby="get-h">
-          <p class="sign"><b>download<span class="slash">/</span></b><span>free, MIT</span></p>
+        <section id="get" aria-labelledby="get-h">
           <div class="text">
             <h2 id="get-h">Get Agent Moshpit</h2>
             <p>Free and open source, with no account to make. It runs the <code>claude</code> and <code>codex</code> you already have, with your own sign-ins.</p>
           </div>
           <ul class="files across">
-            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
-            <li><a class="file usual" href="/#macos"><b>macOS</b><code>command</code></a></li>
-            <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
+            <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Windows</b><code>.exe</code></a></li>
+            <li><a class="file" href="/#macos"><b>macOS</b><code>command</code></a></li>
+            <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Linux</b><code>.AppImage</code></a></li>
           </ul>
           <p class="after">
             Used every day on Windows 11. The macOS and Linux builds pass the same automated checks and have not been used by hand yet.
@@ -267,7 +261,7 @@
     </main>
 
     <footer class="foot">
-      <p>
+      <p class="ends">
         <span class="who">agent moshpit</span>
         <a href="/">home</a>
         <a href="/guides/">guides</a>

@@ -125,6 +125,16 @@ export interface LaunchOptions {
   disallowed_tools?: string[]
   chrome?: boolean | null
   instructions?: string
+  /** Plugins switched on or off for this desk alone, by name. Only those changed from the program's own settings. */
+  plugins?: Record<string, boolean>
+  /** Further words for the program, as typed, after every setting above. */
+  extra_args?: string[]
+}
+
+/** A plugin the program has installed, and whether it is on in its own settings. */
+export interface PluginChoice {
+  id: string
+  enabled: boolean
 }
 
 export interface ModelChoice {
@@ -145,6 +155,8 @@ export interface PermissionChoice {
 export interface ModelCatalog {
   models: ModelChoice[]
   permissions: PermissionChoice[]
+  /** The plugins it has installed, when it can be told which to use for one run. */
+  plugins?: PluginChoice[]
   features: string[]
   fetched_ms: number
   source: string

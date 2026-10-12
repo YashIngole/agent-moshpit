@@ -33,10 +33,22 @@ pub struct PermissionChoice {
     pub description: String,
 }
 
+/// A plugin the program has installed, by the name the program gives it, and whether
+/// it is on in the folder that was asked about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginChoice {
+    pub id: String,
+    pub enabled: bool,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Catalog {
     pub models: Vec<ModelChoice>,
     pub permissions: Vec<PermissionChoice>,
+    /// The plugins it has installed. Listed only when it can be told which to use for one
+    /// run (the feature `plugins`).
+    #[serde(default)]
+    pub plugins: Vec<PluginChoice>,
     pub features: Vec<String>,
     pub fetched_ms: u64,
     pub source: String,
@@ -71,6 +83,13 @@ impl Cache {
             return catalog;
         }
         let mut catalog = probe();
+        // A list of plugins that could not be read this time does not erase the last one.
+        if !catalog.features.iter().any(|f| f == "plugins") {
+            if let Some(previous) = before.as_ref().filter(|previous| previous.features.iter().any(|f| f == "plugins")) {
+                catalog.plugins = previous.plugins.clone();
+                catalog.features.push("plugins".into());
+            }
+        }
         // A network failure does not erase a usable last catalog.
         if catalog.models.is_empty() {
             if let Some(previous) = before {
@@ -175,6 +194,14 @@ fn discover(h: &Harness, found: &Found, cwd: &str, profile: &str) -> Catalog {
     let help = capture(found, &["--help".into()], cwd, false).unwrap_or_default();
     catalog.features = features(&help, h.launch);
     catalog.permissions = permissions(&help, h.launch);
+    // Its plugins, and which are on in this folder, as the program reads its own settings.
+    // Offered only when it can also be told, for one run, which of them to use.
+    if h.launch == Provider::Claude && help.contains("--settings") && help.contains("plugin") {
+        if let Some(plugins) = capture(found, &["plugin".into(), "list".into(), "--json".into()], cwd, false).ok().and_then(|text| plugins_from(&text)) {
+            catalog.plugins = plugins;
+            catalog.features.push("plugins".into());
+        }
+    }
     let args = match h.launch {
         Provider::Codex => {
             let mut args = Vec::new();
@@ -226,6 +253,23 @@ pub fn parse(text: &str, provider: Provider) -> Result<Vec<ModelChoice>, String>
         });
     }
     Ok(models)
+}
+
+/// The plugins in what `claude plugin list --json` prints: each one's name and whether it
+/// is on. None when that is not a list. An entry without a plain name, or that does not
+/// say whether it is on, is left out rather than guessed at.
+fn plugins_from(text: &str) -> Option<Vec<PluginChoice>> {
+    let listed: Vec<Value> = serde_json::from_str(text.trim()).ok()?;
+    let mut seen = HashSet::new();
+    let plain = |id: &str| !id.is_empty() && id.len() <= 200 && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '@' | '/'));
+    Some(
+        listed
+            .iter()
+            .filter_map(|entry| Some(PluginChoice { id: entry["id"].as_str().filter(|id| plain(id))?.to_string(), enabled: entry["enabled"].as_bool()? }))
+            .filter(|plugin| seen.insert(plugin.id.clone()))
+            .take(64)
+            .collect(),
+    )
 }
 
 fn features(help: &str, provider: Provider) -> Vec<String> {
@@ -332,6 +376,34 @@ mod tests {
         assert_eq!(models[0].resolved, "future-id");
         assert_eq!(models[0].auto_mode, Some(false));
         assert_eq!(models[0].efforts, ["new-effort"]);
+    }
+
+    #[test]
+    fn installed_plugins_are_listed_as_the_program_lists_them() {
+        // As Claude Code prints it, with more about each than is used.
+        let text = json!([
+            { "id": "rust-analyzer-lsp@claude-plugins-official", "version": "1.0.0", "scope": "user", "enabled": true, "installPath": "C:\\Users\\Someone\\.claude\\plugins\\x", "projectEnabled": false },
+            { "id": "figma@claude-plugins-official", "enabled": false },
+            { "id": "figma@claude-plugins-official", "enabled": true },
+            { "id": "not a plain name", "enabled": true },
+            { "id": "says-nothing@market" },
+            { "enabled": true }
+        ])
+        .to_string();
+        let plugins = plugins_from(&text).unwrap();
+        assert_eq!(plugins, vec![PluginChoice { id: "rust-analyzer-lsp@claude-plugins-official".into(), enabled: true }, PluginChoice { id: "figma@claude-plugins-official".into(), enabled: false }]);
+        assert_eq!(plugins_from("[]"), Some(vec![]));
+        assert_eq!(plugins_from("No plugins installed."), None);
+        assert_eq!(plugins_from("{\"plugins\":[]}"), None);
+
+        // A list that cannot be read this time does not erase the last one.
+        let cache = Cache::default();
+        let with = Catalog { plugins: plugins.clone(), features: vec!["model".into(), "plugins".into()], ..fixture("m") };
+        assert_eq!(cache.load("cli".into(), false, || with.clone()).plugins.len(), 2);
+        std::thread::sleep(Duration::from_millis(2));
+        let again = cache.load("cli".into(), true, || Catalog { features: vec!["model".into()], ..fixture("m") });
+        assert_eq!(again.plugins, plugins);
+        assert!(again.features.iter().any(|f| f == "plugins"));
     }
 
     #[test]

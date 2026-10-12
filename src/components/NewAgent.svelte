@@ -42,7 +42,7 @@
   const chosen = $derived.by(() => {
     const options = kind ? (launches[kind.id] ?? {}) : {}
     const parts = launchable ? [options.model, options.effort && `${options.effort} effort`, options.permission && options.permission !== '' ? options.permission : ''] : []
-    const rest = launchable && (options.profile || options.sandbox || options.approval || options.search != null || options.chrome != null || options.instructions || options.additional_dirs?.length || options.allowed_tools?.length || options.disallowed_tools?.length)
+    const rest = launchable && (options.profile || options.sandbox || options.approval || options.search != null || options.chrome != null || options.instructions || options.additional_dirs?.length || options.allowed_tools?.length || options.disallowed_tools?.length || Object.keys(options.plugins ?? {}).length || options.extra_args?.length)
     return [title.trim() && `“${title.trim()}”`, ...parts, rest ? 'and more' : ''].filter((part): part is string => Boolean(part))
   })
   /** Folders used before, to pick with one click. */

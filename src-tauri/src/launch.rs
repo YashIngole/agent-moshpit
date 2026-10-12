@@ -1,6 +1,7 @@
 //! Per-desk launch overrides. These are argv values, never a shell command.
 use crate::harness::{self, Harness};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -26,7 +27,17 @@ pub struct Options {
     pub disallowed_tools: Vec<String>,
     pub chrome: Option<bool>,
     pub instructions: String,
+    /// Plugins switched on or off for this desk alone, by the name the program gives each.
+    /// Only those changed from the program's own settings are kept here.
+    pub plugins: BTreeMap<String, bool>,
+    /// Further words for the program, exactly as typed, after everything above. For
+    /// whatever it has that the office has no setting for.
+    pub extra_args: Vec<String>,
 }
+
+/// Words that say which conversation Claude Code carries on, or that make it answer once
+/// and end. The office says the first itself, and a desk's program stays in its terminal.
+const CLAUDE_OWN: [&str; 8] = ["--session-id", "--resume", "-r", "--continue", "-c", "--fork-session", "--print", "-p"];
 
 fn word(value: &str, name: &str) -> Result<(), String> {
     if value.len() > 256 || value.starts_with('-') || value.chars().any(|c| c.is_control() || c.is_whitespace()) {
@@ -55,6 +66,17 @@ impl Options {
         if self.instructions.len() > 16_000 || self.instructions.contains('\0') {
             return Err("Extra instructions must be at most 16,000 characters.".into());
         }
+        if self.plugins.len() > 64 || self.plugins.keys().any(|id| id.is_empty() || id.len() > 200 || !id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '@' | '/'))) {
+            return Err("A plugin is named with letters, digits and . _ - @ / only, and at most 64 can be chosen.".into());
+        }
+        if self.extra_args.len() > 64 || self.extra_args.iter().any(|word| word.is_empty() || word.len() > 4096 || word.chars().any(char::is_control)) {
+            return Err("Use at most 64 extra arguments, each on one line and no longer than 4,096 characters.".into());
+        }
+        // What follows a flag may be its value; what comes first can only be a flag. A bare
+        // word there would be read as a command of the program's, or as the task.
+        if self.extra_args.first().is_some_and(|word| !word.starts_with('-')) {
+            return Err("Extra arguments start with a flag, such as --verbose. The task goes in the box above.".into());
+        }
         match provider {
             Provider::Claude => {
                 if !["", "default", "manual", "acceptEdits", "auto", "plan", "dontAsk", "bypassPermissions"].contains(&self.permission.as_str()) {
@@ -62,6 +84,9 @@ impl Options {
                 }
                 if !self.profile.is_empty() || self.search.is_some() || !self.sandbox.is_empty() || !self.approval.is_empty() {
                     return Err("Codex settings cannot be used with Claude Code.".into());
+                }
+                if let Some(own) = self.extra_args.iter().find(|word| CLAUDE_OWN.contains(&word.split('=').next().unwrap_or(word))) {
+                    return Err(format!("{own} cannot be an extra argument. The office says which conversation a desk carries on, and its program stays in its terminal."));
                 }
             }
             Provider::Codex => {
@@ -74,7 +99,7 @@ impl Options {
                 if self.permission != "custom" && (!self.sandbox.is_empty() || !self.approval.is_empty()) {
                     return Err("Select Custom permissions before changing sandbox or approvals.".into());
                 }
-                if self.chrome.is_some() || !self.allowed_tools.is_empty() || !self.disallowed_tools.is_empty() || !self.instructions.is_empty() {
+                if self.chrome.is_some() || !self.allowed_tools.is_empty() || !self.disallowed_tools.is_empty() || !self.instructions.is_empty() || !self.plugins.is_empty() {
                     return Err("Claude settings cannot be used with Codex.".into());
                 }
             }
@@ -118,6 +143,10 @@ impl Options {
             }
             Provider::None => {}
         }
+        // For this one run, on top of the program's own settings, which stay as they are.
+        if provider == Provider::Claude && !self.plugins.is_empty() {
+            args.extend(["--settings".into(), serde_json::json!({ "enabledPlugins": self.plugins }).to_string()]);
+        }
         // Repeat flags, rather than a greedy variadic value swallowing the task.
         if provider == Provider::Claude && !self.additional_dirs.is_empty() {
             args.push("--add-dir".into());
@@ -125,6 +154,8 @@ impl Options {
         } else {
             for dir in &self.additional_dirs { args.extend(["--add-dir".into(), dir.clone()]); }
         }
+        // Last, so they are the final say where they repeat a setting above.
+        args.extend(self.extra_args.iter().cloned());
         Ok(args)
     }
 }
@@ -219,6 +250,67 @@ mod tests {
         assert!(!args.contains(&"--dangerously-skip-permissions".into()));
         assert!(!args.contains(&"low".into()));
         assert!(args.contains(&"plan".into()));
+    }
+
+    #[test]
+    fn plugins_and_extra_arguments_are_passed_as_words_before_the_conversation_and_the_task() {
+        let h = kind(Provider::Claude);
+        let options = Options {
+            plugins: BTreeMap::from([("off-one@market".to_string(), false), ("on-one@market".to_string(), true)]),
+            extra_args: vec!["--remote-control".into(), "--fallback-model".into(), "a model, with a space & more".into()],
+            additional_dirs: vec!["C:/other".into()],
+            ..Options::default()
+        };
+        let start = start_args(&h, Some("session"), "Name", "Fix it", false, &options).unwrap();
+        let at = |word: &str| start.iter().position(|w| w == word).unwrap_or_else(|| panic!("{word} in {start:?}"));
+        // One word of settings, which is JSON naming each plugin and nothing else.
+        let settings: serde_json::Value = serde_json::from_str(&start[at("--settings") + 1]).unwrap();
+        assert_eq!(settings, serde_json::json!({ "enabledPlugins": { "off-one@market": false, "on-one@market": true } }));
+        // The extra words come last of the settings, each exactly as it was given, and the task is still the task.
+        assert_eq!(&start[at("--remote-control")..at("--remote-control") + 3], ["--remote-control", "--fallback-model", "a model, with a space & more"]);
+        assert!(at("--add-dir") < at("--remote-control") && at("--remote-control") < at("--session-id"));
+        assert_eq!(&start[start.len() - 2..], ["--", "Fix it"]);
+        // Carried on, they are passed again, before the word that says which conversation.
+        let resume = resume_args(&h, Some("session"), &options).unwrap().unwrap();
+        assert!(resume.contains(&"--settings".to_string()) && resume.iter().position(|w| w == "--remote-control").unwrap() < resume.iter().position(|w| w == "--resume").unwrap());
+        // The office's MCP link goes after all of them.
+        assert_eq!(prefix_len(&h, &options).unwrap(), resume.iter().position(|w| w == "--resume").unwrap());
+
+        // Codex takes extra words too, before its `resume`.
+        let codex = kind(Provider::Codex);
+        let extra = Options { extra_args: vec!["--enable".into(), "some_feature".into(), "-c".into(), "model_verbosity=\"low\"".into()], ..Options::default() };
+        let resume = resume_args(&codex, Some("session"), &extra).unwrap().unwrap();
+        assert!(resume.iter().position(|w| w == "--enable").unwrap() < resume.iter().position(|w| w == "resume").unwrap());
+        // With nothing chosen, nothing is added.
+        assert!(!start_args(&h, None, "", "", false, &Options::default()).unwrap().contains(&"--settings".to_string()));
+    }
+
+    #[test]
+    fn extra_arguments_that_would_break_a_desk_are_refused_with_the_reason() {
+        let extra = |words: &[&str]| Options { extra_args: words.iter().map(|w| w.to_string()).collect(), ..Options::default() };
+        // Which conversation a desk carries on is the office's to say, and its program stays in its terminal.
+        for own in ["--resume", "-r", "--continue", "-c", "--session-id", "--session-id=abc", "--fork-session", "--print", "-p"] {
+            let why = extra(&["--verbose", own]).args(Provider::Claude).unwrap_err();
+            assert!(why.contains(own) && why.contains("conversation"), "{own}: {why}");
+        }
+        // Codex's -c is a setting, not a conversation.
+        assert!(extra(&["-c", "model_verbosity=low"]).args(Provider::Codex).is_ok());
+        // A bare word first would be a command, or the task.
+        assert!(extra(&["exec", "do it"]).args(Provider::Codex).unwrap_err().contains("start with a flag"));
+        assert!(extra(&["resume"]).args(Provider::Claude).is_err());
+        // One line each, and not without end.
+        assert!(extra(&["--x", "two\nlines"]).args(Provider::Claude).is_err());
+        assert!(extra(&["--x", ""]).args(Provider::Claude).is_err());
+        assert!(Options { extra_args: vec!["--x".into(); 65], ..Options::default() }.args(Provider::Claude).is_err());
+        // A plugin is named plainly, and only Claude Code has them here.
+        let plugin = |id: &str| Options { plugins: BTreeMap::from([(id.to_string(), false)]), ..Options::default() };
+        assert!(plugin("name@market-place_1.0").args(Provider::Claude).is_ok());
+        for bad in ["", "two words", "quote\"d", "semi;colon", "brace}"] {
+            assert!(plugin(bad).args(Provider::Claude).is_err(), "{bad:?}");
+        }
+        assert!(plugin("name@market").args(Provider::Codex).is_err());
+        // A program with no launch settings takes none of these.
+        assert!(extra(&["--x"]).validate(Provider::None).is_err());
     }
 
     #[test]

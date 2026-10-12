@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
+  import { typed, words } from '../lib/args'
   import { catalogKey, keptCatalog, lines, readCatalog } from '../lib/catalogs'
   import type { Harness, LaunchOptions, ModelCatalog } from '../lib/types'
 
@@ -66,6 +67,29 @@
   }
 
   const setting = (value: string) => value === '' ? null : value === 'on'
+
+  /**
+   * The plugins the program has installed, each as it is in the program's own settings,
+   * and after them any chosen for this desk before that it no longer lists.
+   */
+  const plugins = $derived.by(() => {
+    const listed = catalog?.plugins ?? []
+    const kept = Object.entries(options.plugins ?? {})
+      .filter(([id]) => !listed.some(plugin => plugin.id === id))
+      .map(([id, on]) => ({ id, enabled: !on, gone: true }))
+    return [...listed.map(plugin => ({ ...plugin, gone: false })), ...kept]
+  })
+  /** A plugin is named `name@where-it-came-from`. */
+  const pluginName = (id: string) => id.split('@')[0] || id
+  const pluginFrom = (id: string) => id.split('@').slice(1).join('@')
+
+  /** On or off for this desk. One put back as the program has it is no longer a choice of the desk's. */
+  function choosePlugin(plugin: { id: string; enabled: boolean; gone: boolean }, on: boolean) {
+    const chosen = { ...(options.plugins ?? {}) }
+    if (on === plugin.enabled || plugin.gone) delete chosen[plugin.id]
+    else chosen[plugin.id] = on
+    options = { ...options, plugins: chosen }
+  }
 </script>
 
 <div class="launch">
@@ -180,6 +204,34 @@
           </div>
         {/if}
       {/if}
+      {#if kind.launch === 'claude' && plugins.length > 0}
+        <fieldset class="plugins">
+          <legend class="label">Plugins <span>for this desk</span></legend>
+          {#each plugins as plugin (plugin.id)}
+            <label class="tick">
+              <input type="checkbox" checked={options.plugins?.[plugin.id] ?? plugin.enabled} onchange={event => choosePlugin(plugin, event.currentTarget.checked)} />
+              <span class="plugin">{pluginName(plugin.id)}</span>
+              {#if plugin.gone}<span class="from">no longer installed</span>{:else if pluginFrom(plugin.id)}<span class="from">{pluginFrom(plugin.id)}</span>{/if}
+            </label>
+          {/each}
+          <p class="hint">On or off for this desk only. Your {kind.name} settings stay as they are.</p>
+        </fieldset>
+      {/if}
+      <div>
+        <label class="label" for="new-extra">Extra arguments <span>optional</span></label>
+        <textarea
+          id="new-extra"
+          class="field extra"
+          rows="2"
+          spellcheck="false"
+          autocapitalize="off"
+          placeholder="--verbose"
+          aria-describedby="new-extra-hint"
+          value={typed(options.extra_args ?? [])}
+          onchange={event => options = { ...options, extra_args: words(event.currentTarget.value) }}
+        ></textarea>
+        <p class="hint" id="new-extra-hint">For anything {kind.name} takes that has no setting here. Typed as on a command line; quotes keep a value with spaces together.</p>
+      </div>
       <p class="hint">These settings apply to this desk when it starts or carries on. You can also change settings in its terminal.</p>
       <button type="button" class="button quiet reset" onclick={() => { options = {}; customModel = false }}>Reset to CLI settings</button>
     </div>
@@ -202,5 +254,15 @@
   summary:hover { color: var(--ink); }
   .advanced-fields { display: grid; gap: var(--s-3); padding-top: var(--s-3); }
   .advanced-fields .label span { font-weight: 400; color: var(--ink-2); }
+  /* A group with its own name, drawn as the fields around it are: no box of its own. */
+  .plugins { display: grid; gap: var(--s-1); min-width: 0; margin: 0; padding: 0; border: 0; }
+  .plugins legend { padding: 0; }
+  .tick { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; padding: 3px 0; font-size: var(--t-sm); font-weight: 650; }
+  .tick input { flex: none; align-self: center; width: 16px; height: 16px; margin: 0; accent-color: var(--button); }
+  .plugin { min-width: 0; overflow-wrap: anywhere; }
+  .from { min-width: 0; overflow: hidden; font-family: var(--mono); font-size: var(--t-xs); font-weight: 400; color: var(--ink-3); text-overflow: ellipsis; white-space: nowrap; }
+  .plugins .hint { margin-top: var(--s-1); }
+  /* What is typed here is words for a program: in the office's other voice. */
+  .extra { font-family: var(--mono); font-size: var(--t-sm); }
   .reset { justify-self: start; }
 </style>

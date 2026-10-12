@@ -134,13 +134,15 @@ interface Seen {
   sized: { agent: string; cols: number; rows: number }[]
   /** How many times the programs were asked who is signed in. */
   asked: number
+  /** Each agent that was asked for, as it was asked for. */
+  specs: NewAgentSpec[]
   /** Let a sign-in that is waiting (`&signin=waits`) end, as it does when the browser comes back. */
   finishSignIn: () => void
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, finishSignIn: () => {} }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, specs: [], finishSignIn: () => {} }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -297,7 +299,8 @@ export function demoBridge(): Bridge {
             { id: 'custom', name: 'Custom sandbox and approvals', description: 'Choose sandbox and approval policy under Advanced.' }
           ])
         ],
-        features: claude ? ['model', 'effort', 'additional_dirs', 'tools', 'chrome', 'instructions'] : ['model', 'effort', 'additional_dirs', 'profile', 'search'],
+        plugins: claude ? [{ id: 'rust-analyzer-lsp@claude-plugins-official', enabled: true }, { id: 'figma@claude-plugins-official', enabled: false }] : [],
+        features: claude ? ['model', 'effort', 'additional_dirs', 'tools', 'chrome', 'instructions', 'plugins'] : ['model', 'effort', 'additional_dirs', 'profile', 'search'],
         fetched_ms: Date.now(), source: 'Demo model catalog', problem: ''
       }
     },
@@ -313,6 +316,7 @@ export function demoBridge(): Bridge {
     newAgent: async (spec: NewAgentSpec) => {
       const kind = harnesses.find(h => h.id === spec.harness)
       if (!kind?.installed) throw `${kind?.name ?? 'That program'} was not found on this computer.`
+      seen.specs.push(structuredClone(spec))
       made += 1
       const repo = spec.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'project'
       // Named the way the core names a desk: from the task, else program and folder, numbered when taken.

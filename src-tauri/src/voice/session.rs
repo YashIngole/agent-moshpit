@@ -30,6 +30,11 @@ pub trait Session: Send {
     /// Discard everything now. Dropping a session does the same.
     fn cancel(&mut self);
     fn events(&self) -> &Receiver<Event>;
+    /// How long the last words may take to settle after `finish`, before the recording
+    /// ends with what it has.
+    fn settle_within(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(4)
+    }
 }
 
 /// Puts typed pieces together with the right spacing. The terminal write drops leading and

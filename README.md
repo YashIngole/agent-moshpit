@@ -19,7 +19,7 @@ Run multiple Claude Code, Codex and other coding agents side by side in one desk
 - **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
 - **Updates when you say.** When a newer version is out, the ⋯ menu offers it. One click fetches it, checks it against the app's own key and starts the office again.
 - **Private.** No account, no telemetry. See [what it sends](#what-it-sends).
-- **Voice input.** Hold **Ctrl+Shift+Space** and talk: your words are typed into the terminal as you say them. English, on this computer with NVIDIA's Nemotron streaming model, or with your own Deepgram, OpenAI, AssemblyAI or ElevenLabs key. Review the text and press Enter yourself; voice never sends it for you.
+- **Voice input.** Hold **Ctrl+Shift+Space** and talk: your words are typed into the terminal as you say them. English, on this computer with NVIDIA's Nemotron streaming model, or with your own Deepgram, OpenAI, AssemblyAI, ElevenLabs or OpenRouter key. You can say a new agent's first task too. Review the text and press Enter yourself; voice never sends it for you.
 
 ## Install
 

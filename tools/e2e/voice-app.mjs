@@ -174,6 +174,45 @@ try {
   console.log('ok a lost connection keeps the words already typed')
   mock.mode = 'ok'
 
+  // ── OpenRouter, against a pretend one: each phrase goes up whole at the pause after it ──
+  await invoke('voice_key_set', { provider: 'openrouter', key: secret, sessionOnly: true, check: false })
+  await invoke('voice_config', { settings: { ...settings, engine: 'openrouter' } })
+  const routed = async () => (await terminal()).match(/Routerphrase\d+\./g)?.length ?? 0
+  const uploads = mock.uploads.length
+  const socketsBefore = mock.sessions.length
+  await invoke('voice_start', { agent })
+  await until(async () => (await view()).phase === 'listening')
+  assert.equal((await view()).engine, 'openrouter')
+  const routedFrom = Date.now()
+  await until(async () => await routed() >= 1, 15_000)
+  const firstPhrase = Date.now() - routedFrom
+  assert.equal((await view()).phase, 'listening', 'A phrase is typed at its pause, before the recording stops')
+  assert.equal((await view()).partial, '', 'There are no live words with a provider that is sent whole phrases')
+  await sleep(Math.max(0, 11_500 - (Date.now() - routedFrom)))
+  const routedStop = Date.now()
+  await invoke('voice_stop')
+  await until(async () => !(await view()).busy, 30_000)
+  assert.equal((await view()).phase, 'idle', (await view()).message)
+  const sent = mock.uploads.slice(uploads)
+  assert(sent.length >= 2, `A phrase at a pause and the last one at the stop, got ${sent.length}`)
+  await until(async () => await routed() === sent.length, 5_000)
+  for (const upload of sent) {
+    assert.deepEqual([upload.authorization, upload.model, upload.format, upload.language, upload.riff], [`Bearer ${secret}`, 'elevenlabs/scribe-v2', 'wav', 'en', 'RIFF'])
+    // The audio and nothing else: no word hints, nothing about the desk.
+    assert.deepEqual(upload.fields, ['input_audio', 'language', 'model'])
+    assert(upload.samples >= 8000 && upload.samples <= 16 * 16000, `a phrase of ${upload.samples} samples`)
+  }
+  assert.equal(mock.sessions.length, socketsBefore, 'No socket is opened for OpenRouter')
+  console.log(`ok OpenRouter: ${sent.length} phrases uploaded as WAV with the key and no hints; the first typed ${firstPhrase} ms after listening began, the last ${Date.now() - routedStop} ms after stop`)
+  mock.mode = 'reject'
+  await invoke('voice_start', { agent })
+  await until(async () => (await view()).phase === 'error', 30_000)
+  assert.match((await view()).message, /OpenRouter did not accept the key/)
+  assert(!(await view()).message.includes(secret))
+  console.log('ok a key OpenRouter refuses is explained without showing it')
+  mock.mode = 'ok'
+  await invoke('voice_key_remove', { provider: 'openrouter' })
+
   // ── the system keychain: kept there, and gone when removed ──
   const stored = 'mock-key-keychain-9999'
   await invoke('voice_key_set', { provider: 'deepgram', key: stored, sessionOnly: false, check: false })

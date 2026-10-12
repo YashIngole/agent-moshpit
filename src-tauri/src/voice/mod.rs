@@ -37,6 +37,7 @@ pub enum Engine {
     Assemblyai,
     Openai,
     Elevenlabs,
+    Openrouter,
 }
 
 impl Engine {
@@ -47,6 +48,7 @@ impl Engine {
             Engine::Assemblyai => Some(cloud::Provider::Assemblyai),
             Engine::Openai => Some(cloud::Provider::Openai),
             Engine::Elevenlabs => Some(cloud::Provider::Elevenlabs),
+            Engine::Openrouter => Some(cloud::Provider::Openrouter),
         }
     }
 }
@@ -463,7 +465,7 @@ impl Voice {
                 let mut words = settings.vocabulary.clone();
                 words.extend(engine.voice_context(&target.agent, settings.send_desk_names));
                 let key = self.keys.get(provider.id())?;
-                Box::new(cloud::CloudSession::open(provider, key, &words))
+                cloud::open(provider, key, &words)
             }
         };
         #[cfg(debug_assertions)]
@@ -574,8 +576,9 @@ impl Voice {
             }
         }
         session.finish();
-        // The engine settles the last words; usually a tenth of a second.
-        let deadline = Instant::now() + Duration::from_secs(4);
+        // The engine settles the last words; usually a tenth of a second. One that is sent
+        // each phrase whole has the last one still to hear back about.
+        let deadline = Instant::now() + session.settle_within();
         let mut settled = false;
         while !settled {
             let left = deadline.saturating_duration_since(Instant::now());

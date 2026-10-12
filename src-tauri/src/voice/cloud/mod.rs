@@ -1,11 +1,13 @@
 //! Cloud dictation with the user's own key. Each provider is an adapter: what to connect to,
 //! how to send audio, and what its messages mean. The adapters do no I/O; one thread per
-//! recording drives an adapter over a WebSocket (see `net`).
+//! recording drives an adapter over a WebSocket (see `net`). OpenRouter is the exception: it
+//! has no stream to connect to, and takes each phrase as an upload of its own (`openrouter`).
 pub mod assemblyai;
 pub mod deepgram;
 pub mod elevenlabs;
 pub mod net;
 pub mod openai;
+pub mod openrouter;
 
 use super::session::{Event, Session};
 use serde::Serialize;
@@ -20,9 +22,10 @@ pub enum Provider {
     Assemblyai,
     Openai,
     Elevenlabs,
+    Openrouter,
 }
 
-pub const PROVIDERS: [Provider; 4] = [Provider::Deepgram, Provider::Openai, Provider::Assemblyai, Provider::Elevenlabs];
+pub const PROVIDERS: [Provider; 5] = [Provider::Deepgram, Provider::Openai, Provider::Assemblyai, Provider::Elevenlabs, Provider::Openrouter];
 /// Starts the error of a key check that never reached the provider, so the window can offer
 /// to keep the key unchecked.
 pub const UNREACHED: &str = "unreached:";
@@ -34,6 +37,7 @@ impl Provider {
             Provider::Assemblyai => "assemblyai",
             Provider::Openai => "openai",
             Provider::Elevenlabs => "elevenlabs",
+            Provider::Openrouter => "openrouter",
         }
     }
     pub fn name(self) -> &'static str {
@@ -42,18 +46,31 @@ impl Provider {
             Provider::Assemblyai => "AssemblyAI",
             Provider::Openai => "OpenAI",
             Provider::Elevenlabs => "ElevenLabs",
+            Provider::Openrouter => "OpenRouter",
         }
     }
     pub fn from_id(id: &str) -> Option<Provider> {
         PROVIDERS.into_iter().find(|p| p.id() == id)
     }
-    fn adapter(self, terms: &[String]) -> Box<dyn Adapter> {
-        match self {
+    /// How it is spoken to over a socket. None for the one that has no stream.
+    fn adapter(self, terms: &[String]) -> Option<Box<dyn Adapter>> {
+        Some(match self {
             Provider::Deepgram => Box::new(deepgram::Deepgram::new(terms)),
             Provider::Assemblyai => Box::new(assemblyai::AssemblyAi::new(terms)),
             Provider::Openai => Box::new(openai::OpenAi::new(terms)),
             Provider::Elevenlabs => Box::new(elevenlabs::ElevenLabs::new(terms)),
-        }
+            Provider::Openrouter => return None,
+        })
+    }
+}
+
+/// A recording's way to a provider: a socket its words stream over, or, for the provider
+/// that takes whole phrases, an upload for each. `words` are the terms to expect; a
+/// provider that cannot be told them is not sent them.
+pub fn open(provider: Provider, key: String, words: &[String]) -> Box<dyn Session> {
+    match provider.adapter(words) {
+        Some(adapter) => Box::new(CloudSession::open(provider, adapter, key)),
+        None => Box::new(openrouter::Phrases::open(key)),
     }
 }
 
@@ -149,8 +166,7 @@ pub struct CloudSession {
 
 impl CloudSession {
     /// Starts connecting at once; audio fed meanwhile is sent once the socket is open.
-    pub fn open(provider: Provider, key: String, words: &[String]) -> Self {
-        let mut adapter = provider.adapter(words);
+    fn open(provider: Provider, mut adapter: Box<dyn Adapter>, key: String) -> Self {
         #[cfg(debug_assertions)]
         let url = test_endpoint(&adapter.url()).unwrap_or_else(|| adapter.url());
         #[cfg(not(debug_assertions))]
@@ -330,10 +346,12 @@ pub fn check(provider: Provider, key: &str) -> Result<(), String> {
         Provider::Assemblyai => client.get("https://api.assemblyai.com/v2/transcript?limit=1").header("Authorization", key),
         Provider::Openai => client.get("https://api.openai.com/v1/models").header("Authorization", format!("Bearer {key}")),
         Provider::Elevenlabs => client.get("https://api.elevenlabs.io/v1/models").header("xi-api-key", key),
+        Provider::Openrouter => client.get("https://openrouter.ai/api/v1/key").header("Authorization", format!("Bearer {key}")),
     };
     let response = request.send().map_err(|_| format!("{UNREACHED}{} could not be reached to check the key. Check your connection, or save the key without checking.", provider.name()))?;
     match response.status().as_u16() {
         200..=299 => Ok(()),
+        status if provider == Provider::Openrouter => Err(openrouter::refused(status, "")),
         status => Err(failure(provider, net::Failure::Status(status, String::new()))),
     }
 }

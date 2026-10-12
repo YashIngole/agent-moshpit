@@ -4,6 +4,9 @@
 //
 // `mode` decides how it behaves: 'ok', 'reject' (401 before the upgrade, as Deepgram answers a
 // bad key) or 'drop' (the connection is cut after the first settled words).
+//
+// It is a pretend OpenRouter too: a phrase posted to /api/v1/audio/transcriptions is answered
+// with words, or with 401 in 'reject' mode. What was posted is kept in `uploads`.
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 
@@ -40,8 +43,24 @@ function frames(buffer) {
 const results = (transcript, final, extra = {}) => JSON.stringify({ type: 'Results', is_final: final, speech_final: final, channel: { alternatives: [{ transcript, confidence: 0.98 }] }, ...extra })
 
 export async function startMock(port) {
-  const mock = { mode: 'ok', sessions: [] }
-  const server = createServer((_, response) => { response.writeHead(426); response.end() })
+  const mock = { mode: 'ok', sessions: [], uploads: [] }
+  const server = createServer((request, response) => {
+    if (request.method === 'POST' && request.url === '/api/v1/audio/transcriptions') {
+      const chunks = []
+      request.on('data', chunk => chunks.push(chunk))
+      request.on('end', () => {
+        const sent = JSON.parse(Buffer.concat(chunks).toString())
+        const audio = Buffer.from(sent.input_audio?.data ?? '', 'base64')
+        mock.uploads.push({ authorization: request.headers.authorization, fields: Object.keys(sent).sort(), model: sent.model, format: sent.input_audio?.format, language: sent.language, riff: audio.subarray(0, 4).toString('latin1'), samples: Math.max(0, audio.length - 44) / 2 })
+        const [status, answer] = mock.mode === 'reject' ? [401, { error: { message: 'No auth credentials found', code: 401 } }] : [200, { text: `Router phrase ${mock.uploads.length}.`, usage: { seconds: audio.length / 32000 } }]
+        response.writeHead(status, { 'Content-Type': 'application/json' })
+        response.end(JSON.stringify(answer))
+      })
+      return
+    }
+    response.writeHead(426)
+    response.end()
+  })
   const sockets = new Set()
   server.on('upgrade', (request, socket) => {
     sockets.add(socket)

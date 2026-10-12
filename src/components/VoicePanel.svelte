@@ -77,7 +77,7 @@
     <section aria-labelledby="voice-engine">
       <h3 id="voice-engine">Speech engine</h3>
       <label class="choice"><input type="radio" name="voice-engine" checked={local} disabled={voice.changing} onchange={() => void voice.configure({ engine: 'local' })} /><span><strong>On this computer · English</strong><small>NVIDIA Nemotron, downloaded once. Nothing you say leaves this computer.</small></span></label>
-      <label class="choice"><input type="radio" name="voice-engine" checked={!local} disabled={voice.changing} onchange={useCloud} /><span><strong>Cloud · your own key</strong><small>Deepgram, OpenAI, AssemblyAI or ElevenLabs, paid by you. Your audio goes to the provider while you dictate.</small></span></label>
+      <label class="choice"><input type="radio" name="voice-engine" checked={!local} disabled={voice.changing} onchange={useCloud} /><span><strong>Cloud · your own key</strong><small>Deepgram, OpenAI, AssemblyAI, ElevenLabs or OpenRouter, paid by you. Your audio goes to the provider while you dictate.</small></span></label>
     </section>
 
     {#if local}
@@ -106,7 +106,12 @@
         <select id="voice-provider-choice" value={provider.id} disabled={voice.changing} onchange={e => void voice.configure({ engine: e.currentTarget.value as VoiceSettings['engine'] })}>
           {#each voice.view.providers as p (p.id)}<option value={p.id}>{p.name} · {PROVIDERS[p.id].model}{p.configured ? ' · key added' : ''}</option>{/each}
         </select>
-        <p class="consent">While you dictate, your microphone's audio goes to {provider.name} over an encrypted connection, and {provider.name} bills your account for it. {about.privacy}</p>
+        {#if about.phrased}
+          <!-- No stream to this one: said plainly, because the words come later than with the others. -->
+          <p class="consent">Each phrase you dictate goes to {provider.name} over an encrypted connection. {provider.name} passes it to ElevenLabs and takes the cost from your {provider.name} credits. Words are typed a moment after each pause, not while you speak: {provider.name} takes whole phrases, not a live stream. {about.privacy}</p>
+        {:else}
+          <p class="consent">While you dictate, your microphone's audio goes to {provider.name} over an encrypted connection, and {provider.name} bills your account for it. {about.privacy}</p>
+        {/if}
         <p class="links"><button type="button" class="link" onclick={() => bridge.openPage(about.keys)}>Get a {provider.name} key</button><button type="button" class="link" onclick={() => bridge.openPage(about.pricing)}>{provider.name} pricing</button></p>
         <div class="key">
           {#if provider.configured && !editing}
@@ -134,6 +139,12 @@
           {/if}
         </div>
       </section>
+      {#if about.hints === false}
+      <section aria-labelledby="voice-words-heading">
+        <h3 id="voice-words-heading">Word hints</h3>
+        <p class="note">{provider.name} is sent the audio alone: no word hints, and nothing about the desk. Hints you have added are kept for the other providers.</p>
+      </section>
+      {:else}
       <section aria-labelledby="voice-words-heading">
         <h3 id="voice-words-heading">Word hints</h3>
         <p class="note">Names and terms {provider.name} should expect, sent with the audio. Program names such as Claude and Codex are always included.</p>
@@ -146,6 +157,7 @@
         </form>
         <label class="choice"><input type="checkbox" checked={voice.settings.send_desk_names} disabled={voice.changing} onchange={e => void voice.configure({ send_desk_names: e.currentTarget.checked })} /><span>Also send the desk's name, folder and branch</span></label>
       </section>
+      {/if}
     {/if}
 
     <section>

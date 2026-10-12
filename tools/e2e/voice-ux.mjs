@@ -231,6 +231,30 @@ try {
   check(await until(async () => (await old.locator('.readiness').innerText()).includes('Choose Cloud')), 'an old processor is pointed to the cloud')
   await old.close()
 
+  // ── OpenRouter: a phrase at a time, with no live words ──
+  const routed = await cloudSetup()
+  await routed.getByLabel('Provider', { exact: true }).selectOption('openrouter')
+  const consent = async () => (await routed.locator('.consent').innerText()).replace(/\s+/g, ' ')
+  check(await until(async () => (await consent()).includes('Each phrase you dictate goes to OpenRouter')), 'OpenRouter is offered, and says each phrase goes to it')
+  check((await consent()).includes('passes it to ElevenLabs') && (await consent()).includes('your OpenRouter credits'), 'it says who else hears the phrase and what pays for it')
+  check((await consent()).includes('a moment after each pause, not while you speak'), 'it says before anything is bought that words come after each pause, not live')
+  check(await routed.getByLabel('Provider', { exact: true }).evaluate(el => el.selectedOptions[0].textContent.includes('ElevenLabs Scribe v2')), 'the choice names the model that hears')
+  check(await routed.getByLabel('Add word hints').count() === 0 && (await routed.getByRole('heading', { name: 'Word hints' }).locator('..').innerText()).includes('sent the audio alone'), 'it says word hints and desk names are not sent to OpenRouter, and offers none to add')
+  await routed.getByLabel('OpenRouter API key').fill('sk-or-v1-secret-7788')
+  await routed.getByRole('button', { name: 'Save', exact: true }).click()
+  await routed.getByText(/Key added/).waitFor()
+  check((await routed.locator('.key').innerText()).includes('ends in 7788'), 'an OpenRouter key is kept like the others')
+  await routed.getByRole('button', { name: 'Close', exact: true }).click()
+  await routed.locator('[data-desk="demo-2"]').click()
+  await routed.getByRole('button', { name: 'Start voice input' }).click()
+  check(await until(async () => (await routed.locator('.voice-status').innerText()).includes('· OpenRouter')), 'an OpenRouter recording names it')
+  check(await until(async () => (await routed.locator('.voice-status .words').innerText()).includes('a moment after you pause')), 'while listening it says a phrase is typed after a pause')
+  check(await until(async () => await routed.evaluate(() => window.__demo.typed[0]?.data === 'Fix the checkout total'), 6000) && (await routed.locator('.voice-status .words').innerText()).includes('a moment after you pause'), 'a phrase is typed once it settles, with no live words shown before')
+  await routed.getByRole('button', { name: 'Stop and insert' }).click()
+  await routed.getByText(/^Inserted\./).waitFor()
+  check(await routed.evaluate(() => window.__demo.typed.map(t => t.data).join('') === 'Fix the checkout total and add a test'), 'stopping types the last phrase')
+  await routed.close()
+
   // ── saying the task in New agent ──
   const form = await browser.newPage({ viewport: { width: 1280, height: 800 } })
   await form.goto(`http://localhost:${port}/?demo=office&still`)
@@ -354,6 +378,62 @@ try {
     check(await until(async () => await trouble.count() === 0), `the trouble can be dismissed at ${width}`)
     await wrong.close()
   }
+
+  // ── Start pressed while dictating, and then a change of mind while the last words come ──
+  async function withVoice(scene) {
+    const p = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+    await p.goto(`http://localhost:${port}/?demo=office&still&voice=${scene}`)
+    await p.getByRole('button', { name: 'Set up voice input' }).click()
+    await p.getByLabel('Enable voice input').check()
+    await p.getByRole('button', { name: 'Download Nemotron Speech Streaming', exact: true }).click()
+    await p.getByRole('button', { name: 'Remove Nemotron Speech Streaming', exact: true }).waitFor()
+    await p.getByRole('button', { name: 'Close', exact: true }).click()
+    return p
+  }
+  const mind = await withVoice('slow-finish')
+  const started = () => mind.evaluate(() => window.__demo.specs.length)
+  const settle = () => new Promise(resolve => setTimeout(resolve, 2200))
+  /** New agent, a task typed, dictation going, Start pressed: the last words are on their way. */
+  async function startWhileDictating() {
+    await mind.getByRole('button', { name: 'New agent' }).first().click()
+    await mind.getByLabel(/^What should they do/).fill('Review cancellation')
+    await mind.locator('.panel .talk').click()
+    await mind.locator('.voice-line .words', { hasText: 'Fix the checkout' }).waitFor()
+    await mind.getByRole('button', { name: 'Start agent', exact: true }).click()
+    await mind.locator('.voice-line').getByText('Adding the last words').waitFor()
+  }
+  await startWhileDictating()
+  check(await mind.getByRole('button', { name: 'Starting…' }).isDisabled(), 'Start waits, and says so, while the last words come')
+  await mind.keyboard.press('Escape')
+  await mind.locator('aside.panel').waitFor({ state: 'detached' })
+  await settle()
+  check(await started() === 0 && await mind.locator('.pane').count() === 0, 'Escape while the last words come starts nobody')
+  await startWhileDictating()
+  await mind.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await mind.locator('aside.panel').waitFor({ state: 'detached' })
+  await settle()
+  check(await started() === 0 && await mind.locator('.pane').count() === 0, 'Cancel while the last words come starts nobody')
+  await startWhileDictating()
+  await mind.getByRole('button', { name: 'Cancel voice input' }).click()
+  await settle()
+  check(await started() === 0 && await mind.getByRole('button', { name: 'Start agent', exact: true }).isEnabled(), 'cancelling the recording then starts nobody, and leaves the form to start from')
+  check(await mind.getByLabel(/^What should they do/).inputValue() === 'Review cancellation', 'what was typed is still the task')
+  await mind.getByRole('button', { name: 'Start agent', exact: true }).click()
+  check(await until(async () => await mind.evaluate(() => window.__demo.specs.length === 1 && window.__demo.specs[0].prompt === 'Review cancellation')), 'Start pressed again starts the agent, once')
+  await mind.close()
+
+  // A recording that ends in trouble under Start: the agent waits for a second word.
+  const hush = await withVoice('silence')
+  await hush.getByRole('button', { name: 'New agent' }).first().click()
+  await hush.getByLabel(/^What should they do/).fill('Check the logs')
+  await hush.locator('.panel .talk').click()
+  await hush.locator('.voice-line').getByText('Listening').waitFor()
+  await hush.getByRole('button', { name: 'Start agent', exact: true }).click()
+  await hush.locator('.voice-line.error').waitFor()
+  check((await hush.locator('.voice-line.error').innerText()).includes('No clear speech') && await hush.evaluate(() => window.__demo.specs.length) === 0, 'a recording that ends in trouble does not start the agent, and says why in the form')
+  await hush.getByRole('button', { name: 'Start agent', exact: true }).click()
+  check(await until(async () => await hush.evaluate(() => window.__demo.specs.length === 1 && window.__demo.specs[0].prompt === 'Check the logs')), 'Start pressed again starts it with what was typed')
+  await hush.close()
   console.log(`all ${checks} voice UX checks passed`)
 } finally {
   await browser?.close()

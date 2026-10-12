@@ -1,5 +1,5 @@
 /** Where the words come from: this computer, or a cloud provider with the user's own key. */
-export type VoiceEngine = 'local' | 'deepgram' | 'openai' | 'assemblyai' | 'elevenlabs'
+export type VoiceEngine = 'local' | 'deepgram' | 'openai' | 'assemblyai' | 'elevenlabs' | 'openrouter'
 export type VoiceProvider = Exclude<VoiceEngine, 'local'>
 export interface VoiceSettings {
   enabled: boolean
@@ -62,16 +62,23 @@ export interface VoiceField {
   take(text: string, space: boolean): void
 }
 
-/** What the panel says about each provider. Prices change, so they are linked, not quoted. */
-export const PROVIDERS: Record<VoiceProvider, { model: string; keys: string; pricing: string; privacy: string }> = {
+/**
+ * What the panel says about each provider. Prices change, so they are linked, not quoted.
+ * `phrased`: it is sent each phrase whole, at the pause after it, and has no words to show
+ * while one is being said. `hints: false`: it is not told the words to expect.
+ */
+export const PROVIDERS: Record<VoiceProvider, { model: string; keys: string; pricing: string; privacy: string; phrased?: true; hints?: false }> = {
   deepgram: { model: 'Nova-3', keys: 'https://console.deepgram.com/', pricing: 'https://deepgram.com/pricing', privacy: 'Agent Moshpit asks Deepgram not to use your audio to improve its models.' },
   openai: { model: 'gpt-live-transcribe', keys: 'https://platform.openai.com/api-keys', pricing: 'https://openai.com/api/pricing/', privacy: 'OpenAI does not train on API audio unless your organization opts in.' },
   assemblyai: { model: 'Universal-Streaming English', keys: 'https://www.assemblyai.com/dashboard', pricing: 'https://www.assemblyai.com/pricing', privacy: 'Check your AssemblyAI account settings for how it keeps and uses audio.' },
-  elevenlabs: { model: 'Scribe v2 Realtime', keys: 'https://elevenlabs.io/app/settings/api-keys', pricing: 'https://elevenlabs.io/pricing/api', privacy: 'ElevenLabs keeps request logs unless your plan has zero retention. Word hints cost extra with ElevenLabs.' }
+  elevenlabs: { model: 'Scribe v2 Realtime', keys: 'https://elevenlabs.io/app/settings/api-keys', pricing: 'https://elevenlabs.io/pricing/api', privacy: 'ElevenLabs keeps request logs unless your plan has zero retention. Word hints cost extra with ElevenLabs.' },
+  openrouter: { model: 'ElevenLabs Scribe v2', keys: 'https://openrouter.ai/settings/keys', pricing: 'https://openrouter.ai/elevenlabs/scribe-v2', privacy: 'What OpenRouter and ElevenLabs keep of it follows your OpenRouter privacy settings.', phrased: true, hints: false }
 }
 export const isProvider = (engine: VoiceEngine): engine is VoiceProvider => engine !== 'local'
+/** The engine types a phrase at a time, a moment after each pause, and shows no words meanwhile. */
+export const isPhrased = (engine: VoiceEngine): boolean => engine !== 'local' && !!PROVIDERS[engine].phrased
 export function engineName(engine: VoiceEngine): string {
-  return engine === 'local' ? 'this computer' : ({ deepgram: 'Deepgram', openai: 'OpenAI', assemblyai: 'AssemblyAI', elevenlabs: 'ElevenLabs' } as const)[engine]
+  return engine === 'local' ? 'this computer' : ({ deepgram: 'Deepgram', openai: 'OpenAI', assemblyai: 'AssemblyAI', elevenlabs: 'ElevenLabs', openrouter: 'OpenRouter' } as const)[engine]
 }
 
 /** A key error, without the marker that says what the window can offer instead: keep the key

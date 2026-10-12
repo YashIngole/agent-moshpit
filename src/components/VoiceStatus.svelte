@@ -1,7 +1,7 @@
 <script lang="ts">
   import { office } from '../lib/office.svelte'
   import { voice } from '../lib/voice.svelte'
-  import { engineName, shortcutLabel } from '../lib/voice'
+  import { engineName, isPhrased, shortcutLabel } from '../lib/voice'
   let now = $state(Date.now())
   $effect(() => {
     if (!voice.active) return
@@ -44,7 +44,7 @@
     </div>
     {#if voice.view.phase === 'listening' || voice.view.phase === 'transcribing'}
       <!-- The phrase being spoken; phrases already finished are in the terminal. -->
-      <p class="words" class:waiting={!voice.view.partial}>{voice.view.partial || (voice.view.phase === 'listening' ? (voice.view.detail ? `${voice.view.detail} Start speaking; nothing is lost.` : seconds >= 2 && voice.view.level < 3 ? 'No sound detected. Check that your microphone is unmuted, or cancel and choose another input.' : 'Speak. Your words are typed into the terminal as they settle.') : '')}</p>
+      <p class="words" class:waiting={!voice.view.partial}>{voice.view.partial || (voice.view.phase === 'listening' ? (voice.view.detail ? `${voice.view.detail} Start speaking; nothing is lost.` : seconds >= 2 && voice.view.level < 3 ? 'No sound detected. Check that your microphone is unmuted, or cancel and choose another input.' : isPhrased(voice.view.engine) ? 'Speak. Each phrase is typed into the terminal a moment after you pause.' : 'Speak. Your words are typed into the terminal as they settle.') : '')}</p>
     {/if}
     {#if voice.view.phase === 'listening'}
       <div class="recording">

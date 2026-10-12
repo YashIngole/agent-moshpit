@@ -58,7 +58,7 @@ src-tauri/src/   the core, in Rust
   model.rs         what the window is told about the office: plain data
   voice/           dictation: the microphone, pause detection, settled words typed with no Enter, cancellation;
     local/         the speech worker (`--voice-worker`, a child process) and its framed protocol
-    cloud/         the four providers over one WebSocket each, keys in the system keychain
+    cloud/         four providers over one WebSocket each, OpenRouter a phrase at a time over HTTPS; keys in the system keychain
 src/             the window, in Svelte 5
   App.svelte       the frame, the office's own keys, dropped files
   components/      the floor, a desk, a person, the amber band, the top bar and its menu,

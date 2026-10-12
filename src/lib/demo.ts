@@ -12,7 +12,7 @@ import { version as appVersion } from '../../package.json'
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
-import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, engineName, type FieldText, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
+import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, engineName, isPhrased, type FieldText, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
 
 const MIN = 60_000
 
@@ -173,7 +173,7 @@ export function demoBridge(): Bridge {
       { id: 'nemotron-streaming-en-q8', label: 'Nemotron Speech Streaming', bytes: 729650176, ready: false, recommended: true },
       { id: 'nemotron-streaming-en-q4', label: 'Nemotron Speech Streaming, smaller', bytes: 475436032, ready: false, recommended: false }
     ],
-    providers: (['deepgram', 'openai', 'assemblyai', 'elevenlabs'] as const).map(id => ({ id, name: engineName(id), configured: false, last4: '', session_only: false }))
+    providers: (['deepgram', 'openai', 'assemblyai', 'elevenlabs', 'openrouter'] as const).map(id => ({ id, name: engineName(id), configured: false, last4: '', session_only: false }))
   }
   let voiceEpoch = 0
   let downloadEpoch = 0
@@ -236,7 +236,8 @@ export function demoBridge(): Bridge {
       typeSettled(target, Math.max(settled, Math.ceil(heard / 4), 1))
       voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, partial: '', message: target === null ? 'Added to the task.' : 'Inserted. Press Enter in the terminal to send.' })
       endField()
-    }, 300)
+      // `?voice=slow-finish`: the last words take their time, long enough to change one's mind.
+    }, voiceScene === 'slow-finish' ? 1500 : 300)
   }
   /** Start a recording: for a terminal, or with `onText` for a field in the window. */
   const startVoice = async (target: string | null, onText: ((message: FieldText) => void) | null) => {
@@ -276,7 +277,8 @@ export function demoBridge(): Bridge {
       heard += 1
       if (engine === 'local' && voiceScene === 'worker-crash' && heard === 7) { failVoice('The local speech engine stopped unexpectedly. Words already typed stay. Try again.'); return }
       if (heard >= (settled + 1) * 4 + 2 && (voice.agent || voice.field)) typeSettled(voice.field ? null : voice.agent, settled + 1)
-      voiceChange({ partial: cleanVoice(words.slice(settled * 4, heard).join(' ')) })
+      // A provider that is sent whole phrases has no words to show while one is being said.
+      voiceChange({ partial: isPhrased(engine) ? '' : cleanVoice(words.slice(settled * 4, heard).join(' ')) })
     }, 300)
   
   }

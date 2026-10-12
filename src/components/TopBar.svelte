@@ -2,6 +2,7 @@
   // The bar across the top: what this is, whatever wants you and nothing else, the way
   // between the floor and the terminals, and the way to add someone.
   import { bridge } from '../lib/bridge'
+  import { count as panesIn } from '../lib/layout'
   import { office } from '../lib/office.svelte'
   import { elapsed } from '../lib/time'
   import type { Phase } from '../lib/types'
@@ -40,8 +41,8 @@
   }
 
   /** Terminals that were put away can be brought back; open ones can be put away. */
-  const away = $derived(!office.terminals && office.stowed.rows.length > 0)
-  const stowedCount = $derived(office.stowed.rows.reduce((n, row) => n + row.panes.length, 0))
+  const away = $derived(!office.terminals && office.stowed.root !== null)
+  const stowedCount = $derived(panesIn(office.stowed))
 </script>
 
 <header class="bar" class:asking={first}>

@@ -16,7 +16,7 @@
   const waited = $derived(current ? elapsed(office.now - current.since_ms) : '')
   /** What they asked, when the program said; nothing when it only said that it is waiting. */
   const asked = $derived(current ? doing(current) : '')
-  const open = (id: string) => office.show(id, office.terminals || office.stowed.rows.length > 0)
+  const open = (id: string) => office.show(id, office.terminals || office.stowed.root !== null)
 </script>
 
 {#if current}

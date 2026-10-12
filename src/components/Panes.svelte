@@ -2,8 +2,11 @@
   // The open terminals, sharing the room: one, two side by side, or a grid of any
   // number. Each is headed by its worker, and every edge between two can be dragged.
   //
-  // Panes are placed by position, not nested in rows, so a terminal is never torn
-  // down and made again when the grid changes shape around it.
+  // Panes are placed by position, not nested in rows, and kept in the page in an order
+  // that never changes while they are open. So a terminal is never torn down and made
+  // again when the room changes shape around it, and never moved in the page either:
+  // a terminal that is moved loses the keyboard.
+  import { plan as laidOut, type Edge } from '../lib/layout'
   import { openDeskMenu } from '../lib/menus'
   import { office, type MenuItem } from '../lib/office.svelte'
   import { terms } from '../lib/terms'
@@ -13,49 +16,12 @@
   import Person from './Person.svelte'
   const terminalView = import('./TerminalView.svelte')
 
-  interface Placed {
-    id: string
-    left: number
-    top: number
-    width: number
-    height: number
-  }
-  interface Edge {
-    key: string
-    kind: 'column' | 'row'
-    row: number
-    index: number
-    left: number
-    top: number
-    length: number
-    /** Where the edge stands along its own axis, 0 to 1, for a screen reader. */
-    at: number
-  }
-
-  const sum = (sizes: number[]) => sizes.reduce((total, size) => total + size, 0)
-
-  /** Where each pane and each edge is, as shares of the room. */
-  const plan = $derived.by(() => {
-    const panes: Placed[] = []
-    const edges: Edge[] = []
-    const rows = office.layout.rows
-    const all = sum(rows.map(row => row.size)) || 1
-    let top = 0
-    rows.forEach((row, r) => {
-      const height = row.size / all
-      const across = sum(row.panes.map(pane => pane.size)) || 1
-      let left = 0
-      row.panes.forEach((pane, p) => {
-        const width = pane.size / across
-        panes.push({ id: pane.id, left, top, width, height })
-        left += width
-        if (p < row.panes.length - 1) edges.push({ key: `c${r}.${p}`, kind: 'column', row: r, index: p, left, top, length: height, at: left })
-      })
-      top += height
-      if (r < rows.length - 1) edges.push({ key: `r${r}`, kind: 'row', row: r, index: r, left: 0, top, length: 1, at: top })
-    })
-    return { panes, edges }
-  })
+  /** Where each pane and each edge is, as shares of the room. Panes come in reading order. */
+  const plan = $derived(laidOut(office.layout))
+  /** The panes in the order they are kept in the page: by desk, whatever the room looks like. */
+  const kept = $derived([...plan.panes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)))
+  /** What a pane is called in the page, so the room can say what order they are read in. */
+  const named = (id: string) => `pane-${id}`
 
   const agentOf = (id: string): Agent | undefined => office.agents.find(a => a.id === id)
   const jobOf = (id: string): Job | undefined => office.jobs.find(j => j.id === id)
@@ -78,14 +44,17 @@
   let needle = $state('')
   let missing = $state(false)
 
+  /** How far along its own split the pointer is: what an edge held there would be moved to. */
   function where(event: PointerEvent, edge: Edge): number {
     const box = room!.getBoundingClientRect()
-    return edge.kind === 'column' ? (event.clientX - box.left) / box.width : (event.clientY - box.top) / box.height
+    const across = edge.kind === 'column' ? (event.clientX - box.left) / box.width : (event.clientY - box.top) / box.height
+    return edge.span > 0 ? (across - edge.from) / edge.span : edge.at
   }
 
+  /** No pane is dragged narrower or shorter than a terminal can be read in. */
   function move(edge: Edge, at: number) {
-    if (edge.kind === 'column') office.dragColumnEdge(edge.row, edge.index, at)
-    else office.dragRowEdge(edge.index, at)
+    const box = room!.getBoundingClientRect()
+    office.dragEdge(edge.path, edge.index, at, { row: 160 / box.width, column: 110 / box.height })
   }
 
   function onEdgeDown(event: PointerEvent, edge: Edge) {
@@ -207,8 +176,8 @@
 
 <svelte:window onpointermove={onWindowMove} onpointerup={onWindowUp} onpointercancel={onWindowUp} />
 
-<section class="panes" class:dragging={dragging !== '' || moving !== ''} aria-label="Terminals" bind:this={room}>
-  {#each plan.panes as pane (pane.id)}
+<section class="panes" class:dragging={dragging !== '' || moving !== ''} aria-label="Terminals" aria-owns={plan.panes.map(pane => named(pane.id)).join(' ')} bind:this={room}>
+  {#each kept as pane (pane.id)}
     {@const agent = agentOf(pane.id)}
     {@const job = jobOf(pane.id)}
     {@const zoomed = office.zoomed === pane.id}
@@ -221,6 +190,7 @@
       class:dropping={office.dropTarget === pane.id}
       class:moving={moving === pane.id}
       class:target={target === pane.id}
+      id={named(pane.id)}
       data-pane={pane.id}
       style:left={zoomed ? '0' : percent(pane.left)}
       style:top={zoomed ? '0' : percent(pane.top)}
@@ -398,6 +368,7 @@
         onpointermove={event => onEdgeMove(event, edge)}
         onpointerup={() => onEdgeUp(edge)}
         onpointercancel={() => onEdgeUp(edge)}
+        onlostpointercapture={() => onEdgeUp(edge)}
         ondblclick={() => office.evenOut()}
         onkeydown={event => onEdgeKey(event, edge)}
       ></div>
@@ -689,7 +660,7 @@
     cursor: col-resize;
   }
   .edge.row {
-    width: 100%;
+    width: var(--length);
     height: 9px;
     margin-top: -5px;
     cursor: row-resize;

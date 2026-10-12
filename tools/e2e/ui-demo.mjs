@@ -64,8 +64,18 @@ async function open(query, width = 1280, height = 800) {
 
 const focused = page => page.evaluate(() => document.activeElement?.getAttribute('data-desk') ?? document.activeElement?.className ?? '')
 const panes = page => page.locator('.pane').count()
+/** Every pane as it is laid out, in reading order: the page keeps them in an order of its own, which never changes. */
+const laidOut = page =>
+  page.locator('.pane').evaluateAll(all =>
+    all
+      .map(p => ({ r: p.getBoundingClientRect(), id: p.dataset.pane ?? '', title: p.querySelector('h2')?.textContent ?? '' }))
+      .map(({ r, id, title }) => ({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), id, title }))
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+  )
 /** The size of every pane, in the order they are laid out. */
-const boxes = page => page.locator('.pane').evaluateAll(all => all.map(p => p.getBoundingClientRect()).map(r => ({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) })))
+const boxes = async page => (await laidOut(page)).map(({ x, y, w, h }) => ({ x, y, w, h }))
+/** The names on the panes, in the order they are laid out. */
+const paneTitles = async page => (await laidOut(page)).map(pane => pane.title)
 const desk = (page, n) => page.locator(`.floor button[data-desk="demo-${n}"]`)
 
 /** Keep asking until it is true, or give up. */
@@ -297,7 +307,7 @@ try {
   check('Ctrl+Enter on a desk opens it beside the others', await until(async () => (await panes(page)) === 4))
 
   const spot = title => page.locator('.pane', { hasText: title }).evaluate(p => `${Math.round(p.getBoundingClientRect().x)},${Math.round(p.getBoundingClientRect().y)}`)
-  const [one, two] = await page.locator('.pane h2').allTextContents()
+  const [one, two] = await paneTitles(page)
   const [oneAt, twoAt] = [await spot(one), await spot(two)]
   const head = await page.locator('.pane', { hasText: one }).locator('.status').boundingBox()
   const there = await page.locator('.pane', { hasText: two }).locator('.screen').boundingBox()

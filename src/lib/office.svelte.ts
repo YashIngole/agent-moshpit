@@ -5,7 +5,7 @@ import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
 import { groupProjects } from './projects'
 import { terms } from './terms'
-import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
+import { EMPTY, close, even, has, ids, moveEdge, only, open, parse, sideBySide, swap, trade, type Layout, type Least, type Room } from './layout'
 import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 import { mixed as manyPrograms } from './words'
 
@@ -147,9 +147,9 @@ class Office {
   homeDesk = $state('')
 
   /** The terminals on screen, and how they share the room. */
-  layout = $state<Layout>(EMPTY)
+  layout = $state.raw<Layout>(EMPTY)
   /** The terminals that were on screen before the user went back to the floor. */
-  stowed = $state<Layout>(REMEMBERED.layout)
+  stowed = $state.raw<Layout>(REMEMBERED.layout)
   /** The pane the keyboard goes to. */
   focused = $state('')
   /** A pane given the whole room for a while. The others wait behind it. */
@@ -273,7 +273,7 @@ class Office {
   /** One room per project, in the order the core sends them. */
   rooms = $derived(groupProjects(this.agents))
   /** Whether any terminal is on screen. */
-  terminals = $derived(this.layout.rows.length > 0)
+  terminals = $derived(this.layout.root !== null)
   /** The desks whose terminal is on screen. */
   open = $derived(new Set(ids(this.layout)))
   /** Whether the floor beside the terminals is narrow enough to be a list of names. */
@@ -370,7 +370,7 @@ class Office {
     if (layout !== this.layout) this.#lay(layout)
     this.stowed = only(this.stowed, alive)
     // The window was closed with terminals open and their programs kept running: they come back as they were.
-    if (first && REMEMBERED.open && this.layout.rows.length === 0 && ids(this.stowed).some(id => snapshot.agents.find(a => a.id === id)?.running)) {
+    if (first && REMEMBERED.open && this.layout.root === null && ids(this.stowed).some(id => snapshot.agents.find(a => a.id === id)?.running)) {
       this.focused = ids(this.stowed)[0] ?? ''
       this.#lay(this.stowed)
     }
@@ -393,7 +393,7 @@ class Office {
 
   /** Open a desk's terminal beside the others, as the band does: nobody's pane is taken from under them. */
   #openBeside(id: string) {
-    this.show(id, this.terminals || this.stowed.rows.length > 0)
+    this.show(id, this.terminals || this.stowed.root !== null)
   }
 
   /** True once for an agent that joined after the window opened: their desk plays the walk-in. */
@@ -477,11 +477,11 @@ class Office {
   #place(id: string, beside: boolean) {
     let layout = this.layout
     // Back from the floor: the terminals that were open come back, with this one among them.
-    if (layout.rows.length === 0 && this.stowed.rows.length > 0) layout = this.stowed
+    if (layout.root === null && this.stowed.root !== null) layout = this.stowed
     if (!has(layout, id)) {
       const near = has(layout, this.focused) ? this.focused : (ids(layout).at(-1) ?? '')
       const from = beside || !near || this.#roomBeside(layout) ? '' : this.#makesRoom(layout, near)
-      if (!from) layout = open(layout, id, near || undefined)
+      if (!from) layout = open(layout, id, near || undefined, this.#room())
       else {
         // A grid someone built, or a pane other than the one in use: which made room is said, with a way back.
         if (ids(layout).length > 1 || from !== near) this.#sayMadeRoom(from, id, layout)
@@ -510,9 +510,10 @@ class Office {
 
   /** Whether the terminals are wide enough for one more beside them, each still a usual terminal's width. */
   #roomBeside(layout: Layout): boolean {
-    if (layout.rows.length !== 1 || this.zoomed) return false
+    const beside = sideBySide(layout)
+    if (beside === 0 || this.zoomed) return false
     const width = window.innerWidth - (window.innerWidth <= 760 ? 0 : Math.min(this.floorWidth, window.innerWidth - 420))
-    return width / (layout.rows[0]!.panes.length + 1) >= ROOMY_PANE
+    return width / (beside + 1) >= ROOMY_PANE
   }
 
   #sayMadeRoom(from: string, to: string, before: Layout) {
@@ -564,7 +565,7 @@ class Office {
       this.finding = ''
       this.#lay(EMPTY)
       void tick().then(() => this.#focusDesk(last))
-    } else if (this.stowed.rows.length > 0) {
+    } else if (this.stowed.root !== null) {
       const layout = this.stowed
       if (!has(layout, this.focused)) this.focused = ids(layout)[0] ?? ''
       this.panel = null
@@ -606,12 +607,20 @@ class Office {
     if (layout !== this.layout) this.#lay(layout)
   }
 
-  dragColumnEdge(row: number, index: number, at: number) {
-    this.layout = moveColumnEdge(this.layout, row, index, at)
+  /** An edge between panes, dragged: `at` is how far along its own split it now stands. Remembered when it is let go. */
+  dragEdge(path: number[], index: number, at: number, least?: Least) {
+    this.layout = moveEdge(this.layout, path, index, at, least)
   }
 
-  dragRowEdge(index: number, at: number) {
-    this.layout = moveRowEdge(this.layout, index, at)
+  /**
+   * The room the terminals share, in pixels: measured when they are showing, and
+   * otherwise reckoned from the window, as it will be once they are.
+   */
+  #room(): Room {
+    const shown = document.querySelector('.panes')?.getBoundingClientRect()
+    if (shown && shown.width > 0 && shown.height > 0) return { width: shown.width, height: shown.height }
+    const floor = window.innerWidth <= 760 ? 0 : Math.min(this.terminals ? this.floorWidth : FLOOR_WIDTH.terminals, window.innerWidth - 420)
+    return { width: Math.max(320, window.innerWidth - floor), height: Math.max(240, window.innerHeight - 52) }
   }
 
   evenOut() {
@@ -765,7 +774,7 @@ class Office {
       this.rememberFolder(spec.cwd)
       this.lastHarness = spec.harness
       if (this.focused === jobId) this.focused = id
-      this.#lay(has(this.layout, jobId) ? swap(this.layout, jobId, id) : open(this.layout, id))
+      this.#lay(has(this.layout, jobId) ? swap(this.layout, jobId, id) : open(this.layout, id, undefined, this.#room()))
       bridge.forgetJob(jobId)
     } catch (error) {
       this.problem = typeof error === 'string' ? error : 'The agent could not be started.'

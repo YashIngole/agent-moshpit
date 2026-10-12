@@ -12,7 +12,7 @@ export function deskItems(agent: Agent): MenuItem[] {
   const items: MenuItem[] = []
   const shown = office.open.has(agent.id)
   if (!shown) items.push({ label: 'Open their terminal', keys: 'Enter', run: () => office.show(agent.id) })
-  if (!shown && (office.terminals || office.stowed.rows.length > 0)) {
+  if (!shown && (office.terminals || office.stowed.root !== null)) {
     items.push({ label: 'Open beside the others', keys: 'Ctrl+Enter', run: () => office.show(agent.id, true) })
   }
   items.push({ label: 'Rename', keys: 'F2', run: () => office.startRename(agent.id) })

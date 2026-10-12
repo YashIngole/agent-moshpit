@@ -3,8 +3,8 @@
 //   npm run build:site && node tools/site-shots.mjs
 //
 // Writes into site/img:
-//   terminals.webp, terminals-narrow.webp   the floor with terminals beside it (the page's opening)
-//   office.webp                             the floor by itself
+//   office.webp                             the floor by itself (the home page's opening, until the app itself is drawn)
+//   terminals.webp, terminals-narrow.webp   the floor with terminals beside it (a guide uses the first; the page no longer uses the narrow one)
 //   pose-<status>.webp                      one person for each status, as the app draws them
 //   card.png                                what a link to the site shows
 //   guide-<what>.webp                       the same window looked at more closely, for site/guides

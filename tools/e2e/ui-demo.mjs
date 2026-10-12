@@ -932,6 +932,68 @@ try {
   check('New agent folds its options into one line until asked', !(await page.locator('#new-model').isVisible()) && (await page.locator('details.options > summary').textContent())?.includes('More options'))
   await page.context().close()
 
+  // ── signing in: who is signed in to each program, switching, and a desk whose program is signed out ──
+  {
+    const programs = async p => {
+      await p.getByRole('button', { name: 'More', exact: true }).click()
+      await p.getByRole('menuitem', { name: /Agent programs/ }).click()
+      await p.locator('aside.panel .program-group').first().waitFor()
+    }
+    const row = (p, name) => p.locator('aside.panel li', { has: p.locator('.name', { hasText: new RegExp(`^${name}$`) }) })
+
+    let signs = await open('demo=office&still')
+    await programs(signs)
+    check('the programs are asked who is signed in when their panel opens', (await signs.evaluate(() => window.__demo.asked)) >= 1)
+    check('each says who, in its own words', ((await row(signs, 'Claude Code').locator('.account').textContent()) ?? '') === 'Signed in as you@example.com · Max' && ((await row(signs, 'Codex').locator('.account').textContent()) ?? '') === 'Logged in using ChatGPT')
+    check('with the command that signs in, and a way to sign in as someone else', ((await row(signs, 'Claude Code').locator('.do code').last().textContent()) ?? '') === 'claude auth login' && (await row(signs, 'Claude Code').getByRole('button', { name: 'switch account' }).count()) === 1)
+    check('a program the office cannot sign in to offers nothing of the kind', (await row(signs, 'Hermes').locator('.account').count()) === 0 && (await row(signs, 'Hermes').getByRole('button', { name: /sign in|switch account/ }).count()) === 0)
+    check('with desks of it running, it is said that they keep their sign-in until restarted', ((await row(signs, 'Claude Code').locator('.note').last().textContent()) ?? '').includes('sign-in') && ((await row(signs, 'Claude Code').locator('.note').last().textContent()) ?? '').includes('restarted'))
+    check('the panel still fits its own buttons, with the sign-in rows in it', await signs.locator('aside.panel .do .button').evaluateAll(buttons => buttons.length > 0 && buttons.every(b => b.getBoundingClientRect().right <= b.closest('aside').getBoundingClientRect().right - 8 && b.scrollWidth <= b.clientWidth + 1)))
+    await row(signs, 'Claude Code').getByRole('button', { name: 'switch account' }).click()
+    check('signing in runs the program’s own command in a pane, where it can be watched', await until(async () => (await signs.locator('.pane[aria-label="Claude Code signed in"]').count()) === 1 && ((await signs.locator('.pane[data-pane="job-signin-claude"] .xterm-accessibility-tree').innerText()) ?? '').includes('claude auth login')), await signs.locator('.pane').evaluateAll(ps => ps.map(p => p.getAttribute('aria-label')).join(' | ')))
+    check('and the pane says what it is', ((await signs.locator('.pane[data-pane="job-signin-claude"] .meta').textContent()) ?? '') === 'sign-in')
+    await programs(signs)
+    check('after which the panel says who is signed in now', await until(async () => ((await row(signs, 'Claude Code').locator('.account').textContent()) ?? '') === 'Signed in as other@example.com · Max'))
+    await signs.context().close()
+
+    // Nobody signed in: said where the programs are, on a desk of that program, and when one is about to start.
+    signs = await open('demo=office&still&signedout=claude')
+    await programs(signs)
+    check('a program nobody is signed in to says so, and offers to sign in', ((await row(signs, 'Claude Code').locator('.account').textContent()) ?? '') === 'Signed out' && (await row(signs, 'Claude Code').getByRole('button', { name: 'sign in', exact: true }).count()) === 1 && (await row(signs, 'Codex').getByRole('button', { name: 'switch account' }).count()) === 1)
+    await signs.keyboard.press('Escape')
+    await desk(signs, 3).click()
+    await until(async () => (await panes(signs)) === 1)
+    const foot = signs.locator('.pane[data-pane="demo-3"] .ended')
+    check('a stopped desk of that program says it is signed out, not that it stopped', ((await foot.locator('span').first().textContent()) ?? '') === 'Claude Code is signed out.' && (await foot.getByRole('button', { name: 'Sign in' }).count()) === 1 && (await foot.getByRole('button', { name: 'Carry on' }).count()) === 0, await foot.textContent())
+    await foot.getByRole('button', { name: 'Sign in' }).click()
+    check('Sign in starts its program there, which asks to be signed in to', await until(async () => (await signs.locator('.pane[data-pane="demo-3"] .ended').count()) === 0))
+    await signs.getByRole('button', { name: 'New agent', exact: true }).click()
+    check('New agent says so before one is started', await until(async () => ((await signs.locator('aside.panel .hint').first().textContent()) ?? '').includes('Nobody is signed in to Claude Code')))
+    await signs.context().close()
+
+    // A sign-in waiting on the browser: its pane can be put away and brought back, or the sign-in stopped.
+    signs = await open('demo=office&signin=waits')
+    await programs(signs)
+    await row(signs, 'Codex').getByRole('button', { name: 'switch account' }).click()
+    check('while it waits, its pane says it is signing in', await until(async () => (await signs.locator('.pane[aria-label="signing in to Codex"]').count()) === 1))
+    await signs.locator('.pane[data-pane="job-signin-codex"]').getByRole('button', { name: 'Put this terminal away' }).click()
+    await until(async () => (await signs.locator('.pane[data-pane="job-signin-codex"]').count()) === 0)
+    await programs(signs)
+    check('put away, the sign-in is still there to show or to stop', (await row(signs, 'Codex').getByRole('button', { name: 'show' }).count()) === 1 && (await row(signs, 'Codex').getByRole('button', { name: 'stop' }).count()) === 1 && (await row(signs, 'Codex').getByRole('button', { name: 'switch account' }).count()) === 0)
+    await row(signs, 'Codex').getByRole('button', { name: 'show' }).click()
+    check('show brings its pane back', await until(async () => (await signs.locator('.pane[data-pane="job-signin-codex"]').count()) === 1))
+    await signs.evaluate(() => window.__demo.finishSignIn())
+    check('and when the browser comes back, the pane says it is done', await until(async () => (await signs.locator('.pane[aria-label="Codex signed in"]').count()) === 1))
+    await programs(signs)
+    await row(signs, 'Codex').getByRole('button', { name: 'switch account' }).click()
+    await until(async () => (await signs.locator('.pane[aria-label="signing in to Codex"]').count()) === 1)
+    await programs(signs)
+    await row(signs, 'Codex').getByRole('button', { name: 'stop' }).click()
+    check('stop ends a sign-in that is waiting, and puts its pane away', await until(async () => (await signs.locator('.pane[data-pane="job-signin-codex"]').count()) === 0 && (await row(signs, 'Codex').getByRole('button', { name: 'switch account' }).count()) === 1))
+    check('leaving whoever was signed in as they were', ((await row(signs, 'Codex').locator('.account').textContent()) ?? '') === 'Logged in using ChatGPT')
+    await signs.context().close()
+  }
+
   // ── arranging the terminals: a pane put on a side of another, a whole side of the room, keys, shapes ──
   {
     const room = await open('demo=office&still')

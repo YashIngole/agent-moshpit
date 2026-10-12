@@ -42,6 +42,10 @@ export interface Bridge {
   /** Install a program, or update it, in a terminal of its own. Resolves with that terminal's id. */
   install(harness: string, cols: number, rows: number): Promise<string>
   update(harness: string, cols: number, rows: number): Promise<string>
+  /** Sign in to a program with its own command, in a terminal of its own. Its id is returned. */
+  signIn(harness: string, cols: number, rows: number): Promise<string>
+  /** Ask the programs again who is signed in to each. What they say comes in a snapshot. */
+  refreshAccounts(): void
   /** Put away the terminal of an install or update for good. */
   forgetJob(job: string): void
   /** Make sure a desk's program is running, starting it again if it is not. */
@@ -145,6 +149,8 @@ function tauriBridge(): Bridge {
     modelCatalog: (harness, cwd, profile, refresh) => invoke<ModelCatalog>('model_catalog', { harness, cwd, profile, refresh }),
     install: (harness, cols, rows) => invoke<string>('install', { harness, cols, rows }),
     update: (harness, cols, rows) => invoke<string>('update', { harness, cols, rows }),
+    signIn: (harness, cols, rows) => invoke<string>('sign_in', { harness, cols, rows }),
+    refreshAccounts: () => void invoke('refresh_accounts').catch(() => {}),
     forgetJob: job => void invoke('forget_job', { job }),
     wake: (agent, cols, rows) => invoke('wake', { agent, cols, rows }),
     follow: async (agent, fn) => {

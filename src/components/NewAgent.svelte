@@ -163,6 +163,8 @@
             the agent starts:
           </p>
           <code class="line">{kind.install_line}</code>
+        {:else if kind?.signed_in === false}
+          <p class="hint">Nobody is signed in to {kind.name}. It asks you to sign in when it starts.</p>
         {/if}
         {#if everything && missing.length > 0}
           <p class="hint">Also known, but installed their own way: {missing.map(h => h.name).join(', ')}. Once one is, it is offered here.</p>

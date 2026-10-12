@@ -26,12 +26,17 @@
   const agentOf = (id: string): Agent | undefined => office.agents.find(a => a.id === id)
   const jobOf = (id: string): Job | undefined => office.jobs.find(j => j.id === id)
   /** What a job's header says it is doing. */
-  const jobWords = (job: Job) =>
-    job.running
-      ? `${job.kind === 'install' ? 'installing' : 'updating'} ${job.harness_name}`
-      : job.ok
-        ? `${job.harness_name} ${job.kind === 'install' ? 'installed' : 'updated'}`
-        : `${job.kind === 'install' ? 'install' : 'update'} of ${job.harness_name} failed`
+  const jobWords = (job: Job) => {
+    const name = job.harness_name
+    if (job.kind === 'signin') return job.running ? `signing in to ${name}` : job.ok ? `${name} signed in` : `sign-in to ${name} did not finish`
+    if (job.running) return `${job.kind === 'install' ? 'installing' : 'updating'} ${name}`
+    return job.ok ? `${name} ${job.kind === 'install' ? 'installed' : 'updated'}` : `${job.kind === 'install' ? 'install' : 'update'} of ${name} failed`
+  }
+  /**
+   * Whether nobody is signed in to a desk's program, as that program last said. It then
+   * asks to be signed in to when it starts, so that is what its pane offers.
+   */
+  const signedOut = (agent: Agent) => office.harnesses.find(h => h.id === agent.harness)?.signed_in === false
   const percent = (share: number) => `${(share * 100).toFixed(4)}%`
 
   let room = $state<HTMLElement>()
@@ -294,7 +299,11 @@
           {/if}
         {:else if job}
           <span class="face job" aria-hidden="true">
-            <svg viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" /></svg>
+            {#if job.kind === 'signin'}
+              <svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5" /><path d="M3.500 13c.6-2.200 2.300-3.300 4.500-3.300s3.900 1.100 4.500 3.300" /></svg>
+            {:else}
+              <svg viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" /></svg>
+            {/if}
           </span>
           <div class="title">
             <h2>{jobWords(job)}</h2>
@@ -302,7 +311,7 @@
               <span class="chip {job.running ? 'working' : job.ok ? 'done' : 'failed'}">
                 <i class="dot {job.running ? 'working' : job.ok ? 'done' : 'failed'}"></i>{job.running ? 'running' : job.ok ? 'done' : 'failed'}
               </span>
-              <span class="meta">{job.kind}</span>
+              <span class="meta">{job.kind === 'signin' ? 'sign-in' : job.kind}</span>
             </p>
           </div>
         {:else}
@@ -364,11 +373,13 @@
           <p class="drop" aria-hidden="true">Drop to paste the paths into {agent?.title ?? 'this terminal'}</p>
         {/if}
         {#if agent && !agent.running}
+          <!-- Signing out ends a program, in any terminal. Started again, it asks to be signed in to: said, not left to look like a crash. -->
+          {@const out = agent.phase !== 'failed' && signedOut(agent)}
           <p class="ended" role="status">
-            <span>{agent.phase === 'failed' ? agent.activity || 'Their program stopped with an error.' : 'Their program is not running.'}</span>
+            <span>{agent.phase === 'failed' ? agent.activity || 'Their program stopped with an error.' : out ? `${agent.harness_name} is signed out.` : 'Their program is not running.'}</span>
             {#if agent.resume_note}<span class="resume-note">{agent.resume_note}</span>{/if}
             {#if agent.resumable && (agent.resume_scope === 'folder' || agent.resume_scope === 'latest')}<span class="resume-note">{resumeHint(agent)}</span>{/if}
-            <button type="button" class="button" title={resumeHint(agent)} onclick={() => void office.wake(pane.id)}>{resumeAction(agent)}</button>
+            <button type="button" class="button" title={out ? `Starts ${agent.harness_name} here, where it asks you to sign in. ${resumeHint(agent)}` : resumeHint(agent)} onclick={() => void office.wake(pane.id)}>{out ? 'Sign in' : resumeAction(agent)}</button>
           </p>
         {/if}
       </div>

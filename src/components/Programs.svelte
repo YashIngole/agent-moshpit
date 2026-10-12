@@ -1,10 +1,11 @@
 <script lang="ts">
   // The programs an agent can be: which are on this computer, at which version,
-  // whether a newer one is out, and the way to install or update each. What runs
-  // is written under each button, and it runs in a terminal here, in plain view.
+  // whether a newer one is out, who is signed in to each, and the way to install,
+  // update or sign in. What runs is written beside each button, and it runs in a
+  // terminal here, in plain view.
   import { onMount } from 'svelte'
   import { office } from '../lib/office.svelte'
-  import type { Harness } from '../lib/types'
+  import type { Harness, Job } from '../lib/types'
 
   let first = $state<HTMLElement>()
   let problem = $state('')
@@ -18,7 +19,9 @@
     if (h.installed) return 1
     return h.install_line ? 2 : 3
   }
-  const running = (h: Harness) => office.jobs.some(j => j.harness === h.id && j.running)
+  /** The install or update of this program that is running now, and its sign-in, if either is. */
+  const fetching = (h: Harness): Job | undefined => office.jobs.find(j => j.harness === h.id && j.running && j.kind !== 'signin')
+  const signing = (h: Harness): Job | undefined => office.jobs.find(j => j.harness === h.id && j.running && j.kind === 'signin')
   const groups = $derived([
     { name: 'Installed', rows: rows.filter(h => h.installed) },
     { name: 'Available', rows: rows.filter(h => !h.installed) }
@@ -35,6 +38,15 @@
       else await office.install(h.id)
     } catch (error) {
       problem = typeof error === 'string' ? error : `That did not start.`
+    }
+  }
+
+  async function signIn(h: Harness) {
+    problem = ''
+    try {
+      await office.signIn(h.id)
+    } catch (error) {
+      problem = typeof error === 'string' ? error : `Signing in to ${h.name} did not start.`
     }
   }
 </script>
@@ -66,17 +78,17 @@
             </span>
           </div>
           {#if h.installed ? h.update_line : h.install_line}
+            {@const job = fetching(h)}
             <div class="do">
               <code>{h.installed ? h.update_line : h.install_line}</code>
-              <button
-                type="button"
-                class="button"
-                class:quiet={h.installed && !h.outdated}
-                disabled={running(h)}
-                onclick={() => act(h)}
-              >
-                {running(h) ? 'running…' : h.installed ? 'update' : 'install'}
-              </button>
+              {#if job}
+                <!-- Running in a terminal that may have been put away: this brings it back. -->
+                <button type="button" class="button quiet" title="It is running in a terminal. Show it." onclick={() => office.showJob(job.id)}>show</button>
+              {:else}
+                <button type="button" class="button" class:quiet={h.installed && !h.outdated} onclick={() => act(h)}>
+                  {h.installed ? 'update' : 'install'}
+                </button>
+              {/if}
             </div>
             {#if h.installed && h.outdated && busy(h) > 0}
               <p class="note">
@@ -86,6 +98,25 @@
             {/if}
           {:else if !h.installed}
             <p class="note">Installed its own way. Once it is on this computer it is offered here.</p>
+          {/if}
+          {#if h.installed && h.login_line}
+            {@const job = signing(h)}
+            <!-- Who is signed in, in the program's own words; then the way to sign in, or as someone else. -->
+            {#if h.account}<p class="account" class:out={h.signed_in === false}>{h.account}</p>{/if}
+            <div class="do">
+              <code>{h.login_line}</code>
+              {#if job}
+                <button type="button" class="button quiet" title="Signing in is waiting in a terminal. Show it." onclick={() => office.showJob(job.id)}>show</button>
+                <button type="button" class="button quiet" title="Stop signing in. Whoever is signed in now stays signed in." onclick={() => office.stopJob(job.id)}>stop</button>
+              {:else}
+                <button type="button" class="button" class:quiet={h.signed_in !== false} onclick={() => signIn(h)}>
+                  {h.signed_in === true ? 'switch account' : 'sign in'}
+                </button>
+              {/if}
+            </div>
+            {#if busy(h) > 0}
+              <p class="note">Desks running now keep their sign-in until they are restarted.</p>
+            {/if}
           {/if}
         </li>
       {/each}
@@ -241,6 +272,18 @@
   .do .button {
     flex: none;
     min-width: 74px;
+  }
+  /* Who is signed in: a line of its own above the way to change it. Nobody signed in is said in full ink. */
+  .account {
+    overflow-wrap: anywhere;
+    font-size: var(--t-sm);
+    line-height: 1.4;
+    color: var(--ink-2);
+    user-select: text;
+  }
+  .account.out {
+    font-weight: 600;
+    color: var(--ink);
   }
   .note,
   .foot {

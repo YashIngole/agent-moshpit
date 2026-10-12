@@ -828,6 +828,32 @@ class Office {
     }
   }
 
+  /**
+   * Sign in to a program, or as someone else, with the program's own command, in a
+   * terminal beside the others. Every desk of that program uses whoever is signed in.
+   */
+  async signIn(harness: string) {
+    this.problem = ''
+    const id = await bridge.signIn(harness, ...this.#size())
+    this.panel = null
+    this.#place(id, true)
+    terms.get(id)?.resync()
+  }
+
+  /** Show the terminal of an install, an update or a sign-in that is still running. */
+  showJob(id: string) {
+    if (!this.jobs.some(j => j.id === id)) return
+    this.panel = null
+    this.#place(id, true)
+  }
+
+  /** End an install, an update or a sign-in, and put its terminal away. */
+  stopJob(id: string) {
+    this.#pending.delete(id)
+    if (has(this.layout, id)) this.closePane(id, false)
+    bridge.forgetJob(id)
+  }
+
   /** An install that went well, and its program found: the agent takes over its pane. */
   #afterInstalls(snapshot: Snapshot) {
     for (const [id, waiting] of this.#pending) {
@@ -872,6 +898,8 @@ class Office {
     this.panel = { kind: 'programs' }
     // One installed since the window opened is offered too.
     this.findEditors()
+    // Who is signed in may have changed in a terminal, where nobody told the office.
+    bridge.refreshAccounts()
   }
 
   // ── the editor file paths open in ──────────────────────────────────────

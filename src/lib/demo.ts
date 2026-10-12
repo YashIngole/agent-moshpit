@@ -26,12 +26,15 @@ const program = (over: Partial<Harness> & Pick<Harness, 'id' | 'name' | 'tag'>):
   outdated: false,
   install_line: '',
   update_line: '',
+  signed_in: null,
+  account: '',
+  login_line: '',
   ...over
 })
 
 const HARNESSES: Harness[] = [
-  program({ id: 'claude', launch: 'claude', name: 'Claude Code', tag: 'Claude', version: '2.1.290', latest: '2.1.294', outdated: true, takes_task: true, worktree: true, install_line: 'npm install -g @anthropic-ai/claude-code', update_line: 'claude update' }),
-  program({ id: 'codex', launch: 'codex', name: 'Codex', tag: 'Codex', version: '0.161.0', latest: '0.161.0', takes_task: true, worktree: true, install_line: 'npm install -g @openai/codex', update_line: 'codex update' }),
+  program({ id: 'claude', launch: 'claude', name: 'Claude Code', tag: 'Claude', version: '2.1.290', latest: '2.1.294', outdated: true, takes_task: true, worktree: true, install_line: 'npm install -g @anthropic-ai/claude-code', update_line: 'claude update', signed_in: true, account: 'Signed in as you@example.com · Max', login_line: 'claude auth login' }),
+  program({ id: 'codex', launch: 'codex', name: 'Codex', tag: 'Codex', version: '0.161.0', latest: '0.161.0', takes_task: true, worktree: true, install_line: 'npm install -g @openai/codex', update_line: 'codex update', signed_in: true, account: 'Logged in using ChatGPT', login_line: 'codex login' }),
   program({ id: 'antigravity', name: 'Antigravity CLI', tag: 'Antigravity', version: '1.2.4', takes_task: true, update_line: 'agy update' }),
   program({ id: 'hermes', name: 'Hermes', tag: 'Hermes', version: '0.21.2', worktree: true, update_line: 'hermes update' }),
   program({ id: 'gemini', name: 'Gemini CLI', tag: 'Gemini', version: '0.2.1', latest: '0.63.0', outdated: true, takes_task: true, install_line: 'npm install -g @google/gemini-cli', update_line: 'npm install -g @google/gemini-cli@latest' }),
@@ -129,17 +132,23 @@ interface Seen {
   started: { agent: string; cols: number; rows: number }[]
   /** Each size a terminal's program was told. */
   sized: { agent: string; cols: number; rows: number }[]
+  /** How many times the programs were asked who is signed in. */
+  asked: number
+  /** Let a sign-in that is waiting (`&signin=waits`) end, as it does when the browser comes back. */
+  finishSignIn: () => void
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [] }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, finishSignIn: () => {} }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
   /** The name each desk was given when it was seated. */
   const given = new Map(agents.map(a => [a.id, a.title]))
-  let harnesses = HARNESSES.map(h => ({ ...h }))
+  // `&signedout=claude` (or `claude,codex`): nobody is signed in to those.
+  const signedOut = (params.get('signedout') ?? '').split(',')
+  let harnesses = HARNESSES.map(h => (signedOut.includes(h.id) ? { ...h, signed_in: false, account: 'Signed out' } : { ...h }))
   let jobs: Job[] = []
   let made = 0
   let closeQuits = false
@@ -219,23 +228,31 @@ export function demoBridge(): Bridge {
     followers.get(id)?.forEach(fn => fn(encoder.encode(text), false))
   }
 
-  /** A pretend install or update: a few lines, then done, and the program is there. */
-  function job(harness: string, kind: 'install' | 'update'): string {
+  /** A pretend install, update or sign-in: a few lines, then done, and the program is there, or someone is signed in. */
+  function job(harness: string, kind: Job['kind']): string {
     const kindOf = harnesses.find(h => h.id === harness)
-    const line = kind === 'install' ? kindOf?.install_line : kindOf?.update_line
-    if (!kindOf || !line) throw `The office does not know how to ${kind} ${kindOf?.name ?? 'that'}.`
+    const line = kind === 'install' ? kindOf?.install_line : kind === 'update' ? kindOf?.update_line : kindOf?.login_line
+    if (!kindOf || !line) throw kind === 'signin' ? `The office does not know how to sign in to ${kindOf?.name ?? 'that'}. Start one of its desks and sign in from its terminal.` : `The office does not know how to ${kind} ${kindOf?.name ?? 'that'}.`
     const id = `job-${kind}-${harness}`
     jobs = [...jobs.filter(j => j.id !== id), { id, harness, harness_name: kindOf.name, kind, running: true, ok: null }]
     printed.set(id, `${dim('$')} ${line}\r\n`)
     publish()
-    const steps = ['', 'added 1 package in 3s', '', `${green('✓')} ${kindOf.name} ${kind === 'install' ? 'installed' : 'up to date'}`]
+    const account = harness === 'claude' ? 'Signed in as other@example.com · Max' : 'Logged in using ChatGPT'
+    const steps = kind === 'signin' ? ['', 'Opening your browser to sign in…', '', `${green('✓')} ${account}`] : ['', 'added 1 package in 3s', '', `${green('✓')} ${kindOf.name} ${kind === 'install' ? 'installed' : 'up to date'}`]
+    const finish = () => {
+      if (!jobs.some(j => j.id === id && j.running)) return
+      print(id, `${steps.at(-1)}\r\n`)
+      harnesses = harnesses.map(h => (h.id !== harness ? h : kind === 'signin' ? { ...h, signed_in: true, account } : { ...h, installed: true, version: h.latest || '1.0.0', outdated: false }))
+      jobs = jobs.map(j => (j.id === id ? { ...j, running: false, ok: true } : j))
+      publish()
+    }
+    // `&signin=waits`: a sign-in stays open on the browser until it is let through, or stopped.
+    const waits = kind === 'signin' && params.get('signin') === 'waits'
+    if (waits) seen.finishSignIn = finish
     steps.forEach((step, i) =>
       setTimeout(() => {
-        print(id, `${step}\r\n`)
-        if (i < steps.length - 1) return
-        harnesses = harnesses.map(h => (h.id === harness ? { ...h, installed: true, version: h.latest || '1.0.0', outdated: false } : h))
-        jobs = jobs.map(j => (j.id === id ? { ...j, running: false, ok: true } : j))
-        publish()
+        if (i < steps.length - 1) print(id, `${step}\r\n`)
+        else if (!waits) finish()
       }, still ? 0 : 500 + i * 450)
     )
     return id
@@ -286,6 +303,8 @@ export function demoBridge(): Bridge {
     },
     install: async harness => job(harness, 'install'),
     update: async harness => job(harness, 'update'),
+    signIn: async harness => job(harness, 'signin'),
+    refreshAccounts: () => void (seen.asked += 1),
     forgetJob: id => {
       jobs = jobs.filter(j => j.id !== id)
       printed.delete(id)

@@ -50,14 +50,20 @@ export interface Harness {
   /** What runs to install it, and to update it, as typed. Empty when there is no way. */
   install_line: string
   update_line: string
+  /** Whether someone is signed in to it, as it says itself. Null until it has been asked, and for a program that cannot say. */
+  signed_in: boolean | null
+  /** Who is signed in, or that nobody is, in a few words. Empty when not known. */
+  account: string
+  /** What runs to sign in, as typed. Empty when the office knows no way. */
+  login_line: string
 }
 
-/** An install or an update, running in a terminal of its own. Its id starts with `job-`. */
+/** An install, an update or a sign-in, running in a terminal of its own. Its id starts with `job-`. */
 export interface Job {
   id: string
   harness: string
   harness_name: string
-  kind: 'install' | 'update'
+  kind: 'install' | 'update' | 'signin'
   running: boolean
   /** How it ended; null while it runs. */
   ok: boolean | null

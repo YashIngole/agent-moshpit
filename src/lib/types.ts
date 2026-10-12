@@ -99,6 +99,8 @@ export interface Settings {
   /** Closing the window quits the office instead of leaving it in the tray. */
   close_quits: boolean
   voice: import('./voice').VoiceSettings
+  /** How something new from one agent is brought to another's attention. */
+  messages: import('./messages').MessageDelivery
 }
 
 /** An editor on this computer that file paths can be opened in. */

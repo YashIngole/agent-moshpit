@@ -98,6 +98,7 @@
         {#if office.outdated.length > 0}<span>{`${office.outdated.length} update${office.outdated.length === 1 ? '' : 's'} out: ${office.outdated.map(h => h.name).join(', ')}`}</span>{/if}
       </button>
       <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openVoice() }}>Voice input</button>
+      <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.openMessages() }}>Agent messages</button>
       {#if office.healthProblem}
         <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.showHealthProblem() }}>Configuration warning</button>
       {/if}

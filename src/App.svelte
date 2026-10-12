@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import Floor from './components/Floor.svelte'
   import Keys from './components/Keys.svelte'
+  import Messages from './components/Messages.svelte'
   import KnockBand from './components/KnockBand.svelte'
   import Menu from './components/Menu.svelte'
   import NewAgent from './components/NewAgent.svelte'
@@ -231,6 +232,8 @@
       <Keys />
     {:else if office.panel?.kind === 'voice'}
       <VoicePanel />
+    {:else if office.panel?.kind === 'messages'}
+      <Messages />
     {/if}
     <!-- Said over the floor, never over the foot of a terminal, where a program's prompt and choices are. -->
     {#if office.undoToast || office.toast}

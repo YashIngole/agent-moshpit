@@ -10,7 +10,7 @@ import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, P
 import { mixed as manyPrograms } from './words'
 
 /** The side panel, when there is one. Terminals are not a panel: they are the room. */
-export type Panel = { kind: 'new'; cwd: string; harness: string; launch?: LaunchOptions } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | null
+export type Panel = { kind: 'new'; cwd: string; harness: string; launch?: LaunchOptions } | { kind: 'programs' } | { kind: 'keys' } | { kind: 'voice' } | { kind: 'messages' } | null
 
 /** Whether a terminal is an install or an update rather than a desk's. */
 export const isJob = (id: string) => id.startsWith('job-')
@@ -948,6 +948,12 @@ class Office {
   openVoice() {
     this.#rememberFocus()
     this.panel = { kind: 'voice' }
+  }
+
+  /** What agents have sent each other, and how each is told of something new. */
+  openMessages() {
+    this.#rememberFocus()
+    this.panel = { kind: 'messages' }
   }
 
   // ── desks ──────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
 import type { Editor, ModelCatalog, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
+import type { Mailbox, MessageDelivery } from './messages'
 import type { FieldText, VoiceInputs, VoiceProvider, VoiceSettings, VoiceView } from './voice'
 
 /**
@@ -104,6 +105,11 @@ export interface Bridge {
    * for the user when the update could not be had, and nothing was changed.
    */
   updateNow(): Promise<boolean>
+  /** How each agent is reached, and how far each message and task between agents got.
+   *  Null when the office's connection for agents is off. */
+  mailbox(): Promise<Mailbox | null>
+  /** How something new is brought to an agent's attention, for sessions started from now on. */
+  setMessageDelivery(push: MessageDelivery): void
   voiceView(): Promise<VoiceView>
   /** Every change to the voice view, as it happens. */
   onVoiceView(fn: (view: VoiceView) => void): () => void
@@ -214,6 +220,8 @@ function tauriBridge(): Bridge {
     quit: () => void invoke('quit'),
     settings: () => invoke<Settings>('settings'),
     setCloseQuits: on => void invoke('set_close_quits', { on }),
+    mailbox: () => invoke<Mailbox | null>('mailbox'),
+    setMessageDelivery: push => void invoke('set_message_delivery', { hooks: push.hooks, wake: push.wake, channels: push.channels }).catch(() => {}),
     version: () => invoke<string>('app_version'),
     newer: () => invoke<Newer | null>('newer_version'),
     onNewer: fn => subscribe<Newer | null>('office:newer', fn),

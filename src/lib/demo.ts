@@ -12,6 +12,7 @@ import { version as appVersion } from '../../package.json'
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
+import { DEFAULT_DELIVERY, type Delivery, type Link, type Mailbox, type MessageDelivery } from './messages'
 import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, engineName, isPhrased, type FieldText, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
 
 const MIN = 60_000
@@ -137,6 +138,8 @@ interface Seen {
   asked: number
   /** How many times the programs were looked for again. */
   looked: number
+  /** Each change to how agents are told of something new, as it was asked for. */
+  delivery: MessageDelivery[]
   /** Node.js arrives (`&nonode`), as when its installer has finished: the next look finds it. */
   findNode: () => void
   /** Each agent that was asked for, as it was asked for. */
@@ -147,7 +150,7 @@ interface Seen {
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, looked: 0, findNode: () => {}, specs: [], finishSignIn: () => {} }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, looked: 0, delivery: [], findNode: () => {}, specs: [], finishSignIn: () => {} }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -174,6 +177,31 @@ export function demoBridge(): Bridge {
       { id: 'nemotron-streaming-en-q4', label: 'Nemotron Speech Streaming, smaller', bytes: 475436032, ready: false, recommended: false }
     ],
     providers: (['deepgram', 'openai', 'assemblyai', 'elevenlabs', 'openrouter'] as const).map(id => ({ id, name: engineName(id), configured: false, last4: '', session_only: false }))
+  }
+  // What the agents of the pretend office have sent each other, in each state a thing can be in.
+  let delivery: MessageDelivery = { ...DEFAULT_DELIVERY }
+  const mailbox = (): Mailbox => {
+    const got = (over: Partial<Delivery>): Delivery => ({ state: 'saved', revision: 1, notified_ms: null, notified_via: '', fetched_ms: null, acknowledged_ms: null, ...over })
+    const link = (over: Partial<Link>): Link => ({ granted: true, live: true, client: '', push: 'poll', channel: 'off', hooks: 'off', hook_seen_ms: null, wake: false, note: '', ...over })
+    const title = (id: string) => agents.find(a => a.id === id)?.title ?? id
+    const now = Date.now()
+    const links: Record<string, Link> = {
+      'demo-1': link({ client: 'claude-code 2.1.296', push: 'hooks', hooks: 'seen', hook_seen_ms: now - 40_000, wake: true }),
+      'demo-2': link({ client: 'codex 0.161.0' }),
+      'demo-3': link({ granted: false, live: false }),
+      'demo-4': link({ client: 'codex 0.161.0' }),
+      'demo-7': link({ granted: false, live: false })
+    }
+    const none = params.get('mail') === 'none'
+    return {
+      desks: agents.filter(a => a.harness === 'claude' || a.harness === 'codex').map(a => ({ id: a.id, title: a.title, harness: a.harness, harness_name: a.harness_name, running: a.running, waiting: !none && a.id === 'demo-3' ? 1 : 0, link: links[a.id] ?? link({ granted: a.running, live: a.running }) })),
+      items: none ? [] : [
+        { kind: 'message', id: 'mail-3', from_title: title('demo-4'), to_title: title('demo-2'), text: 'The orders routes are typed now: /orders and /orders/:id changed shape. Your middleware tests read the old one.', created_ms: now - 50_000, delivery: got({ state: 'notified', notified_via: 'hint', notified_ms: now - 45_000 }) },
+        { kind: 'message', id: 'mail-2', from_title: title('demo-2'), to_title: title('demo-1'), text: 'The session check now runs before the cart loads. Your total test may need the new fixture.', created_ms: now - 4 * 60_000, delivery: got({ state: 'acknowledged', notified_via: 'stop', notified_ms: now - 230_000, fetched_ms: now - 225_000, acknowledged_ms: now - 224_000 }) },
+        { kind: 'task', id: 'mail-1', from_title: title('demo-1'), to_title: title('demo-3'), text: 'Run the checkout tests three times and report any that flake.', created_ms: now - 9 * 60_000, status: 'queued', spawned: false, delivery: got({}), result: null }
+      ],
+      push: { ...delivery }
+    }
   }
   let voiceEpoch = 0
   let downloadEpoch = 0
@@ -495,8 +523,14 @@ export function demoBridge(): Bridge {
     openPage: url => void window.open(url, '_blank', 'noopener'),
     pickFolder: async () => 'C:/code/shop',
     quit: () => {},
-    settings: async () => ({ close_quits: closeQuits, voice: { ...voiceSettings } }),
+    settings: async () => ({ close_quits: closeQuits, voice: { ...voiceSettings }, messages: { ...delivery } }),
     setCloseQuits: on => void (closeQuits = on),
+    // `&mail=off`: the office's connection for agents is off. `&mail=none`: nothing has been sent.
+    mailbox: async () => (params.get('mail') === 'off' ? null : mailbox()),
+    setMessageDelivery: push => {
+      delivery = { ...push }
+      seen.delivery.push({ ...push })
+    },
     version: async () => appVersion,
     newer: async () => (params.has('update') ? { version: '99.0.0' } : null),
     onNewer: () => () => {},

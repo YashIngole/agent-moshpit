@@ -933,6 +933,45 @@ try {
   await page.context().close()
 
   // ── signing in: who is signed in to each program, switching, and a desk whose program is signed out ──
+  // ── what agents sent each other, and how each is told ──
+  {
+    const mail = await open('demo=office&still')
+    await mail.getByRole('button', { name: 'More', exact: true }).click()
+    await mail.getByRole('menuitem', { name: 'Agent messages' }).click()
+    const panel = mail.locator('aside.panel[aria-label="Agent messages"]')
+    await panel.getByRole('heading', { name: 'What was sent' }).waitFor()
+    const told = name => panel.getByRole('checkbox', { name: new RegExp(`^${name}`) })
+    check('agents are told at a step of their work and woken when idle unless that is turned off; pushes are off until turned on', (await told('At the next step of its work').isChecked()) && (await told('Wake it when it is idle').isChecked()) && !(await told('Push it in as it arrives').isChecked()))
+    check('pushes are said to be a preview that asks for confirmation each start', ((await panel.locator('label', { hasText: 'Push it in as it arrives' }).textContent()) ?? '').replace(/\s+/g, ' ').includes('research preview') && ((await panel.locator('label', { hasText: 'Push it in as it arrives' }).textContent()) ?? '').includes('asks you to confirm in its terminal each time it starts'))
+    await told('Push it in as it arrives').check()
+    check('turning pushes on is passed to the core, with the others as they were', await until(async () => JSON.stringify(await mail.evaluate(() => window.__demo.delivery.at(-1))) === JSON.stringify({ hooks: true, wake: true, channels: true })))
+    await told('At the next step of its work').uncheck()
+    check('without the hooks there is nothing to wake with, and the choice says so by being unavailable', (await told('Wake it when it is idle').isDisabled()) && !(await told('Wake it when it is idle').isChecked()) && (await mail.evaluate(() => window.__demo.delivery.at(-1).hooks)) === false)
+    await told('At the next step of its work').check()
+    check('the choice to wake is remembered when the hooks come back', (await told('Wake it when it is idle').isChecked()) && !(await told('Wake it when it is idle').isDisabled()))
+    const reached = name => panel.locator('.desks li', { has: mail.locator('.name', { hasText: new RegExp(`^${name}$`) }) })
+    check('each agent says how it is reached, by what has been seen and not by what was hoped', ((await reached('Fix the checkout total').locator('.how').textContent()) ?? '') === 'Connected: told at a step of its work, and woken when idle.' && ((await reached('Refactor auth middleware').locator('.how').textContent()) ?? '').includes('next call to the office, or when it checks its inbox'))
+    check('an agent that is not running keeps what is sent to it, and says how much is unread', ((await reached('Flaky test hunt').locator('.how').textContent()) ?? '').startsWith('Not running. What is sent is kept') && ((await reached('Flaky test hunt').locator('.tag').textContent()) ?? '').includes('1 unread'))
+    check('only the programs that can take messages are listed', (await panel.locator('.desks li').count()) === 5 && (await reached('Bump dependencies').count()) === 0)
+    const sent = text => panel.locator('.items li', { hasText: text })
+    check('a message that was acknowledged says so, with who sent it to whom', /^Acknowledged .+\.$/.test((await sent('session check now runs').locator('.how').textContent()) ?? '') && ((await sent('session check now runs').locator('.name').textContent()) ?? '').replace(/\s+/g, ' ').includes('Refactor auth middleware → to Fix the checkout total'))
+    check('a message only mentioned is not said to have been read', /^Said with a tool's answer .+\. Not read yet\.$/.test((await sent('orders routes are typed').locator('.how').textContent()) ?? ''))
+    check('a task says its own state apart from whether it arrived', ((await sent('Run the checkout tests').locator('.tag').textContent()) ?? '') === 'task · not taken up yet' && ((await sent('Run the checkout tests').locator('.how').textContent()) ?? '') === 'Saved. Not told yet.')
+    check('the panel fits its column', await mail.evaluate(() => document.documentElement.scrollWidth <= innerWidth) && await panel.locator('.body').evaluate(el => el.scrollWidth <= el.clientWidth))
+    await mail.keyboard.press('Escape')
+    check('Escape closes it', (await panel.count()) === 0)
+    await mail.close()
+
+    for (const [scene, says] of [['off', "The office's connection for agents is off"], ['none', 'Nothing yet. Ask an agent to send another one a message']]) {
+      const quiet = await open(`demo=office&still&mail=${scene}`, 420, 800)
+      await quiet.getByRole('button', { name: 'More', exact: true }).click()
+      await quiet.getByRole('menuitem', { name: 'Agent messages' }).click()
+      check(`with ${scene === 'off' ? 'the connection off' : 'nothing sent'} the panel says so, in a narrow window too`, await until(async () => ((await quiet.locator('aside.panel[aria-label="Agent messages"]').textContent()) ?? '').includes(says)) && await until(() => quiet.evaluate(() => document.documentElement.scrollWidth <= innerWidth)))
+      check(`and ${scene === 'off' ? 'offers no settings that could do nothing' : 'still offers how agents are told'}`, (await quiet.locator('aside.panel[aria-label="Agent messages"] input[type="checkbox"]').count()) === (scene === 'off' ? 0 : 3))
+      await quiet.close()
+    }
+  }
+
   // ── a program that needs Node.js, on a computer without it ──
   {
     const bare = await open('demo=office&still&nonode')

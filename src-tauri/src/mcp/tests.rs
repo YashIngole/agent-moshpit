@@ -15,9 +15,9 @@ impl Shell for Quiet {
 // Bound live-shell fan-out on runners with a small native PTY pool. Each test
 // still exercises real terminals; pure project checks below use no shell.
 static FIXTURE_TERMINALS: Mutex<()> = Mutex::new(());
-struct Fixture { handle: Handle, hub: Arc<Hub>, dir: PathBuf, a: String, b: String, _terminals: std::sync::MutexGuard<'static, ()> }
+pub(super) struct Fixture { pub(super) handle: Handle, pub(super) hub: Arc<Hub>, pub(super) dir: PathBuf, pub(super) a: String, pub(super) b: String, _terminals: std::sync::MutexGuard<'static, ()> }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let terminals = FIXTURE_TERMINALS.lock().unwrap_or_else(|e| e.into_inner());
         let dir = std::env::temp_dir().join(format!("moshpit-mcp-{}", random_id().unwrap()));
         std::fs::create_dir_all(dir.join(".git")).unwrap();
@@ -38,8 +38,8 @@ impl Fixture {
         hub.issue(&a).unwrap(); hub.issue(&b).unwrap();
         Self { handle, hub, dir, a, b, _terminals: terminals }
     }
-    fn call(&self, caller: &str, name: &str, args: Value) -> Result<Value, String> { self.hub.call(&self.handle, caller, name, &args) }
-    fn queued(&self) -> Task {
+    pub(super) fn call(&self, caller: &str, name: &str, args: Value) -> Result<Value, String> { self.hub.call(&self.handle, caller, name, &args) }
+    pub(super) fn queued(&self) -> Task {
         let result = self.call(&self.a, "send_task", json!({"session_id":self.b,"prompt":"Review the API without editing files","request_key":"review-1"})).unwrap();
         let id = result["task"]["id"].as_str().unwrap();
         self.hub.task(&self.a, id).unwrap()
@@ -87,7 +87,7 @@ fn queued_tasks_are_owned_idempotent_and_survive_restart() {
     assert_eq!(result["task"]["validation"], "npm test passed");
     let restored = Hub::start(f.handle.clone(), f.dir.join("coordination.json")).unwrap();
     assert_eq!(restored.task(&f.a, &task.id).unwrap().summary, "Reviewed the tests");
-    assert!(!restored.connected(&f.a));
+    assert!(!restored.granted(&f.a));
     restored.shutdown();
 }
 
@@ -202,7 +202,7 @@ fn accepted_nonblocking_socket_waits_for_the_authenticated_request() {
     let hub = f.hub.clone();
     let handle = f.handle.clone();
     let (finished, completion) = std::sync::mpsc::channel();
-    let worker = std::thread::spawn(move || { finished.send(hub.connection(&handle, server)).unwrap(); });
+    let worker = std::thread::spawn(move || { finished.send(hub.connection(&handle, server, &mut Slot(None))).unwrap(); });
     assert!(matches!(completion.recv_timeout(Duration::from_millis(100)), Err(std::sync::mpsc::RecvTimeoutError::Timeout)), "The connection must wait for its request instead of closing on WouldBlock");
     let mut reader = BufReader::new(client);
     protocol::write_frame(reader.get_mut(), &json!({"token":token,"name":"get_context","arguments":{}})).unwrap();

@@ -51,7 +51,7 @@ try {
   assert.equal(init.serverInfo.name, 'agent-moshpit')
   bridge.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
   const definitions = await request('tools/list')
-  assert.equal(definitions.tools.length, 11)
+  assert.equal(definitions.tools.length, 14)
   const context = await call('get_context')
   const id = context.session.id
   const protectedName = context.title_locked
@@ -86,7 +86,8 @@ try {
     assert.equal(result.task.status, 'completed')
     assert.equal(result.task.validation, 'Model-free fixture passed')
     const followup = await call('send_task', { session_id: child.session_id, prompt: 'Review error handling next', request_key: 'followup' })
-    assert.equal(followup.delivery, 'queued_for_next_inbox_check')
+    // Kept, and not yet said to anyone: Codex is told with the answer to its next call.
+    assert.deepEqual([followup.delivery.state, followup.delivery.how], ['saved', 'poll'])
     const next = await call('get_task', { task_id: followup.task.id, wait_seconds: 25 })
     assert.equal(next.task.status, 'completed')
     record('delegation-passed', { id, childId: child.session_id, taskId: child.task_id, followupId: followup.task.id, cwd: context.session.cwd })

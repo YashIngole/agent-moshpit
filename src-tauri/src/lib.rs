@@ -25,6 +25,12 @@ mod voice;
 
 /// Run the lightweight MCP subprocess without opening a desktop or another office.
 pub fn run_mcp_stdio() -> Result<(), String> { mcp::run_stdio() }
+/// A hook of Claude Code's (`--mcp-hook <Event>`): what is new for the session, said at a
+/// step of its work. Its exit code.
+pub fn run_mcp_hook(event: &str) -> i32 { mcp::run_hook(event) }
+/// The hook that waits (`--mcp-wait`): it ends when there is something to wake an idle
+/// session for. Its exit code.
+pub fn run_mcp_wait() -> i32 { mcp::run_wait() }
 /// The speech worker process (`--voice-worker`): the local speech engine, apart from the app.
 pub fn run_voice_worker() -> i32 { voice::run_worker() }
 
@@ -219,6 +225,9 @@ struct Settings {
     close_quits: bool,
     #[serde(deserialize_with = "voice::lenient")]
     voice: voice::Settings,
+    /// How something new from one agent is brought to another's attention.
+    #[serde(deserialize_with = "voice::lenient")]
+    messages: mcp::Push,
 }
 
 struct Chosen {
@@ -741,6 +750,26 @@ fn set_close_quits(chosen: State<'_, Chosen>, on: bool) {
     }
 }
 
+/// How something new from one agent is brought to another's attention from now on: by
+/// Claude Code's hooks, by waking a session that is idle, and by its Channels preview.
+/// Sessions already running keep what they were started with.
+#[tauri::command]
+fn set_message_delivery(chosen: State<'_, Chosen>, handle: State<'_, Handle>, hooks: bool, wake: bool, channels: bool) {
+    let mut now = chosen.now.lock().unwrap();
+    now.messages = mcp::Push { hooks, wake, channels };
+    handle.set_push(now.messages);
+    if let Ok(text) = serde_json::to_string_pretty(&*now) {
+        write_whole(&chosen.path, &text);
+    }
+}
+
+/// How each session is reached, and how far each recent message and task between
+/// sessions got. Null when the office's MCP service is off.
+#[tauri::command]
+fn mailbox(handle: State<'_, Handle>) -> serde_json::Value {
+    handle.mailbox().unwrap_or(serde_json::Value::Null)
+}
+
 /// The desk a click on a notification asked for, once: the window opens its terminal.
 #[tauri::command]
 fn take_new_agent(request: State<'_, NewAgentRequest>) -> bool {
@@ -1022,6 +1051,8 @@ pub fn run() {
             take_new_agent,
             settings,
             set_close_quits,
+            set_message_delivery,
+            mailbox,
             dismiss,
             rename,
             watch,
@@ -1109,6 +1140,7 @@ pub fn run() {
                 if let Err(text) = handle.enable_mcp(path.clone()) {
                     app.state::<StartupProblems>().0.lock().unwrap().push(harness::Problem { text, file: path.to_string_lossy().into_owned(), line: None });
                 }
+                handle.set_push(app.state::<Chosen>().now.lock().unwrap().messages);
             }
             app.manage(handle);
             clear_old_pastes(&dir);

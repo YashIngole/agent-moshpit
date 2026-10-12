@@ -293,10 +293,26 @@ impl Handle {
     }
 
     fn mcp_launch(&self, harness: &Harness, id: &str, args: Vec<String>, options: &crate::launch::Options) -> Result<crate::mcp::PreparedLaunch, String> {
+        // What the program last said its version is: what a launch can be given depends on it.
+        let version = self.inner.state.lock().unwrap().installed.get(&harness.id).map(|here| here.version.clone()).unwrap_or_default();
         match self.inner.mcp.lock().unwrap().as_ref() {
-            Some(hub) => hub.prepare(&harness.id, id, args, crate::launch::prefix_len(harness, options)?),
+            Some(hub) => hub.prepare(&harness.id, id, args, crate::launch::prefix_len(harness, options)?, &version),
             None => Ok((args, vec![])),
         }
+    }
+
+    /// How something new for a session may be brought to its attention, as the user has
+    /// set it. Sessions already running keep what they were started with.
+    pub fn set_push(&self, push: crate::mcp::Push) {
+        if let Some(hub) = self.inner.mcp.lock().unwrap().as_ref() { hub.set_push(push); }
+    }
+
+    /// For the window: how each session is reached, and how far each recent message and
+    /// task between sessions got. None when the office's MCP service is off.
+    pub fn mailbox(&self) -> Option<serde_json::Value> {
+        // Let go of before asking: what it answers with looks at the desks.
+        let hub = self.inner.mcp.lock().unwrap().clone();
+        hub.map(|hub| hub.overview(self))
     }
 
     fn mcp_revoke(&self, id: &str) {

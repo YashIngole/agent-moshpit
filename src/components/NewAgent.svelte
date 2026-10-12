@@ -69,7 +69,14 @@
     office.newDraft = { harness, task, cwd, title, worktree, launches: $state.snapshot(launches) }
   })
 
-  onMount(() => taskField?.focus())
+  /** The form has been closed. Whatever it was waiting for then must not start an agent. */
+  let closed = false
+  onMount(() => {
+    taskField?.focus()
+    return () => {
+      closed = true
+    }
+  })
 
   // ── saying the task instead of typing it ──────────────────────────────
   /** Voice is on and its engine is there to use; until then the microphone opens its setup. */
@@ -134,8 +141,11 @@
     // Still dictating: the recording is finished first, so its last words are in the task.
     if (voice.form) {
       starting = true
-      await voice.settle()
+      const whole = await voice.settle()
       starting = false
+      // Cancelled while it finished, the form closed, or the recording ended in trouble:
+      // nobody is started behind the back of whoever did that, or without the words.
+      if (closed || !whole) return
     }
     problem = ''
     folderProblem = false

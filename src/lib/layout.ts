@@ -653,11 +653,18 @@ export function arrange(list: string[], to: Shape = 'grid', main?: string): Layo
 
 // ── the edges ──────────────────────────────────────────────────────────────
 
-/** The least room a node needs along one way, as a share of the room: a pane its least, a line of them their sum. */
+/**
+ * The least room a node needs along one way, as a share of the room, with the edges inside
+ * it where they are now: squeezing a node moves none of them, so each part keeps the share
+ * it has and the narrowest decides. A pane needs its least; parts side by side that way,
+ * enough that the one with the smallest share still has what it needs; parts across it,
+ * what the neediest of them needs.
+ */
 function need(node: Node, dir: Dir, least: Least): number {
   if (isPane(node)) return least[dir]
-  const each = node.parts.map(part => need(part.node, dir, least))
-  return node.dir === dir ? sum(each) : Math.max(...each)
+  if (node.dir !== dir) return Math.max(...node.parts.map(part => need(part.node, dir, least)))
+  const all = sum(node.parts.map(part => part.size))
+  return Math.max(...node.parts.map(part => (need(part.node, dir, least) * all) / part.size))
 }
 
 /**

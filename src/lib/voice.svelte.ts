@@ -162,13 +162,34 @@ class Voice {
       if (this.view.field) this.cancel()
     }
   }
-  /** Finish the recording for the field and wait until its last words are in it. */
-  async settle() {
-    for (let i = 0; this.acting && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 30))
-    if (!this.view.field || !(this.active || this.view.busy)) return
-    const over = this.#fieldOver
+  /**
+   * Finish the recording for the field and wait until its last words are in it. True when
+   * they are, or nothing was being recorded. False when the recording was cancelled
+   * meanwhile, the field went, or it ended in trouble: whoever waited must not carry on as
+   * if the words were all there, or as if nobody had changed their mind.
+   */
+  async settle(): Promise<boolean> {
+    const wait = (ms: number) => new Promise<false>(resolve => setTimeout(() => resolve(false), ms))
+    for (let i = 0; this.acting && i < 100; i++) await wait(30)
+    if (!this.view.field || !(this.active || this.view.busy)) return true
+    const run = this.#fieldRun
+    const form = this.form
+    const mine = () => run === this.#fieldRun && this.form === form
+    const over = this.#fieldOver.then(() => true as const)
     await this.finish()
-    await Promise.race([over, new Promise(resolve => setTimeout(resolve, 20_000))])
+    const came = await Promise.race([over, wait(20_000)])
+    if (!mine()) return false
+    if (!came) {
+      this.cancel()
+      this.problem = 'The last words did not come in time and were dropped. Check the task, then start again.'
+      return false
+    }
+    // How it ended is said by the view, which can be a moment behind the last word.
+    for (let i = 0; i < 40 && mine() && (this.active || this.view.busy); i++) {
+      await this.refresh()
+      if (this.active || this.view.busy) await wait(50)
+    }
+    return mine() && this.view.phase !== 'error' && !this.problem
   }
   /** The shortcut went down: start a recording, or finish the one going. Held, it is
    *  push-to-talk (see `release`); tapped, the recording goes on until the next tap. */

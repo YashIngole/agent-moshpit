@@ -293,8 +293,9 @@ impl Office {
             Signal::Working if desk.drawing_its_opening(now) => None,
             Signal::Working => {
                 // A new stretch of work: what the agent said it was doing in the last one is
-                // no longer what it is doing. It says again, if it does.
-                if !desk.worked {
+                // no longer what it is doing. It says again, if it does. Done is the end of a
+                // stretch too, when nobody was looking: the desk never went to rest between.
+                if !desk.worked || desk.phase == Phase::Done {
                     desk.reported_activity.clear();
                 }
                 desk.worked = true;
@@ -694,6 +695,23 @@ mod tests {
         office.observe("a", &Signal::Quiet, false, 14_000);
         office.observe("a", &Signal::Working, false, 15_000);
         assert_eq!(office.views(&[])[0].activity, "Running the tests");
+    }
+
+    #[test]
+    fn what_an_agent_said_does_not_outlast_a_stretch_nobody_watched_end() {
+        // Finished with nobody looking, the desk is done, not at rest; a turn it starts by
+        // itself after that (scheduled work, a message from elsewhere) is a new stretch.
+        let mut office = office();
+        office.observe("a", &Signal::Working, false, 300);
+        office.agent_activity("a", "old task");
+        let ended = office.observe("a", &Signal::Finished, false, 5_000).unwrap();
+        assert_eq!((ended.to, ended.note.as_str()), (Phase::Done, "old task"));
+        // Still what it did, for as long as it is done.
+        assert_eq!(office.views(&[])[0].activity, "old task");
+        assert!(office.observe("a", &Signal::Finished, false, 6_000).is_none());
+        office.observe("a", &Signal::Working, false, 9_000);
+        assert_eq!((phase(&office), office.views(&[])[0].activity.as_str()), (Phase::Working, ""));
+        assert_eq!(office.observe("a", &Signal::Finished, false, 12_000).unwrap().note, "");
     }
 
     #[test]

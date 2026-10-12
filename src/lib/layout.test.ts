@@ -178,6 +178,30 @@ describe('laying out terminals', () => {
     expect(where(tiny, 'c')[2]).toBeGreaterThan(0)
   })
 
+  it('keeps a narrow pane inside an uneven split its least when an edge outside it is dragged', () => {
+    // A room 1600 by 900, where no pane is narrower than 160 or shorter than 110.
+    const least = { row: 160 / 1600, column: 110 / 900 }
+    const widths = (layout: Layout) => Object.fromEntries(plan(layout).panes.map(pane => [pane.id, Math.round(pane.width * 1600)]))
+    const heights = (layout: Layout) => Object.fromEntries(plan(layout).panes.map(pane => [pane.id, Math.round(pane.height * 900)]))
+    // a large, beside a column of b, c and d; e put beside b, and b made the narrow one of the two.
+    let room = putBeside(arrange(['a', 'b', 'c', 'd'], 'main-beside', 'a'), 'e', 'b', 'right')
+    room = moveEdge(room, [1, 0], 0, 0.3, least)
+    expect(widths(room)).toEqual({ a: 960, b: 192, e: 448, c: 640, d: 640 })
+    // Dragging a's edge across moves no edge inside the column: b keeps its three tenths of
+    // it, so the column stops while b still has its least. It used to go on to 96.
+    const squeezed = moveEdge(room, [], 0, 0.8, least)
+    expect(widths(squeezed)).toEqual({ a: 1067, b: 160, e: 373, c: 533, d: 533 })
+    // Dragged the other way there is nothing in a to keep, but a itself.
+    expect(widths(moveEdge(room, [], 0, 0, least)).a).toBe(160)
+
+    // The same the other way up: a above a row of b, c and d; e under b, and b the short one.
+    let tall = putBeside(arrange(['a', 'b', 'c', 'd'], 'main-below', 'a'), 'e', 'b', 'bottom')
+    tall = moveEdge(tall, [1, 0], 0, 0.4, least)
+    const pressed = moveEdge(tall, [], 0, 0.95, least)
+    expect(heights(pressed).b).toBe(110)
+    expect(Object.values(heights(pressed)).every(height => height >= 110)).toBe(true)
+  })
+
   it('makes everything even again', () => {
     const messy = moveRowEdge(moveColumnEdge(arrange(['a', 'b', 'c']), 0, 0, 0.8), 0, 0.3)
     expect(even(messy)).toEqual(arrange(['a', 'b', 'c']))
@@ -616,8 +640,15 @@ describe('whatever is done to a room', () => {
           if (edges.length > 0) {
             const edge = pick(edges)
             const least = { row: 0.02 + roll() * 0.1, column: 0.02 + roll() * 0.1 }
+            // The way the edge's split runs, and how much of that way each pane has.
+            const dir = edge.kind === 'column' ? 'row' : 'column'
+            const along = (pane: { width: number; height: number }) => (dir === 'row' ? pane.width : pane.height)
+            const roomy = plan(layout).panes.every(pane => along(pane) >= least[dir] - 1e-9)
             layout = moveEdge(layout, edge.path, edge.index, roll() * 1.4 - 0.2, least)
             did = `drag edge ${edge.key}`
+            // With room for everyone before, nobody is under the least after, however deep
+            // in the dragged split they sit and whatever share of it they have.
+            if (roomy) for (const pane of plan(layout).panes) expect(along(pane), `seed ${seed}, step ${step}: ${did} keeps ${pane.id} its least`).toBeGreaterThanOrEqual(least[dir] - 1e-9)
           }
         } else if (what < 0.96) {
           layout = arrange(here, pick(shapes), pick(here))

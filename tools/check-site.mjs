@@ -22,6 +22,8 @@ for (const channel of ['msedge', 'chrome', undefined]) {
 assert.ok(browser, 'an installed browser is required')
 const checkedLinks = new Set()
 const checkedAssets = new Set()
+const installers = new Set()
+const release = 'https://github.com/YashIngole/agent-moshpit/releases/latest/download/'
 const titles = new Set()
 const descriptions = new Set()
 try {
@@ -99,6 +101,15 @@ try {
       link.protocol = new URL(origin).protocol
       if (checkedLinks.has(link.href)) continue
       checkedLinks.add(link.href)
+      // An installer is counted on the site and sent on to GitHub. That it is sent on to
+      // the right file is checked; the file is not fetched, and the check says it is a check.
+      if (link.pathname.startsWith('/get/')) {
+        const sent = await context.request.get(link.href, { maxRedirects: 0, headers: { 'user-agent': 'agent-moshpit check-site bot' } })
+        assert.equal(sent.status(), 302, `installer link ${link.href}`)
+        assert.equal(sent.headers().location, release + link.pathname.slice(5), `installer link ${link.href}`)
+        installers.add(link.pathname.slice(5))
+        continue
+      }
       const result = await context.request.get(link.href)
       assert.equal(result.status(), 200, `internal link ${link.href}`)
       if (link.hash) {
@@ -124,6 +135,9 @@ try {
     assert.match(result.headers()['x-robots-tag'] || '', /noindex/, `${path}: excluded from search`)
     if (path.startsWith('/install.')) assert.match(result.headers()['content-type'], /text\/plain/)
   }
+  assert.equal(installers.size, 7, `every installer is offered through the site: ${[...installers].join(', ')}`)
+  const unknown = await context.request.get(`${origin}/get/not-an-installer.exe`, { maxRedirects: 0 })
+  assert.equal(unknown.status(), 404, 'a file nobody publishes is not sent on anywhere')
   const missing = await context.request.get(`${origin}/__seo-check-missing-page__`)
   assert.equal(missing.status(), 404, 'missing URL returns a real 404')
   assert.match(await missing.text(), /Nobody sits at this desk/, 'custom 404 page')
@@ -145,7 +159,7 @@ try {
   assert.deepEqual(cspErrors, [], 'structured data and scripts respect the content security policy')
   const allowedHosts = new Set([new URL(origin).hostname, 'static.cloudflareinsights.com', 'cloudflareinsights.com'])
   for (const host of hosts) assert.ok(allowedHosts.has(host), `unexpected resource host: ${host}`)
-  console.log(`PASS indexing headers, install scripts, 404 and JavaScript. ${checkedLinks.size} internal links; ${checkedAssets.size} assets.`)
+  console.log(`PASS indexing headers, install scripts, installer links, 404 and JavaScript. ${checkedLinks.size} internal links; ${checkedAssets.size} assets.`)
   console.log(`Resource hosts: ${[...hosts].join(', ')}`)
 } finally {
   await browser.close()

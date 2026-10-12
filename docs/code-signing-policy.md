@@ -27,4 +27,4 @@ Optional voice input is off until you turn it on. On this computer, it downloads
 
 The agent programs it starts (Claude Code, Codex and the rest) are other people's software, started at your request with your own sign-ins. They talk to their own services as they do in any terminal, under their own privacy policies.
 
-The website, agentmoshpit.com, sets no cookies and counts visits with Cloudflare Web Analytics.
+The website, agentmoshpit.com, sets no cookies and counts visits with Cloudflare Web Analytics. It also counts downloads: how many times each installer and install script was asked for each day, and from which country, as a number and nothing about who asked.

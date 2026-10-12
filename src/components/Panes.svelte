@@ -6,7 +6,7 @@
   // that never changes while they are open. So a terminal is never torn down and made
   // again when the room changes shape around it, and never moved in the page either:
   // a terminal that is moved loses the keyboard.
-  import { plan as laidOut, type Edge } from '../lib/layout'
+  import { aim, land, plan as laidOut, type Aim, type Edge } from '../lib/layout'
   import { openDeskMenu } from '../lib/menus'
   import { office, type MenuItem } from '../lib/office.svelte'
   import { terms } from '../lib/terms'
@@ -36,9 +36,9 @@
 
   let room = $state<HTMLElement>()
   let dragging = $state('')
-  /** A pane being dragged by its header, and the pane it would change places with. */
+  /** A pane being dragged by its header, and where it would go, and the room it would have, if it were let go now. */
   let moving = $state('')
-  let target = $state('')
+  let landing = $state.raw<{ to: Aim; left: number; top: number; width: number; height: number } | null>(null)
   let press: { x: number; y: number; id: string } | null = null
   /** What the find bar is looking for, and whether it found it. */
   let needle = $state('')
@@ -84,7 +84,7 @@
     office.keepView()
   }
 
-  // ── a pane dragged by its header onto another ──
+  // ── a pane dragged by its header: onto a side of another, into its place, or to an edge of the room ──
 
   function onHeadDown(event: PointerEvent, id: string) {
     if (event.button !== 0 || plan.panes.length < 2 || office.zoomed) return
@@ -92,9 +92,18 @@
     press = { x: event.clientX, y: event.clientY, id }
   }
 
-  function paneAt(x: number, y: number): string {
-    const pane = document.elementsFromPoint(x, y).find(el => el instanceof HTMLElement && el.matches('.pane'))
-    return pane instanceof HTMLElement ? (pane.dataset.pane ?? '') : ''
+  /**
+   * Where the pane held at this place in the window would go, and the room it would
+   * have there. Worked out from the layout as it is, by the same rules that move it
+   * when it is let go, so what is ringed is where it lands. Nothing moves until then:
+   * no terminal is resized, and no program draws itself again, while a pane is held.
+   */
+  function aimed(x: number, y: number) {
+    if (!room || !moving) return null
+    const box = room.getBoundingClientRect()
+    const to = aim(office.layout, moving, x - box.left, y - box.top, { width: box.width, height: box.height })
+    const there = to ? laidOut(land(office.layout, moving, to)).panes.find(pane => pane.id === moving) : undefined
+    return to && there ? { to, left: there.left, top: there.top, width: there.width, height: there.height } : null
   }
 
   function onWindowMove(event: PointerEvent) {
@@ -103,16 +112,36 @@
       if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8) return
       moving = press.id
     }
-    const over = paneAt(event.clientX, event.clientY)
-    target = over !== moving ? over : ''
+    landing = aimed(event.clientX, event.clientY)
   }
 
-  function onWindowUp() {
-    if (moving && target) office.tradePanes(moving, target)
+  function onWindowUp(event: PointerEvent) {
+    // Aimed afresh, at the room as it is now: a desk may have gone while the pane was held.
+    const id = moving
+    const to = aimed(event.clientX, event.clientY)?.to
+    letGo()
+    if (id && to) office.landPane(id, to)
+  }
+
+  /** The pane is let go and nothing moves. */
+  function letGo() {
     press = null
     moving = ''
-    target = ''
+    landing = null
   }
+
+  /** Escape puts a held pane back. Taken before the terminal sees it: to its program, Escape means stop. */
+  function onWindowKey(event: KeyboardEvent) {
+    if (!moving || event.key !== 'Escape') return
+    event.preventDefault()
+    event.stopPropagation()
+    letGo()
+  }
+
+  // A pane given the whole room, or the held pane's desk going, ends the drag.
+  $effect(() => {
+    if (moving && (office.zoomed !== '' || !plan.panes.some(pane => pane.id === moving))) letGo()
+  })
 
   function menuFrom(event: MouseEvent, id: string) {
     const button = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -174,7 +203,7 @@
   const behind = $derived(office.zoomed ? plan.panes.length - 1 : 0)
 </script>
 
-<svelte:window onpointermove={onWindowMove} onpointerup={onWindowUp} onpointercancel={onWindowUp} />
+<svelte:window onpointermove={onWindowMove} onpointerup={onWindowUp} onpointercancel={letGo} onblur={letGo} onkeydowncapture={onWindowKey} />
 
 <section class="panes" class:dragging={dragging !== '' || moving !== ''} aria-label="Terminals" aria-owns={plan.panes.map(pane => named(pane.id)).join(' ')} bind:this={room}>
   {#each kept as pane (pane.id)}
@@ -189,7 +218,6 @@
       class:hidden
       class:dropping={office.dropTarget === pane.id}
       class:moving={moving === pane.id}
-      class:target={target === pane.id}
       id={named(pane.id)}
       data-pane={pane.id}
       style:left={zoomed ? '0' : percent(pane.left)}
@@ -347,6 +375,11 @@
     </article>
   {/each}
 
+  {#if landing}
+    <div class="landing" aria-hidden="true" style:left={percent(landing.left)} style:top={percent(landing.top)} style:width={percent(landing.width)} style:height={percent(landing.height)}></div>
+  {/if}
+  <p class="aloud" aria-live="polite">{office.aloud}</p>
+
   {#if office.zoomed === ''}
     {#each plan.edges as edge (edge.key)}
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -400,10 +433,22 @@
   .pane.hidden {
     visibility: hidden;
   }
-  /* Files over it, or another pane about to take its place. */
-  .pane.dropping,
-  .pane.target {
+  /* Files over it, about to be pasted into it. */
+  .pane.dropping {
     box-shadow: inset 0 0 0 2px var(--work);
+  }
+  /* Where a pane being dragged would land: the room it would have, ringed, over whatever is there now. */
+  .landing {
+    position: absolute;
+    z-index: 6;
+    background: rgba(130, 170, 255, 0.08);
+    box-shadow: inset 0 0 0 2px var(--work);
+    pointer-events: none;
+    transition:
+      left var(--quick) var(--ease),
+      top var(--quick) var(--ease),
+      width var(--quick) var(--ease),
+      height var(--quick) var(--ease);
   }
   .pane.moving {
     opacity: 0.55;

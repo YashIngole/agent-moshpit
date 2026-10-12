@@ -15,6 +15,7 @@
   import { voiceKey, voiceKeyUp } from './lib/voice'
   import { startBeat } from './lib/beat'
   import { bridge, type Drop } from './lib/bridge'
+  import type { Side } from './lib/layout'
   import { FLOOR_WIDTH, office } from './lib/office.svelte'
   import { terms, typedPath } from './lib/terms'
 
@@ -80,6 +81,18 @@
     return target instanceof HTMLElement && target.closest('.term-host') !== null
   }
 
+  /** The way each arrow key points, among the panes. */
+  const TOWARD: Record<string, Side> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'top', ArrowDown: 'bottom' }
+
+  /**
+   * Whether Ctrl+Shift and an arrow is the office's here. Among the terminals it is. In a
+   * text field anywhere else it selects by the word, as it does everywhere; behind a panel
+   * the terminals are covered; and with AltGr held it is somebody typing a letter.
+   */
+  function paneArrow(event: KeyboardEvent): boolean {
+    return office.terminals && !office.panel && !event.getModifierState('AltGraph') && (inTerminal(event.target) || !typing(event.target))
+  }
+
   /** The office's own keys, which work even in a terminal (see TerminalView's list). True when one was used. */
   function officeKey(event: KeyboardEvent): boolean {
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
@@ -102,7 +115,11 @@
     else if (ctrl && !shift && !alt && (code === 'Minus' || code === 'NumpadSubtract')) office.setFontSize(-1)
     else if (ctrl && !shift && !alt && (code === 'Digit0' || code === 'Numpad0')) office.setFontSize(0)
     else if (alt && !ctrl && !shift && /^Digit[1-9]$/.test(code) && office.terminals) office.focusNth(Number(code.slice(5)))
-    else return false
+    // The keyboard to the pane that way; with Alt as well, the pane itself, one step for each press.
+    else if (ctrl && shift && code in TOWARD && paneArrow(event)) {
+      if (!alt) office.focusToward(TOWARD[code]!)
+      else if (pane && !event.repeat) office.movePane(pane, TOWARD[code]!)
+    } else return false
     return true
   }
 

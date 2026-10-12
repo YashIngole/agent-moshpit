@@ -5,7 +5,7 @@ import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
 import { groupProjects } from './projects'
 import { terms } from './terms'
-import { EMPTY, close, even, has, ids, moveEdge, only, open, parse, sideBySide, swap, trade, type Layout, type Least, type Room } from './layout'
+import { EMPTY, arrange, close, count, even, has, ids, land, move, moveEdge, neighbour, only, open, parse, samePicture, sideBySide, swap, type Aim, type Layout, type Least, type Room, type Shape, type Side } from './layout'
 import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 import { mixed as manyPrograms } from './words'
 
@@ -77,6 +77,10 @@ const ROOMY_PANE = 720
 export const FONT_SIZE = { least: 9, usual: 13, most: 24 }
 /** How long a removed desk can be brought back. */
 const UNDO_MS = 8000
+/** Said once every terminal has been put in one shape. A shape with a large pane names who has it. */
+const ARRANGED: Record<'grid' | 'side' | 'stacked', string> = { grid: 'Arranged in a grid.', side: 'Arranged side by side.', stacked: 'Arranged one above another.' }
+/** Where a pane is once it has been put on a side of another. */
+const BESIDE: Record<Side, string> = { left: 'left of', right: 'right of', top: 'above', bottom: 'below' }
 
 /** Folders agents were started in before, newest first. Kept by the window; nothing depends on it. */
 function rememberedFolders(): string[] {
@@ -601,10 +605,92 @@ class Office {
     if (this.zoomed) { this.zoomed = id; this.#report() }
   }
 
-  /** Two panes change places, a pane dragged by its header onto another. */
-  tradePanes(a: string, b: string) {
-    const layout = trade(this.layout, a, b)
-    if (layout !== this.layout) this.#lay(layout)
+  /** Where a pane last went, said aloud: someone who cannot see the room hears what moved. */
+  aloud = $state('')
+
+  #called(id: string): string {
+    return this.agents.find(a => a.id === id)?.title ?? 'A terminal'
+  }
+
+  #alongSide(id: string, side: Side): string {
+    return `${this.#called(id)} has the ${side === 'left' || side === 'right' ? `${side} side` : side} of the room.`
+  }
+
+  /**
+   * A pane dragged by its header and let go where it was aimed: on a side of another,
+   * in another's place, or along a whole side of the room.
+   */
+  landPane(id: string, to: Aim) {
+    const layout = land(this.layout, id, to)
+    if (samePicture(layout, this.layout)) return
+    const words = to.kind === 'edge' ? this.#alongSide(id, to.side) : to.kind === 'beside' ? `${this.#called(id)} is now ${BESIDE[to.side]} ${this.#called(to.target)}.` : `${this.#called(id)} and ${this.#called(to.target)} changed places.`
+    this.#moved(id, layout, words)
+  }
+
+  /**
+   * Move a pane one step: it changes places with its neighbour on that side, and with
+   * none there, takes that whole side of the room. Not while one pane has the room:
+   * the others are behind it, and nothing would be seen to move.
+   *
+   * Its terminal takes the keyboard, unless `keyboard` is false: a step taken from a
+   * menu leaves the keyboard in the menu, for the next step.
+   */
+  movePane(id: string, side: Side, keyboard = true) {
+    if (!has(this.layout, id) || count(this.layout) < 2) return
+    if (this.zoomed) {
+      this.hint('move-zoomed', 'Put the other terminals back to move one of them.')
+      return
+    }
+    const beside = neighbour(this.layout, id, side)
+    const layout = move(this.layout, id, side)
+    if (samePicture(layout, this.layout)) return
+    this.#moved(id, layout, beside ? `${this.#called(id)} and ${this.#called(beside)} changed places.` : this.#alongSide(id, side), keyboard)
+  }
+
+  /** A pane that has just been placed is the one being worked in: its terminal has the keyboard. */
+  #moved(id: string, layout: Layout, words: string, keyboard = true) {
+    this.focused = id
+    this.#lay(layout)
+    this.aloud = words
+    if (keyboard) void tick().then(() => terms.get(id)?.focus())
+  }
+
+  /** Move the keyboard to the pane on one side of the one it is in. */
+  focusToward(side: Side) {
+    const next = has(this.layout, this.focused) ? neighbour(this.layout, this.focused, side) : (ids(this.layout)[0] ?? null)
+    if (!next) return
+    this.focused = next
+    if (this.zoomed) { this.zoomed = next; this.#report() }
+  }
+
+  /**
+   * Every open terminal in one shape. The one the keyboard is in is the large one,
+   * where the shape has one. The room as it was can be had back.
+   */
+  arrange(to: Shape) {
+    const before = this.layout
+    const list = ids(before)
+    if (list.length < 2) return
+    const main = list.includes(this.focused) ? this.focused : list[0]!
+    const layout = arrange(list, to, main)
+    this.zoomed = ''
+    this.focused = main
+    void tick().then(() => terms.get(main)?.focus())
+    if (samePicture(layout, before)) {
+      this.#report()
+      return
+    }
+    this.#lay(layout)
+    this.say(to === 'grid' || to === 'side' || to === 'stacked' ? ARRANGED[to] : `${this.#called(main)} is the large one.`, {
+      label: 'Undo',
+      run: () => {
+        // As it was, without what has been put away since and with what has been opened since.
+        let back = only(before, id => has(this.layout, id))
+        for (const id of ids(this.layout)) if (!has(back, id)) back = open(back, id, undefined, this.#room())
+        this.zoomed = ''
+        this.#lay(back)
+      }
+    })
   }
 
   /** An edge between panes, dragged: `at` is how far along its own split it now stands. Remembered when it is let go. */

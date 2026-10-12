@@ -4,14 +4,18 @@
   // lives here as well as in the tray, because not every desktop has a tray.
   import { onMount, tick } from 'svelte'
   import { bridge } from '../lib/bridge'
-  import { ids } from '../lib/layout'
+  import { count } from '../lib/layout'
   import { office } from '../lib/office.svelte'
+  import ArrangeItems from './ArrangeItems.svelte'
 
   let open = $state(false)
   let version = $state('')
   let root = $state<HTMLElement>()
+  let width = $state(window.innerWidth)
 
-  const panes = $derived(ids(office.layout).length)
+  const panes = $derived(count(office.layout))
+  /** A window too narrow for the bar's Arrange button: what it offers is here instead. */
+  const arranges = $derived(panes > 1 && width <= 760)
 
   onMount(() => {
     void bridge.version().then(
@@ -64,6 +68,7 @@
   }
 </script>
 
+<svelte:window bind:innerWidth={width} />
 <svelte:document onpointerdown={onDocumentPointer} />
 
 <div class="menu" bind:this={root} onkeydown={onKey} role="presentation">
@@ -102,8 +107,9 @@
           <span class="line">Compact floor<i class="tick" aria-hidden="true"></i></span>
         </button>
       {/if}
-      {#if panes > 1}
-        <button type="button" role="menuitem" tabindex="-1" onclick={() => { close(true); office.evenOut() }}>Make the terminals even</button>
+      {#if arranges}
+        <hr />
+        <ArrangeItems onchosen={() => close(true)} />
       {/if}
       <hr />
       <button type="button" role="menuitemcheckbox" tabindex="-1" aria-checked={office.copyOnSelect} onclick={() => { close(true); office.setCopyOnSelect(!office.copyOnSelect) }}>

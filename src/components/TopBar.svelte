@@ -7,6 +7,7 @@
   import { elapsed } from '../lib/time'
   import type { Phase } from '../lib/types'
   import AppMenu from './AppMenu.svelte'
+  import Arrange from './Arrange.svelte'
   import Mark from './Mark.svelte'
   import Person from './Person.svelte'
   import VoiceControl from './VoiceControl.svelte'
@@ -78,6 +79,7 @@
     </button>
   {/if}
   {#if bridge.demo}<span class="demo">demo data</span>{/if}
+  <Arrange />
   {#if office.terminals || away}
     <button type="button" class="button quiet between" title={office.terminals ? 'Hide the terminals (Ctrl+`). Their programs keep running.' : 'Bring the terminals back (Ctrl+`)'} onclick={() => office.toggleTerminals()}>
       {#if office.terminals}
@@ -253,7 +255,8 @@
   .new {
     margin-left: auto;
   }
-  .between + .new {
+  .between + .new,
+  .bar > :global(.arrange + .between) {
     margin-left: 0;
   }
 

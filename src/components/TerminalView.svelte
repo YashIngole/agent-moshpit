@@ -75,6 +75,8 @@
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     if (ctrl && code === 'Backquote') return true
     if (ctrl && shift && ['BracketLeft', 'BracketRight', 'KeyA', 'KeyW', 'KeyN', 'KeyQ', 'KeyF', 'Enter', 'Slash'].includes(code)) return true
+    // To the pane on that side, and with Alt, the pane itself. Not with AltGr, which is a letter being typed.
+    if (ctrl && shift && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(code) && !event.getModifierState('AltGraph')) return true
     if (ctrl && !shift && !alt && ['Equal', 'Minus', 'Digit0', 'NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(code)) return true
     if (alt && !ctrl && !shift && /^Digit[1-9]$/.test(code)) return true
     return false
@@ -422,7 +424,9 @@
   .term-host :global(.xterm) {
     height: 100%;
   }
+  /* Under the last whole line there is up to a line of room to spare: the terminal's own colour, not xterm's black. */
   .term-host :global(.xterm-viewport) {
+    background-color: var(--term);
     scrollbar-color: var(--term-line) transparent;
   }
 </style>

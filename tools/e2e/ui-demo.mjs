@@ -932,6 +932,221 @@ try {
   check('New agent folds its options into one line until asked', !(await page.locator('#new-model').isVisible()) && (await page.locator('details.options > summary').textContent())?.includes('More options'))
   await page.context().close()
 
+  // ── arranging the terminals: a pane put on a side of another, a whole side of the room, keys, shapes ──
+  {
+    const room = await open('demo=office&still')
+    await desk(room, 2).click()
+    await desk(room, 5).click({ modifiers: ['ControlOrMeta'] })
+    await desk(room, 6).click({ modifiers: ['ControlOrMeta'] })
+    await until(async () => (await panes(room)) === 3)
+    await sleep(300)
+    // Every pane as the page first made it, and a count of any taken out of the page since.
+    await room.evaluate(() => {
+      window.__made = new Map([...document.querySelectorAll('.pane')].map(p => [p.dataset.pane, p]))
+      window.__taken = 0
+      new MutationObserver(changes => changes.forEach(c => c.removedNodes.forEach(n => n instanceof HTMLElement && n.classList.contains('pane') && window.__taken++))).observe(document.querySelector('.panes'), { childList: true })
+    })
+    const places = async () => Object.fromEntries((await laidOut(room)).map(p => [p.id, [p.x, p.y, p.w, p.h]]))
+    const order = async () => (await laidOut(room)).map(p => p.id.replace('demo-', '')).join(' ')
+    const box = id => room.locator(`.pane[data-pane="demo-${id}"]`).boundingBox()
+    const near = (a, b) => a.every((n, i) => Math.abs(n - b[i]) <= 2)
+    /** Take a pane by its header and hold it at a place in another pane, given as shares of that pane's box. */
+    const hold = async (id, over, fx, fy) => {
+      const head = await room.locator(`.pane[data-pane="demo-${id}"] header .status`).boundingBox()
+      const target = typeof over === 'number' ? await box(over) : await room.locator('.panes').boundingBox()
+      await room.mouse.move(head.x + 4, head.y + 4)
+      await room.mouse.down()
+      await room.mouse.move(target.x + target.width * fx, target.y + target.height * fy, { steps: 12 })
+      await sleep(320)
+    }
+    const landing = async () => {
+      if ((await room.locator('.panes .landing').count()) === 0) return null
+      const ring = await room.locator('.panes .landing').boundingBox()
+      return ring ? [ring.x, ring.y, ring.width, ring.height].map(Math.round) : null
+    }
+    const said = () => room.locator('.panes > .aloud').textContent()
+
+    // Two above one. The one below, held at the right of the top right pane: it would stand third in that row.
+    const before = await places()
+    await hold(6, 5, 0.85, 0.5)
+    const ring = await landing()
+    check('a pane held over the side of another shows where it would land', ring !== null, JSON.stringify(ring))
+    check('and nothing moves while it is held', JSON.stringify(await places()) === JSON.stringify(before))
+    await room.mouse.up()
+    check('let go, it stands on that side: three side by side', await until(async () => (await order()) === '2 5 6' && new Set((await laidOut(room)).map(p => p.y)).size === 1), JSON.stringify(await places()))
+    check('exactly where the ring was', ring !== null && near((await places())['demo-6'], ring), `${JSON.stringify((await places())['demo-6'])} against ${JSON.stringify(ring)}`)
+    check('and it is said aloud', ((await said()) ?? '') === 'Bump dependencies is now right of Docs pass for the API.', await said())
+    check('with the keyboard in the terminal that moved', await until(() => room.evaluate(() => document.activeElement?.closest('.pane')?.dataset.pane === 'demo-6')))
+
+    // Escape puts a held pane back, and the program in the terminal never hears it.
+    const three = await places()
+    await hold(6, 2, 0.5, 0.8)
+    check('the ring follows the pane to wherever it is held', (await landing()) !== null)
+    await room.keyboard.press('Escape')
+    check('Escape lets it go where it was', (await landing()) === null)
+    await room.mouse.up()
+    await sleep(200)
+    check('and nothing has moved', JSON.stringify(await places()) === JSON.stringify(three), JSON.stringify(await places()))
+    check('and the program was not sent the Escape', await room.evaluate(() => !window.__demo.typed.some(t => t.data.includes('\x1b'))))
+
+    // Below another: the two share the room that one had.
+    await hold(6, 5, 0.5, 0.82)
+    await room.mouse.up()
+    check(
+      'held at the foot of a pane, it goes below it, in the room that pane had',
+      await until(async () => {
+        const p = await places()
+        return (await order()) === '2 5 6' && near([p['demo-6'][0], p['demo-6'][2]], [p['demo-5'][0], p['demo-5'][2]]) && p['demo-6'][1] > p['demo-5'][1] && p['demo-2'][3] > p['demo-5'][3] * 1.8
+      }),
+      JSON.stringify(await places())
+    )
+
+    // Where it would change nothing, nothing is offered.
+    await hold(6, 5, 0.5, 0.82)
+    check('held where it already stands, no ring is shown', (await landing()) === null, JSON.stringify(await landing()))
+    await room.mouse.up()
+
+    // The edge of the room: the whole side.
+    const whole = await room.locator('.panes').boundingBox()
+    await hold(2, 'room', 0.75, 0.99)
+    const strip = await landing()
+    check('held at the edge of the room, it would have that whole side', strip !== null && near([strip[0], strip[2]], [Math.round(whole.x), Math.round(whole.width)]), JSON.stringify(strip))
+    await room.mouse.up()
+    check('and takes it: one above another, the last across the whole foot', await until(async () => (await order()) === '5 6 2' && new Set((await laidOut(room)).map(p => p.x)).size === 1), JSON.stringify(await places()))
+    check('said aloud as the side it has', ((await said()) ?? '') === 'Refactor auth middleware has the bottom of the room.', await said())
+
+    // A header: the two change places.
+    const stacked = await places()
+    const head5 = await room.locator('.pane[data-pane="demo-5"] header').boundingBox()
+    const from2 = await room.locator('.pane[data-pane="demo-2"] header .status').boundingBox()
+    await room.mouse.move(from2.x + 4, from2.y + 4)
+    await room.mouse.down()
+    await room.mouse.move(head5.x + head5.width / 2, head5.y + head5.height / 2, { steps: 12 })
+    await sleep(320)
+    await room.mouse.up()
+    check('let go on another pane’s header, the two change places', await until(async () => JSON.stringify((await places())['demo-2']) === JSON.stringify(stacked['demo-5']) && JSON.stringify((await places())['demo-5']) === JSON.stringify(stacked['demo-2'])), JSON.stringify(await places()))
+
+    // The keys: Ctrl+Shift and an arrow to the pane that way; with Alt, the pane itself.
+    await room.locator('.pane[data-pane="demo-6"] .term-host').click()
+    const typingIn = () => room.evaluate(() => document.querySelector('.pane.typing')?.dataset.pane ?? '')
+    await room.keyboard.press('Control+Shift+ArrowUp')
+    check('Ctrl+Shift+Up takes the keyboard to the pane above', await until(async () => (await typingIn()) === 'demo-2'), await typingIn())
+    await room.keyboard.press('Control+Shift+ArrowDown')
+    await room.keyboard.press('Control+Shift+ArrowDown')
+    check('and Down, twice, to the one at the foot', await until(async () => (await typingIn()) === 'demo-5'), await typingIn())
+    await room.keyboard.press('Control+Shift+ArrowDown')
+    check('at the edge of the room it stays where it is', (await typingIn()) === 'demo-5')
+    await room.keyboard.press('Control+Shift+Alt+ArrowUp')
+    check('Ctrl+Shift+Alt+Up moves that pane up a place', await until(async () => (await order()) === '2 5 6'), await order())
+    await room.keyboard.type('k')
+    check('and the keyboard goes with it', await until(() => room.evaluate(() => window.__demo.typed.at(-1)?.agent === 'demo-5' && window.__demo.typed.at(-1)?.data === 'k')), JSON.stringify(await room.evaluate(() => window.__demo.typed.slice(-2))))
+    await room.keyboard.press('Control+Shift+Alt+ArrowLeft')
+    check(
+      'with nobody on that side, it takes that whole side of the room',
+      await until(async () => {
+        const p = (await places())['demo-5']
+        return near([p[0], p[1], p[3]], [Math.round(whole.x), Math.round(whole.y), Math.round(whole.height)])
+      }),
+      JSON.stringify(await places())
+    )
+    check('none of those keys reached a program', await room.evaluate(() => !window.__demo.typed.some(t => t.data.includes('\x1b'))), JSON.stringify(await room.evaluate(() => window.__demo.typed)))
+
+    // Arrange: every terminal in one shape, with a way back.
+    const built = await places()
+    await room.getByRole('button', { name: 'Arrange', exact: true }).click()
+    check('Arrange offers each shape, an even share, and a step each way', (await room.getByRole('menuitem').evaluateAll(items => items.map(i => i.textContent.trim() || i.getAttribute('aria-label')).join('|'))) === 'In a grid|Side by side|Stacked|This one large, the others beside it|This one large, the others below it|Make them even|Move Docs pass for the API left|Move Docs pass for the API right|Move Docs pass for the API up|Move Docs pass for the API down', await room.getByRole('menuitem').evaluateAll(items => items.map(i => i.textContent.trim() || i.getAttribute('aria-label')).join('|')))
+    await room.getByRole('menuitem', { name: 'Stacked' }).click()
+    check('Stacked puts them one above another', await until(async () => new Set((await laidOut(room)).map(p => p.x)).size === 1 && new Set((await laidOut(room)).map(p => p.h)).size === 1), JSON.stringify(await places()))
+    check('and says so, with a way back', ((await room.locator('.toast').textContent()) ?? '').includes('Arranged one above another.') && (await room.locator('.toast').getByRole('button', { name: 'Undo' }).count()) === 1, await room.locator('.toast').textContent())
+    await room.locator('.toast').getByRole('button', { name: 'Undo' }).click()
+    check('Undo puts the room back as it was built', await until(async () => JSON.stringify(await places()) === JSON.stringify(built)), JSON.stringify(await places()))
+    const shape = async name => {
+      await room.getByRole('button', { name: 'Arrange', exact: true }).click()
+      await room.getByRole('menuitem', { name }).click()
+      await sleep(250)
+      return laidOut(room)
+    }
+    let shaped = await shape('Side by side')
+    check('Side by side stands them in one row', new Set(shaped.map(p => p.y)).size === 1 && new Set(shaped.map(p => p.w)).size <= 2, JSON.stringify(shaped))
+    shaped = await shape('In a grid')
+    check('In a grid is two above one', shaped.filter(p => p.y === shaped[0].y).length === 2 && shaped.length === 3, JSON.stringify(shaped))
+    shaped = await shape('This one large, the others beside it')
+    const mine = await typingIn()
+    check('This one large gives the pane the keyboard is in the height of the room and most of its width', shaped[0].id === mine && Math.abs(shaped[0].h - whole.height) <= 2 && shaped[0].w > shaped[1].w * 1.3 && shaped[1].x === shaped[2].x, JSON.stringify(shaped))
+    check('and names who has it', ((await room.locator('.toast').textContent()) ?? '').includes('Docs pass for the API is the large one.'), await room.locator('.toast').textContent())
+    shaped = await shape('This one large, the others below it')
+    check('or the width of the room, with the others in a row below', shaped[0].id === mine && Math.abs(shaped[0].w - whole.width) <= 2 && shaped[1].y === shaped[2].y && shaped[0].h > shaped[1].h * 1.3, JSON.stringify(shaped))
+    check('the keyboard is back in that terminal once the room is arranged', await until(() => room.evaluate(() => document.activeElement?.closest('.pane')?.dataset.pane === document.querySelector('.pane.typing')?.dataset.pane)))
+    await room.getByRole('button', { name: 'Arrange', exact: true }).click()
+    await room.getByRole('menuitem', { name: 'Move Docs pass for the API down' }).click()
+    check('a step from Arrange moves the pane and leaves Arrange open for the next', await until(async () => (await laidOut(room)).at(-1).id === mine || (await laidOut(room))[0].id !== mine) && (await room.getByRole('menuitem', { name: 'Stacked' }).count()) === 1, JSON.stringify(await laidOut(room)))
+    await room.keyboard.press('Escape')
+    check('Escape closes Arrange', await until(async () => (await room.getByRole('menuitem', { name: 'Stacked' }).count()) === 0))
+
+    check('through all of it, no terminal was taken out of the page or made again', await room.evaluate(() => window.__taken === 0 && [...document.querySelectorAll('.pane')].every(p => window.__made.get(p.dataset.pane) === p)), String(await room.evaluate(() => window.__taken)))
+
+    // One pane given the room: the others are behind it, and nothing would be seen to move.
+    await room.keyboard.press('Control+Shift+Enter')
+    await until(async () => (await room.locator('.pane:not(.hidden)').count()) === 1)
+    const zoomed = await order()
+    await room.keyboard.press('Control+Shift+Alt+ArrowRight')
+    await sleep(200)
+    check('a pane given the room is not moved from behind it', (await order()) === zoomed && ((await room.locator('.toast').textContent()) ?? '').includes('Put the other terminals back'), await room.locator('.toast').textContent().catch(() => ''))
+    await room.keyboard.press('Control+Shift+Enter')
+
+    // With one terminal there is nothing to arrange; in a narrow window it is in the menu.
+    await room.setViewportSize({ width: 700, height: 800 })
+    await sleep(300)
+    check('a narrow window has no Arrange in its bar', (await room.getByRole('button', { name: 'Arrange', exact: true }).count()) === 0)
+    await room.getByRole('button', { name: 'More', exact: true }).click()
+    check('its menu arranges instead', (await room.getByRole('menuitem', { name: 'Side by side' }).count()) === 1 && (await room.getByRole('menuitem', { name: 'Make them even' }).count()) === 1)
+    await room.getByRole('menuitem', { name: 'Side by side' }).click()
+    check('and does', await until(async () => new Set((await laidOut(room)).map(p => p.y)).size === 1), JSON.stringify(await places()))
+    await room.setViewportSize({ width: 1280, height: 800 })
+    await room.locator('.pane[data-pane="demo-6"]').getByRole('button', { name: 'Put this terminal away' }).click()
+    await room.locator('.pane[data-pane="demo-5"]').getByRole('button', { name: 'Put this terminal away' }).click()
+    check('with one terminal open there is no Arrange', await until(async () => (await panes(room)) === 1 && (await room.getByRole('button', { name: 'Arrange', exact: true }).count()) === 0))
+
+    // In a form, Ctrl+Shift and an arrow still selects by the word.
+    await room.getByRole('button', { name: 'New agent', exact: true }).click()
+    await room.locator('#new-task').fill('alpha beta')
+    await room.keyboard.press('Control+Shift+ArrowLeft')
+    check('in a text field Ctrl+Shift+Left still selects a word', await room.evaluate(() => document.activeElement?.id === 'new-task' && document.activeElement.value.slice(document.activeElement.selectionStart, document.activeElement.selectionEnd) === 'beta'))
+    await room.context().close()
+
+    // What an earlier office kept, rows of panes with their shares, is still read.
+    const kept = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
+    await kept.addInitScript(() => {
+      localStorage.setItem('moshpit.view', JSON.stringify({ floor: 264, floorChosen: true, open: true, layout: { rows: [{ size: 1, panes: [{ id: 'demo-2', size: 1.4 }, { id: 'demo-5', size: 0.6 }] }, { size: 2, panes: [{ id: 'demo-6', size: 1 }] }] } }))
+    })
+    const again = await kept.newPage()
+    again.on('pageerror', error => errors.push(String(error)))
+    await again.goto(`${base}?demo=office&still`)
+    await again.waitForSelector('.pane')
+    await until(async () => (await panes(again)) === 3)
+    const old = await laidOut(again)
+    check('the terminals an earlier office kept come back where they were', old.map(p => p.id).join(' ') === 'demo-2 demo-5 demo-6' && old[0].y === old[1].y && old[2].y > old[0].y, JSON.stringify(old))
+    check('with the shares they were dragged to', Math.abs(old[0].w / old[1].w - 1.4 / 0.6) < 0.05 && Math.abs(old[2].h / old[0].h - 2) < 0.05, JSON.stringify(old))
+    await kept.close()
+
+    // The bar keeps its menu at every width, with one more button in it.
+    for (const width of [1101, 901, 761, 621, 420, 340]) {
+      const bar = await open('demo=office&still', 1280, 720)
+      await bar.getByRole('button', { name: 'Open their terminal' }).click()
+      await desk(bar, 2).click({ modifiers: ['ControlOrMeta'] })
+      await until(async () => (await panes(bar)) === 2)
+      await bar.setViewportSize({ width, height: 720 })
+      await sleep(300)
+      const fits = await bar.evaluate(() => {
+        const more = document.querySelector('.bar .more').getBoundingClientRect()
+        const strip = document.querySelector('.bar').getBoundingClientRect()
+        return { more: Math.round(more.right), bar: Math.round(strip.height), page: document.documentElement.scrollWidth, wide: innerWidth, arrange: document.querySelectorAll('.bar .arrange').length }
+      })
+      check(`at ${width} wide the bar still holds its menu, with two terminals open and someone waiting`, fits.more <= fits.wide && fits.bar <= 53 && fits.page <= fits.wide && fits.arrange === (width > 760 ? 1 : 0), JSON.stringify(fits))
+      await bar.context().close()
+    }
+  }
+
   check('nothing went wrong on the page', errors.length === 0, errors.join(' | '))
 } catch (error) {
   check('the checks ran to the end', false, error?.stack ?? error)

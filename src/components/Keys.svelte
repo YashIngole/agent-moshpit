@@ -28,6 +28,8 @@
       keys: [
         ['Alt+1 … Alt+9', 'The keyboard to pane 1 to 9'],
         ['Ctrl+Shift+] / [', 'The keyboard to the next pane, or the one before'],
+        ['Ctrl+Shift+arrows', 'The keyboard to the pane on that side'],
+        ['Ctrl+Shift+Alt+arrows', 'Move this pane that way: it changes places with its neighbour, or takes that whole side of the room'],
         ['Ctrl+Shift+Enter', 'Give this pane the room, and put the others back'],
         ['Ctrl+Shift+W', 'Put this pane away; its program keeps running'],
         ['Ctrl+Shift+F', 'Find in what this terminal has shown'],
@@ -57,7 +59,7 @@
         ['Ctrl and the wheel', 'Bigger or smaller text, over a terminal'],
         ['Right-click', 'A desk’s menu, or a terminal’s'],
         ['Middle-click', 'Take a desk away'],
-        ['Drag a pane’s header', 'Onto another pane, to change places'],
+        ['Drag a pane’s header', 'Onto a side of another pane to put it there, onto its middle or its header to change places, or to the edge of the room for that whole side. Esc puts it back'],
         ['Double-click a pane’s header', 'Give it the room'],
         ['Drop files on a pane', 'Their paths are pasted into it']
       ]

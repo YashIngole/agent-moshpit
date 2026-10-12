@@ -421,7 +421,7 @@ fn session_for_agents(view: AgentView, asking: &str) -> Value {
 /// handed over by default. Who is signed in is for the window: it can name a person,
 /// and an agent has no use for it.
 fn program_for_agents(view: HarnessView) -> Value {
-    let HarnessView { id, name, tag, installed, launch, version, takes_task, worktree, latest, outdated, install_line, update_line, signed_in: _, account: _, login_line: _ } = view;
+    let HarnessView { id, name, tag, installed, launch, version, takes_task, worktree, latest, outdated, install_line, update_line, install_needs: _, signed_in: _, account: _, login_line: _ } = view;
     json!({"id":id,"name":name,"tag":tag,"installed":installed,"launch":launch,"version":version,"takes_task":takes_task,"worktree":worktree,"latest":latest,"outdated":outdated,"install_line":install_line,"update_line":update_line})
 }
 

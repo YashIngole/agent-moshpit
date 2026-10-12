@@ -933,6 +933,37 @@ try {
   await page.context().close()
 
   // ── signing in: who is signed in to each program, switching, and a desk whose program is signed out ──
+  // ── a program that needs Node.js, on a computer without it ──
+  {
+    const bare = await open('demo=office&still&nonode')
+    const looked = () => bare.evaluate(() => window.__demo.looked)
+    await bare.getByRole('button', { name: 'New agent' }).first().click()
+    check('the programs are looked for again when New agent opens', (await looked()) === 1)
+    await bare.getByRole('button', { name: /to install$/ }).click()
+    await bare.locator('.pick label', { hasText: 'OpenCode' }).click()
+    const hint = bare.locator('aside.panel .hint', { hasText: 'Node.js' })
+    check('a program npm installs says Node.js is missing before anything is pressed', /was not found on this computer\..*nothing to restart/.test(((await hint.textContent()) ?? '').replace(/\s+/g, ' ')))
+    check('with a way to get it', (await bare.getByRole('button', { name: 'Get Node.js', exact: true }).count()) === 1 && (await bare.locator('aside.panel code.line').count()) === 0)
+    await bare.getByRole('button', { name: 'Install OpenCode and start' }).click()
+    check('pressing install anyway says the same, and that no restart is needed', await until(async () => ((await bare.locator('aside.panel footer .problem').textContent().catch(() => '')) ?? '').includes('the office does not need restarting')))
+    check('and nothing was started', (await bare.evaluate(() => window.__demo.specs.length)) === 0 && (await bare.locator('.pane').count()) === 0)
+    await bare.keyboard.press('Escape')
+
+    await bare.getByRole('button', { name: 'More', exact: true }).click()
+    await bare.getByRole('menuitem', { name: /Agent programs/ }).click()
+    check('Agent programs says so once, above the programs that are not here, with the way to get it', (await bare.locator('aside.panel .needs').count()) === 1 && ((await bare.locator('aside.panel .needs .note').textContent()) ?? '').replace(/\s+/g, ' ').includes('need Node.js, which was not found') && (await bare.getByRole('button', { name: 'get Node.js', exact: true }).count()) === 1)
+    check('the programs that are here are not under it', (await bare.locator('aside.panel .program-group', { has: bare.locator('.needs') }).locator('li:not(.absent)').count()) === 0)
+    await bare.keyboard.press('Escape')
+
+    // Node.js is installed while the office is open: the next look finds it, with no restart.
+    await bare.evaluate(() => window.__demo.findNode())
+    await bare.getByRole('button', { name: 'New agent' }).first().click()
+    check('once Node.js is there, the program is offered to install as usual, without restarting', await until(async () => (await bare.locator('aside.panel code.line').count()) === 1 && (await bare.getByRole('button', { name: 'Get Node.js', exact: true }).count()) === 0))
+    await bare.getByRole('button', { name: 'Install OpenCode and start' }).click()
+    check('and installing it starts', await until(async () => (await bare.locator('.pane').count()) === 1))
+    await bare.close()
+  }
+
   {
     const programs = async p => {
       await p.getByRole('button', { name: 'More', exact: true }).click()

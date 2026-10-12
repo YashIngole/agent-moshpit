@@ -12,7 +12,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 /// How a program is given the first thing to do.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -503,45 +504,185 @@ pub struct Found {
     pub through_shell: bool,
 }
 
+/// How long a list of folders is gone by before it is made again. A program installed
+/// while the office is open, Node.js above all, is found the next time anything is
+/// looked for, without restarting the office.
+const FOLDERS_FOR: Duration = Duration::from_secs(3);
+
+/// The folders last listed, and when.
+static FOLDERS: Mutex<Option<(Instant, Arc<Vec<PathBuf>>)>> = Mutex::new(None);
+
+/// The PATH the user's login shell sets up, once it has been asked. See `look_again`.
+#[cfg(unix)]
+static SHELL_PATH: Mutex<Option<Option<std::ffi::OsString>>> = Mutex::new(None);
+
+/// When the login shell was last asked again, which starts it: not more than once a minute.
+#[cfg(unix)]
+static SHELL_ASKED: Mutex<Option<Instant>> = Mutex::new(None);
+#[cfg(unix)]
+const SHELL_EVERY: Duration = Duration::from_secs(60);
+
 /// Every folder a program might be in: the PATH this app was given, the PATH a
 /// login shell would have (an app started from a dock or a menu is given a much
-/// shorter one), and the places installers usually use.
-fn folders() -> &'static [PathBuf] {
-    static FOLDERS: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    FOLDERS.get_or_init(|| {
-        let mut all: Vec<PathBuf> = Vec::new();
-        let mut add = |dir: PathBuf| {
-            if !dir.as_os_str().is_empty() && !all.contains(&dir) {
-                all.push(dir);
+/// shorter one), the PATH Windows keeps for programs started from now on (an
+/// installer adds to that one, never to a running app's), and the places installers
+/// usually use.
+fn folders() -> Arc<Vec<PathBuf>> {
+    let mut kept = FOLDERS.lock().unwrap();
+    if let Some((at, all)) = kept.as_ref() {
+        if at.elapsed() < FOLDERS_FOR {
+            return all.clone();
+        }
+    }
+    let all = Arc::new(list_folders());
+    *kept = Some((Instant::now(), all.clone()));
+    all
+}
+
+fn list_folders() -> Vec<PathBuf> {
+    let mut all: Vec<PathBuf> = Vec::new();
+    let mut add = |dir: PathBuf| {
+        if !dir.as_os_str().is_empty() && !all.contains(&dir) {
+            all.push(dir);
+        }
+    };
+    if let Some(path) = std::env::var_os("PATH") {
+        std::env::split_paths(&path).for_each(&mut add);
+    }
+    #[cfg(unix)]
+    {
+        let mut asked = SHELL_PATH.lock().unwrap();
+        if let Some(path) = asked.get_or_insert_with(login_shell_path).as_ref() {
+            std::env::split_paths(path).for_each(&mut add);
+        }
+    }
+    #[cfg(windows)]
+    for path in windows_path::now() {
+        std::env::split_paths(&path).for_each(&mut add);
+    }
+    if let Some(home) = home_dir() {
+        for rest in [".local/bin", ".npm-global/bin", ".bun/bin", ".cargo/bin", ".opencode/bin", ".hermes/bin"] {
+            add(home.join(rest));
+        }
+        #[cfg(windows)]
+        for rest in ["AppData/Roaming/npm", "AppData/Local/agy/bin", "AppData/Local/hermes/bin", "AppData/Local/Programs/hermes/bin", "scoop/shims", "AppData/Local/Microsoft/WinGet/Links", "AppData/Local/Volta/bin"] {
+            add(home.join(rest));
+        }
+    }
+    // Where Node.js is put by its own installer, whatever the PATH says yet.
+    #[cfg(windows)]
+    for root in ["ProgramFiles", "ProgramW6432"] {
+        if let Some(root) = std::env::var_os(root).filter(|r| !r.is_empty()) {
+            add(PathBuf::from(root).join("nodejs"));
+        }
+    }
+    #[cfg(unix)]
+    for dir in ["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin"] {
+        add(PathBuf::from(dir));
+    }
+    all
+}
+
+/// Forget where programs were thought to be: the next search reads the PATH anew.
+/// With `shell`, on Unix, the login shell is asked for its PATH again as well, when a
+/// minute has gone by since the last time. That starts the shell and waits two seconds
+/// at most, so it is for a thread that can wait, and for when somebody is looking for a
+/// program; a shell that does not answer leaves what it said before.
+pub fn look_again(shell: bool) {
+    #[cfg(unix)]
+    if shell {
+        let mut asked = SHELL_ASKED.lock().unwrap();
+        if !matches!(*asked, Some(at) if at.elapsed() < SHELL_EVERY) {
+            *asked = Some(Instant::now());
+            if let Some(path) = login_shell_path() {
+                *SHELL_PATH.lock().unwrap() = Some(Some(path));
             }
-        };
-        if let Some(path) = std::env::var_os("PATH") {
-            std::env::split_paths(&path).for_each(&mut add);
         }
-        #[cfg(unix)]
-        if let Some(path) = login_shell_path() {
-            std::env::split_paths(&path).for_each(&mut add);
-        }
-        if let Some(home) = home_dir() {
-            for rest in [".local/bin", ".npm-global/bin", ".bun/bin", ".cargo/bin", ".opencode/bin", ".hermes/bin"] {
-                add(home.join(rest));
+    }
+    #[cfg(not(unix))]
+    let _ = shell;
+    *FOLDERS.lock().unwrap() = None;
+}
+
+/// The PATH as Windows has it written down, which is what a program started from the
+/// desktop from now on is given. An app that is already running keeps the PATH it was
+/// started with, so a folder an installer has just added is only here.
+#[cfg(windows)]
+mod windows_path {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ};
+
+    const MACHINE: &str = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
+    const USER: &str = "Environment";
+    const MORE_DATA: u32 = 234;
+
+    fn wide(text: &str) -> Vec<u16> {
+        std::ffi::OsStr::new(text).encode_wide().chain([0]).collect()
+    }
+
+    /// One written-down variable, with the `%NAME%`s Windows can fill in filled in.
+    fn read(root: HKEY, key: &str, name: &str) -> Option<String> {
+        let (key, name) = (wide(key), wide(name));
+        let mut room = 8 * 1024usize;
+        for _ in 0..4 {
+            let mut text = vec![0u16; room];
+            let mut bytes = (room * 2) as u32;
+            // Safe: every pointer is to a live buffer of the size said, and the strings end in a zero.
+            let said = unsafe { RegGetValueW(root, key.as_ptr(), name.as_ptr(), RRF_RT_REG_SZ, std::ptr::null_mut(), text.as_mut_ptr().cast(), &mut bytes) };
+            if said == MORE_DATA {
+                room = (bytes as usize / 2 + 1).max(room * 2);
+                continue;
             }
-            #[cfg(windows)]
-            for rest in ["AppData/Roaming/npm", "AppData/Local/agy/bin", "AppData/Local/hermes/bin", "AppData/Local/Programs/hermes/bin", "scoop/shims"] {
-                add(home.join(rest));
+            if said != 0 {
+                return None;
+            }
+            let end = text.iter().position(|&c| c == 0).unwrap_or(text.len());
+            return Some(OsString::from_wide(&text[..end]).to_string_lossy().into_owned()).filter(|value| !value.is_empty());
+        }
+        None
+    }
+
+    /// A variable of the user's, or else of the computer's.
+    fn variable(name: &str) -> Option<String> {
+        read(HKEY_CURRENT_USER, USER, name).or_else(|| read(HKEY_LOCAL_MACHINE, MACHINE, name))
+    }
+
+    /// The computer's PATH and then the user's, as Windows joins them. A `%NAME%` this
+    /// app was started without (a variable the same installer has just made) is filled
+    /// in from where it is written down.
+    pub fn now() -> Vec<OsString> {
+        [read(HKEY_LOCAL_MACHINE, MACHINE, "Path"), read(HKEY_CURRENT_USER, USER, "Path")].into_iter().flatten().map(|path| super::fill_in(&path, &variable).into()).collect()
+    }
+}
+
+/// Text with each `%NAME%` that `value` knows replaced; one it does not know is left as it is.
+#[cfg(any(windows, test))]
+fn fill_in(text: &str, value: &dyn Fn(&str) -> Option<String>) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find('%') {
+        let (before, from) = rest.split_at(start);
+        out.push_str(before);
+        let named = from[1..].find('%').map(|end| &from[1..1 + end]).filter(|name| !name.is_empty() && !name.contains([';', '\\', '/']));
+        match named.and_then(|name| value(name).map(|value| (name, value))) {
+            Some((name, value)) => {
+                out.push_str(&value);
+                rest = &from[name.len() + 2..];
+            }
+            None => {
+                out.push('%');
+                rest = &from[1..];
             }
         }
-        #[cfg(unix)]
-        for dir in ["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin"] {
-            add(PathBuf::from(dir));
-        }
-        all
-    })
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Child programs need the same PATH used to find them (including interpreters).
 pub fn child_path() -> Option<std::ffi::OsString> {
-    std::env::join_paths(folders()).ok()
+    std::env::join_paths(folders().iter()).ok()
 }
 
 pub fn home_dir() -> Option<PathBuf> {
@@ -894,6 +1035,40 @@ mod tests {
         // A package that ships a program of its own, as Claude Code's does: no `node` in it.
         let claude = "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe\"   %*\r\n";
         assert_eq!(npm_script(claude).unwrap(), "node_modules/@anthropic-ai/claude-code/bin/claude.exe");
+    }
+
+    #[test]
+    fn a_name_between_percent_signs_is_filled_in_from_where_it_is_written_down() {
+        // As nvm for Windows writes itself into the PATH, with variables it has only just made.
+        let known = |name: &str| match name {
+            "NVM_HOME" => Some("C:\\nvm".to_string()),
+            "NVM_SYMLINK" => Some("C:\\nvm4w\\nodejs".to_string()),
+            _ => None,
+        };
+        assert_eq!(fill_in("C:\\Windows;%NVM_HOME%;%NVM_SYMLINK%;%NOT_SET%\\bin;100%", &known), "C:\\Windows;C:\\nvm;C:\\nvm4w\\nodejs;%NOT_SET%\\bin;100%");
+        assert_eq!(fill_in("%%NVM_HOME%", &known), "%C:\\nvm");
+        assert_eq!(fill_in("", &known), "");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_path_windows_has_written_down_is_read_with_its_names_filled_in() {
+        // The computer's own PATH is written with %SystemRoot% in it.
+        let all = windows_path::now().iter().map(|path| path.to_string_lossy().to_lowercase()).collect::<Vec<_>>().join(";");
+        assert!(all.contains("system32"), "{all}");
+        assert!(!all.contains("%systemroot%"), "{all}");
+    }
+
+    #[test]
+    fn the_folders_are_listed_afresh_once_asked_to_look_again() {
+        let first = folders();
+        assert!(!first.is_empty());
+        look_again(false);
+        let again = folders();
+        assert!(!Arc::ptr_eq(&first, &again));
+        // Where Node.js is put by its installer is looked in whatever the PATH says.
+        #[cfg(windows)]
+        assert!(again.iter().any(|dir| dir.ends_with("nodejs")), "{again:?}");
     }
 
     #[test]

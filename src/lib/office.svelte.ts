@@ -904,8 +904,9 @@ class Office {
     this.panel = { kind: 'programs' }
     // One installed since the window opened is offered too.
     this.findEditors()
-    // Who is signed in may have changed in a terminal, where nobody told the office.
-    bridge.refreshAccounts()
+    // So is a program, or what installs one. And who is signed in may have changed in a
+    // terminal, where nobody told the office.
+    bridge.refreshPrograms(true)
   }
 
   // ── the editor file paths open in ──────────────────────────────────────
@@ -1139,6 +1140,8 @@ class Office {
     this.#rememberFocus()
     this.menu = null
     this.panel = { kind: 'new', cwd, harness, launch }
+    // A program installed since the office opened is offered without restarting it.
+    bridge.refreshPrograms(false)
   }
 
   closePanel() {

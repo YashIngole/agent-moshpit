@@ -299,6 +299,7 @@ fn agents_are_told_about_a_program_but_not_who_is_signed_in_to_it() {
         outdated: true,
         install_line: "npm install -g @anthropic-ai/claude-code".into(),
         update_line: "claude update".into(),
+        install_needs: String::new(),
         signed_in: Some(true),
         account: "Signed in as someone@example.com \u{b7} Max".into(),
         login_line: "claude auth login".into(),

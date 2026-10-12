@@ -26,6 +26,7 @@ const program = (over: Partial<Harness> & Pick<Harness, 'id' | 'name' | 'tag'>):
   outdated: false,
   install_line: '',
   update_line: '',
+  install_needs: '',
   signed_in: null,
   account: '',
   login_line: '',
@@ -134,6 +135,10 @@ interface Seen {
   sized: { agent: string; cols: number; rows: number }[]
   /** How many times the programs were asked who is signed in. */
   asked: number
+  /** How many times the programs were looked for again. */
+  looked: number
+  /** Node.js arrives (`&nonode`), as when its installer has finished: the next look finds it. */
+  findNode: () => void
   /** Each agent that was asked for, as it was asked for. */
   specs: NewAgentSpec[]
   /** Let a sign-in that is waiting (`&signin=waits`) end, as it does when the browser comes back. */
@@ -142,7 +147,7 @@ interface Seen {
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, specs: [], finishSignIn: () => {} }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [], asked: 0, looked: 0, findNode: () => {}, specs: [], finishSignIn: () => {} }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -150,7 +155,11 @@ export function demoBridge(): Bridge {
   const given = new Map(agents.map(a => [a.id, a.title]))
   // `&signedout=claude` (or `claude,codex`): nobody is signed in to those.
   const signedOut = (params.get('signedout') ?? '').split(',')
-  let harnesses = HARNESSES.map(h => (signedOut.includes(h.id) ? { ...h, signed_in: false, account: 'Signed out' } : { ...h }))
+  // `&nonode`: Node.js is not on this computer, so nothing npm installs can be installed yet.
+  let noNode = params.has('nonode')
+  const needs = (h: Harness): Harness => ({ ...h, install_needs: noNode && !h.installed && h.install_line.startsWith('npm ') ? 'Node.js' : '' })
+  let harnesses = HARNESSES.map(h => needs(signedOut.includes(h.id) ? { ...h, signed_in: false, account: 'Signed out' } : { ...h }))
+  seen.findNode = () => { noNode = false }
   let jobs: Job[] = []
   let made = 0
   let closeQuits = false
@@ -293,6 +302,7 @@ export function demoBridge(): Bridge {
     const kindOf = harnesses.find(h => h.id === harness)
     const line = kind === 'install' ? kindOf?.install_line : kind === 'update' ? kindOf?.update_line : kindOf?.login_line
     if (!kindOf || !line) throw kind === 'signin' ? `The office does not know how to sign in to ${kindOf?.name ?? 'that'}. Start one of its desks and sign in from its terminal.` : `The office does not know how to ${kind} ${kindOf?.name ?? 'that'}.`
+    if (kind === 'install' && noNode && line.startsWith('npm ')) throw `${kindOf.name} is installed with npm, which comes with Node.js, and Node.js was not found on this computer. Install it from nodejs.org, then try again here: the office does not need restarting.`
     const id = `job-${kind}-${harness}`
     jobs = [...jobs.filter(j => j.id !== id), { id, harness, harness_name: kindOf.name, kind, running: true, ok: null }]
     printed.set(id, `${dim('$')} ${line}\r\n`)
@@ -365,7 +375,15 @@ export function demoBridge(): Bridge {
     install: async harness => job(harness, 'install'),
     update: async harness => job(harness, 'update'),
     signIn: async harness => job(harness, 'signin'),
-    refreshAccounts: () => void (seen.asked += 1),
+    refreshPrograms: accounts => {
+      seen.looked += 1
+      if (accounts) seen.asked += 1
+      // What has changed on the computer since the last look is found.
+      if (harnesses.some(h => h.install_needs !== needs(h).install_needs)) {
+        harnesses = harnesses.map(needs)
+        publish()
+      }
+    },
     forgetJob: id => {
       jobs = jobs.filter(j => j.id !== id)
       printed.delete(id)

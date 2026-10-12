@@ -174,7 +174,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 
 ## The ⋯ menu
 
-- **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. This panel also chooses the editor that file paths open in.
+- **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. A program you install while the office is open, yourself or with a button here, is found without restarting it: the office looks again when you open this panel or **New agent**, and when you come back to its window. That includes Node.js. Most of these programs are installed with npm, which comes with Node.js; on a computer without it, the panel and **New agent** say so before you press anything, with a **get Node.js** button, and install as usual once it is there. This panel also chooses the editor that file paths open in.
 - **Voice input.** Enable voice, choose where speech becomes words (this computer, or a cloud provider with your own key), download or remove the model, add, test or remove keys, word hints, the microphone and the shortcut.
 - **Configuration warning**, while a startup warning is unresolved. Opens the warning again after it has been dismissed, with its file action. Moving between desks never clears it.
 - **Compact floor**, while terminals are open.

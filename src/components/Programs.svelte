@@ -4,8 +4,9 @@
   // update or sign in. What runs is written beside each button, and it runs in a
   // terminal here, in plain view.
   import { onMount } from 'svelte'
+  import { bridge } from '../lib/bridge'
   import { office } from '../lib/office.svelte'
-  import type { Harness, Job } from '../lib/types'
+  import { WHERE_TO_GET, type Harness, type Job } from '../lib/types'
 
   let first = $state<HTMLElement>()
   let problem = $state('')
@@ -30,6 +31,9 @@
   const busy = (h: Harness) => office.agents.filter(a => a.harness === h.id && a.running).length
 
   onMount(() => first?.focus())
+
+  /** What the programs of a group need before the office can install them, and is not here. */
+  const needed = (rows: Harness[]) => rows.find(h => !h.installed && h.install_needs)?.install_needs ?? ''
 
   async function act(h: Harness) {
     problem = ''
@@ -63,6 +67,19 @@
     {#each groups as group (group.name)}
     <section class="program-group" aria-label={group.name}>
     <h3>{group.name}</h3>
+    {#if needed(group.rows)}
+      {@const what = needed(group.rows)}
+      <!-- What installs them is missing: said once, above them, with where to get it. -->
+      <div class="do needs">
+        <p class="note">
+          The ones installed with npm need {what}, which was not found on this computer. Install it first; the office
+          finds it when you come back to this window, with nothing to restart.
+        </p>
+        {#if WHERE_TO_GET[what]}
+          <button type="button" class="button quiet" onclick={() => bridge.openPage(WHERE_TO_GET[what]!)}>get {what}</button>
+        {/if}
+      </div>
+    {/if}
     <ul>
       {#each group.rows as h (h.id)}
         <li class:absent={!h.installed}>
@@ -272,6 +289,14 @@
   .do .button {
     flex: none;
     min-width: 74px;
+  }
+  .do.needs {
+    align-items: start;
+  }
+  .do.needs .note {
+    flex: 1;
+    min-width: 0;
+    color: var(--ink-2);
   }
   /* Who is signed in: a line of its own above the way to change it. Nobody signed in is said in full ink. */
   .account {

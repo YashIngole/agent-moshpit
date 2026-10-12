@@ -573,8 +573,8 @@ async fn sign_in(handle: State<'_, Handle>, harness: String, cols: u16, rows: u1
 
 /// Ask the programs again who is signed in to each. Answered in a snapshot, when they have said.
 #[tauri::command]
-fn refresh_accounts(handle: State<'_, Handle>) {
-    handle.refresh_accounts();
+fn refresh_programs(handle: State<'_, Handle>, accounts: bool) {
+    handle.refresh_programs(accounts);
 }
 
 #[tauri::command]
@@ -1003,7 +1003,7 @@ pub fn run() {
             install,
             update,
             sign_in,
-            refresh_accounts,
+            refresh_programs,
             forget_job,
             wake,
             term_attach,

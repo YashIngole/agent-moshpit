@@ -30,6 +30,9 @@ export interface Agent {
   launch?: LaunchOptions
 }
 
+/** Where to get what a program needs before the office can install it (`install_needs`). */
+export const WHERE_TO_GET: Record<string, string> = { 'Node.js': 'https://nodejs.org/en/download' }
+
 /** One program an agent can be, and whether it is on this computer. */
 export interface Harness {
   id: string
@@ -50,6 +53,8 @@ export interface Harness {
   /** What runs to install it, and to update it, as typed. Empty when there is no way. */
   install_line: string
   update_line: string
+  /** What has to be on this computer before the office can install it, and is not: `Node.js`, when it is installed with npm and npm was not found. Empty otherwise. */
+  install_needs: string
   /** Whether someone is signed in to it, as it says itself. Null until it has been asked, and for a program that cannot say. */
   signed_in: boolean | null
   /** Who is signed in, or that nobody is, in a few words. Empty when not known. */

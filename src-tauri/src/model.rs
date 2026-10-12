@@ -88,6 +88,9 @@ pub struct HarnessView {
     /// Empty when the office does not know a way.
     pub install_line: String,
     pub update_line: String,
+    /// What has to be on this computer before the office can install it, and is not:
+    /// `Node.js`, when it is installed with npm and npm was not found. Empty otherwise.
+    pub install_needs: String,
     /// Whether someone is signed in to it, as it says itself. `None` until it has been
     /// asked, and for a program that cannot say.
     pub signed_in: Option<bool>,

@@ -8,7 +8,7 @@
   import { joinPiece, shortcutLabel } from '../lib/voice'
   import LaunchSettings from './LaunchSettings.svelte'
   import VoiceLine from './VoiceLine.svelte'
-  import type { LaunchOptions } from '../lib/types'
+  import { WHERE_TO_GET, type LaunchOptions } from '../lib/types'
 
   let { cwd: initialCwd, harness: initialHarness = '', launch: initialLaunch }: { cwd: string; harness?: string; launch?: LaunchOptions } = $props()
 
@@ -216,7 +216,17 @@
             <button type="button" class="more" onclick={() => (everything = true)}>+{more} to install</button>
           {/if}
         </div>
-        {#if kind && !kind.installed}
+        {#if kind && !kind.installed && kind.install_needs}
+          <!-- What installs it is missing: said before the button is pressed, with where to get it. -->
+          <p class="hint">
+            {kind.name} is installed with npm, which comes with {kind.install_needs}, and {kind.install_needs} was not
+            found on this computer. Install it first. The office finds it when you come back to this window: there is
+            nothing to restart.
+          </p>
+          {#if WHERE_TO_GET[kind.install_needs]}
+            <button type="button" class="button quiet get-it" onclick={() => bridge.openPage(WHERE_TO_GET[kind.install_needs]!)}>Get {kind.install_needs}</button>
+          {/if}
+        {:else if kind && !kind.installed}
           <p class="hint">
             {kind.name} is not on this computer yet. It is installed in a terminal here, where you can watch it, and then
             the agent starts:
@@ -461,6 +471,9 @@
     font-size: var(--t-sm);
     white-space: nowrap;
     user-select: text;
+  }
+  .get-it {
+    margin-top: var(--s-2);
   }
   .check {
     display: flex;

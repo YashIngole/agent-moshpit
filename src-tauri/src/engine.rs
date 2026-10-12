@@ -118,6 +118,9 @@ struct State {
     looks: u64,
     /// Voice text must not end up in an app-owned screen file through PTY echo.
     voice_used: HashSet<String>,
+    /// Whether npm is on this computer, once it has been looked for. Without it, the
+    /// programs it installs cannot be installed yet, and the window says what is needed.
+    npm: Option<bool>,
 }
 
 /// Something to tell the desktop. Queued, and said by a thread that holds no lock.
@@ -145,6 +148,9 @@ struct Inner {
     /// One thread asks them, one at a time, and none waits twice.
     asking: Mutex<HashSet<String>>,
     accounts: Mutex<Sender<String>>,
+    /// Every program is being looked for: the pass at the start, or one asked for since.
+    /// A second one asked for meanwhile would find the same, and is not made.
+    looking: AtomicBool,
 }
 
 /// The engine, as the rest of the app holds it. Cheap to clone.
@@ -195,6 +201,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
         revision: 0,
         looks: 0,
         voice_used: HashSet::new(),
+        npm: None,
     };
     let home = harness::home_dir().unwrap_or_default();
     // The desktop is told things by this thread alone. Showing a snapshot or a
@@ -226,6 +233,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             catalogs: crate::catalog::Cache::default(),
             asking: Mutex::new(HashSet::new()),
             accounts: Mutex::new(accounts),
+            looking: AtomicBool::new(true),
         }),
     };
     *slot.lock().unwrap() = Some(handle.clone());
@@ -259,6 +267,7 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
     let finder = handle.clone();
     std::thread::spawn(move || {
         finder.find_programs();
+        finder.inner.looking.store(false, Ordering::Release);
         if std::env::var_os("MOSHPIT_NO_UPDATE_CHECK").is_some() {
             return;
         }
@@ -475,7 +484,7 @@ impl Handle {
         };
         let (found, words) = match runner {
             Runner::Npm(words) => {
-                let npm = harness::find("npm").ok_or_else(|| format!("{} is installed with npm, which was not found. Install Node.js from nodejs.org, then try again.", program.name))?;
+                let npm = harness::find("npm").ok_or_else(|| format!("{} is installed with npm, which comes with Node.js, and Node.js was not found on this computer. Install it from nodejs.org, then try again here: the office does not need restarting.", program.name))?;
                 (npm, words)
             }
             Runner::Itself(words) => (self.locate(&program)?, harness::own_words(&program, &words)),
@@ -691,6 +700,10 @@ impl Handle {
         drop(state);
         for id in out {
             self.wonder(&id);
+        }
+        // Back from installing something, perhaps: what is on this computer is looked at again.
+        if came {
+            self.look_for_programs(false);
         }
     }
 
@@ -932,6 +945,7 @@ impl Handle {
                     latest,
                     takes_task: h.task != harness::TaskArg::None,
                     worktree: !h.worktree.is_empty(),
+                    install_needs: if !installed && state.npm == Some(false) && matches!(harness::install_runner(h), Some(Runner::Npm(_))) { "Node.js".into() } else { String::new() },
                     install_line: harness::install_runner(h).map(|r| r.line(&h.program)).unwrap_or_default(),
                     update_line: harness::update_runner(h).map(|r| r.line(&h.program)).unwrap_or_default(),
                     signed_in: here.filter(|_| installed).and_then(|i| i.account.signed_in),
@@ -1039,6 +1053,77 @@ impl Handle {
         }
     }
 
+    /// Somebody is looking at the programs, or has come back to the window: each is looked
+    /// for again, off this thread, so one installed since the office opened is offered
+    /// without restarting it. One that was not here before is asked its version and who
+    /// is signed in; the others are left alone. With `accounts`, every program that can
+    /// say who is signed in is asked.
+    pub fn refresh_programs(&self, accounts: bool) {
+        self.look_for_programs(true);
+        if accounts {
+            self.refresh_accounts();
+        }
+    }
+
+    /// `asked`: somebody is looking for a program, which is worth asking their shell
+    /// where things are again. Coming back to the window is not.
+    fn look_for_programs(&self, asked: bool) {
+        if self.inner.stopping.load(Ordering::Relaxed) || self.inner.looking.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let again = self.clone();
+        std::thread::spawn(move || {
+            harness::look_again(asked);
+            again.find_new_programs();
+            again.inner.looking.store(false, Ordering::Release);
+        });
+    }
+
+    /// Look for every program again. One that has come, or moved, is asked its version
+    /// and who is signed in; one that has gone is no longer offered.
+    fn find_new_programs(&self) {
+        let npm = harness::find("npm").is_some();
+        let found: Vec<(String, Option<Found>)> = self.inner.table.iter().map(|h| (h.id.clone(), harness::find(&h.program))).collect();
+        let mut fresh = Vec::new();
+        {
+            let mut state = self.inner.state.lock().unwrap();
+            state.npm = Some(npm);
+            for (id, found) in found {
+                let entry = state.installed.entry(id.clone()).or_default();
+                if entry.found == found {
+                    continue;
+                }
+                entry.found = found.clone();
+                match found {
+                    Some(found) => fresh.push((id, found)),
+                    // What it said about itself goes with it.
+                    None => {
+                        entry.version.clear();
+                        entry.account = harness::Account::default();
+                    }
+                }
+            }
+            self.publish(&mut state);
+        }
+        for (id, found) in fresh {
+            if self.inner.stopping.load(Ordering::Relaxed) {
+                return;
+            }
+            let version = harness::version(&found);
+            let account = self.kind(&id).ok().and_then(|kind| Self::account_of(kind, &found));
+            let mut state = self.inner.state.lock().unwrap();
+            let entry = state.installed.entry(id).or_default();
+            // Unless it has moved again meanwhile: whoever saw that asks for themselves.
+            if entry.found.as_ref() == Some(&found) {
+                entry.version = version;
+                if let Some(account) = account {
+                    entry.account = account;
+                }
+            }
+            self.publish(&mut state);
+        }
+    }
+
     /// Ask npm for the newest version of every installed program it publishes.
     fn check_updates(&self) {
         let Some(npm) = harness::find("npm") else {
@@ -1069,9 +1154,11 @@ impl Handle {
 
     /// Look for every program of the table, then ask the ones found their version.
     fn find_programs(&self) {
+        let npm = harness::find("npm").is_some();
         let found: Vec<(String, Option<Found>)> = self.inner.table.iter().map(|h| (h.id.clone(), harness::find(&h.program))).collect();
         {
             let mut state = self.inner.state.lock().unwrap();
+            state.npm = Some(npm);
             for (id, found) in &found {
                 state.installed.entry(id.clone()).or_default().found = found.clone();
             }
@@ -1313,6 +1400,55 @@ mod tests {
         engine.forget_job(&id);
         assert!(job(&engine).is_none());
         engine.shutdown();
+    }
+
+    #[test]
+    fn a_program_installed_while_the_office_is_open_is_found_when_somebody_looks() {
+        let dir = std::env::temp_dir().join(format!("moshpit-later-{}-{}", std::process::id(), now_ms()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Where the program will be, once it is installed. Nothing is there yet.
+        let later = dir.join(if cfg!(windows) { "later.cmd" } else { "later" });
+        let mut kind = shell_kind();
+        kind.program = later.to_string_lossy().into_owned();
+        kind.args = vec![];
+        // A second program that npm would install, and never is in this test.
+        let mut packaged = shell_kind();
+        packaged.id = "packaged".into();
+        packaged.program = dir.join("never-here").to_string_lossy().into_owned();
+        packaged.package = "@example/never-here".into();
+        let engine = start(Arc::new(Quiet::default()), vec![kind, packaged], vec![], vec![]);
+        let here = |id: &str| engine.snapshot().harnesses.into_iter().find(|h| h.id == id).unwrap();
+        assert!(until(|| !engine.inner.looking.load(Ordering::Acquire)));
+        assert!(!here("shell").installed);
+
+        // Installed, as an installer would: the office is not restarted, somebody only looks.
+        if cfg!(windows) {
+            std::fs::write(&later, "@echo 4.5.6\r\n").unwrap();
+        } else {
+            std::fs::write(&later, "#!/bin/sh\necho 4.5.6\n").unwrap();
+            #[cfg(unix)]
+            std::fs::set_permissions(&later, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        }
+        engine.refresh_programs(false);
+        assert!(until(|| here("shell").installed && here("shell").version == "4.5.6"), "{:?}", here("shell"));
+        // Looked at again with nothing changed, nothing is asked again and nothing is lost.
+        engine.refresh_programs(false);
+        assert!(until(|| !engine.inner.looking.load(Ordering::Acquire)));
+        assert_eq!((here("shell").installed, here("shell").version.as_str()), (true, "4.5.6"));
+
+        // Taken away again, it is no longer offered, and what it said goes with it.
+        std::fs::remove_file(&later).unwrap();
+        engine.refresh_programs(false);
+        assert!(until(|| !here("shell").installed && here("shell").version.is_empty()), "{:?}", here("shell"));
+
+        // A program npm installs says what is missing while npm is not here, and only then.
+        assert!(until(|| !engine.inner.looking.load(Ordering::Acquire)));
+        engine.inner.state.lock().unwrap().npm = Some(false);
+        assert_eq!((here("packaged").install_needs.as_str(), here("shell").install_needs.as_str()), ("Node.js", ""));
+        engine.inner.state.lock().unwrap().npm = Some(true);
+        assert_eq!(here("packaged").install_needs, "");
+        engine.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -565,6 +565,18 @@ async fn update(handle: State<'_, Handle>, harness: String, cols: u16, rows: u16
     handle.run_job(&harness, engine::JobKind::Update, cols, rows)
 }
 
+/// Sign in to a program, with its own command, in a terminal of its own. Returns the terminal's id.
+#[tauri::command]
+async fn sign_in(handle: State<'_, Handle>, harness: String, cols: u16, rows: u16) -> Result<String, String> {
+    handle.run_job(&harness, engine::JobKind::SignIn, cols, rows)
+}
+
+/// Ask the programs again who is signed in to each. Answered in a snapshot, when they have said.
+#[tauri::command]
+fn refresh_accounts(handle: State<'_, Handle>) {
+    handle.refresh_accounts();
+}
+
 #[tauri::command]
 fn forget_job(handle: State<'_, Handle>, job: String) {
     handle.forget_job(&job);
@@ -958,6 +970,8 @@ pub fn run() {
             new_agent,
             install,
             update,
+            sign_in,
+            refresh_accounts,
             forget_job,
             wake,
             term_attach,

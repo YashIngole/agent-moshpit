@@ -114,6 +114,14 @@ pub struct Harness {
     /// that npm does not install. Built-in rows leave it empty.
     #[serde(default)]
     pub install: Vec<String>,
+    /// Words that make the program sign someone in: `claude auth login`. Empty when
+    /// it has no such command, and signing in is done in its own terminal.
+    #[serde(default)]
+    pub login: Vec<String>,
+    /// Words that make it say who is signed in, asking nothing: `claude auth status`.
+    /// Empty when it cannot say.
+    #[serde(default)]
+    pub account: Vec<String>,
 }
 
 fn row(id: &str, name: &str, tag: &str, program: &str) -> Harness {
@@ -135,6 +143,8 @@ fn row(id: &str, name: &str, tag: &str, program: &str) -> Harness {
         package: String::new(),
         update: Vec::new(),
         install: Vec::new(),
+        login: Vec::new(),
+        account: Vec::new(),
     }
 }
 
@@ -170,6 +180,8 @@ pub fn built_in() -> Vec<Harness> {
             trust: TrustFrom::Claude,
             package: "@anthropic-ai/claude-code".into(),
             update: words(&["update"]),
+            login: words(&["auth", "login"]),
+            account: words(&["auth", "status", "--json"]),
             ..row("claude", "Claude Code", "Claude", "claude")
         },
         Harness {
@@ -183,6 +195,8 @@ pub fn built_in() -> Vec<Harness> {
             trust: TrustFrom::Codex,
             package: "@openai/codex".into(),
             update: words(&["update"]),
+            login: words(&["login"]),
+            account: words(&["login", "status"]),
             ..row("codex", "Codex", "Codex", "codex")
         },
         Harness {
@@ -330,6 +344,18 @@ pub fn update_runner(h: &Harness) -> Option<Runner> {
         return Some(Runner::Itself(h.update.clone()));
     }
     (!h.package.is_empty()).then(|| Runner::Npm(vec!["install".into(), "-g".into(), format!("{}@latest", h.package)]))
+}
+
+/// How a program signs someone in, if it has a command for that.
+pub fn login_runner(h: &Harness) -> Option<Runner> {
+    (!h.login.is_empty()).then(|| Runner::Itself(h.login.clone()))
+}
+
+/// The words for one of a program's own commands, as it has to be given them. A row
+/// may name a program that runs another (`node`, with a script as its first word): the
+/// words before its first flag are that other program, and come before any command.
+pub fn own_words(h: &Harness, command: &[String]) -> Vec<String> {
+    h.args.iter().take_while(|word| !word.starts_with('-')).chain(command).cloned().collect()
 }
 
 /// The newest version of a package, as npm says. Empty when npm is not here or does not answer.
@@ -641,40 +667,136 @@ pub fn version(found: &Found) -> String {
 /// What a program prints when it is asked something, with no window and no input.
 /// Empty when it does not answer within `secs`.
 fn ask(found: &Found, words: &[String], secs: u64) -> String {
+    answer(found, words, secs).map(|said| said.out).unwrap_or_default()
+}
+
+/// What a program said when it was asked something: whether it ended well, and what
+/// it printed, on each of the two ways it has of printing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Answer {
+    pub ok: bool,
+    pub out: String,
+    pub err: String,
+}
+
+/// Ask a program something, with no window and no input, as one of the office's own
+/// desks would start it. None when it could not be started, or did not answer within
+/// `secs`. Only for answers of a few lines: they are read once it has ended.
+pub fn answer(found: &Found, words: &[String], secs: u64) -> Option<Answer> {
     use std::process::{Command, Stdio};
-    let Ok((program, args)) = command_line(found, words) else {
-        return String::new();
-    };
+    let (program, args) = command_line(found, words).ok()?;
     let mut command = Command::new(program);
     if let Some(path) = child_path() {
         command.env("PATH", path);
     }
-    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    // Asked as a desk's program would be: not as a session inside whatever started this app.
+    for name in crate::pty::borrowed_names() {
+        command.env_remove(name);
+    }
+    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         // No console window may flash up for a question nobody asked to see answered.
         command.creation_flags(0x0800_0000);
     }
-    let Ok(mut child) = command.spawn() else {
-        return String::new();
-    };
+    let mut child = command.spawn().ok()?;
     let started = std::time::Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() < std::time::Duration::from_secs(secs) => std::thread::sleep(std::time::Duration::from_millis(50)),
             _ => {
                 let _ = child.kill();
-                return String::new();
+                let _ = child.wait();
+                return None;
             }
         }
-    }
-    let mut text = String::new();
+    };
+    let mut said = Answer { ok: status.success(), ..Answer::default() };
     if let Some(out) = child.stdout.as_mut() {
-        let _ = std::io::Read::read_to_string(out, &mut text);
+        let _ = std::io::Read::read_to_string(out, &mut said.out);
     }
-    text
+    if let Some(err) = child.stderr.as_mut() {
+        let _ = std::io::Read::read_to_string(err, &mut said.err);
+    }
+    Some(said)
+}
+
+// ── who is signed in ───────────────────────────────────────────────────────
+
+/// Whether someone is signed in to a program, as far as the program says.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Account {
+    /// None when it has not said, or what it said was not understood.
+    pub signed_in: Option<bool>,
+    /// A few words to show: who is signed in, or how, or that nobody is. Empty when not known.
+    pub label: String,
+}
+
+/// Read what a program answered when asked who is signed in.
+///
+/// Claude Code answers in JSON with `loggedIn`; of the rest only the address and the
+/// plan are taken, never the answer whole, which names folders and an organisation.
+/// Codex answers with a line of its own ("Logged in using ChatGPT", printed as an
+/// error would be), and ends badly when nobody is signed in. An answer that says
+/// neither is not taken for "signed out": a program that could not read its own
+/// settings has not said that.
+pub fn account_from(said: &Answer) -> Account {
+    let signed_out = || Account { signed_in: Some(false), label: "Signed out".into() };
+    if let Ok(serde_json::Value::Object(fields)) = serde_json::from_str::<serde_json::Value>(said.out.trim()) {
+        return match fields.get("loggedIn").and_then(serde_json::Value::as_bool) {
+            Some(true) => {
+                let text = |name: &str| fields.get(name).and_then(serde_json::Value::as_str).map(clean).filter(|s| !s.is_empty());
+                let plan = text("subscriptionType").map(|plan| {
+                    let mut letters = plan.chars();
+                    letters.next().map(|first| first.to_uppercase().chain(letters).collect::<String>()).unwrap_or_default()
+                });
+                let label = match (text("email"), plan) {
+                    (Some(who), Some(plan)) => format!("Signed in as {who} · {plan}"),
+                    (Some(who), None) => format!("Signed in as {who}"),
+                    (None, Some(plan)) => format!("Signed in · {plan}"),
+                    (None, None) => "Signed in".into(),
+                };
+                Account { signed_in: Some(true), label }
+            }
+            Some(false) => signed_out(),
+            None => Account::default(),
+        };
+    }
+    let line = said.out.lines().chain(said.err.lines()).map(clean).find(|l| !l.is_empty()).unwrap_or_default();
+    let lower = line.to_lowercase();
+    if ["not logged in", "not signed in", "logged out", "signed out", "no credentials"].iter().any(|says| lower.contains(says)) {
+        return signed_out();
+    }
+    if !said.ok || line.is_empty() {
+        return Account::default();
+    }
+    // Its own line, without what follows a dash: Codex shows part of an API key there.
+    let label = line.split(" - ").next().unwrap_or(&line).trim();
+    Account { signed_in: Some(true), label: shorten(label, 80) }
+}
+
+/// One line of what a program printed, without the codes that colour it or move the cursor.
+fn clean(text: &str) -> String {
+    let mut plain = String::new();
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            // An escape sequence: up to the letter that ends it.
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for end in chars.by_ref() {
+                    if end.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else if !c.is_control() {
+            plain.push(c);
+        }
+    }
+    shorten(&plain, 120)
 }
 
 /// "2.1.290 (Claude Code)" and "codex-cli 0.160.0" both become their number.
@@ -802,6 +924,58 @@ mod tests {
         assert_eq!(update_runner(&known("claude")).unwrap().line("claude"), "claude update");
         let mine = Harness { install: words(&["pipx", "install", "my agent"]), ..row("mine", "Mine", "Mine", "mine") };
         assert_eq!(install_runner(&mine).unwrap().line("mine"), "pipx install \"my agent\"");
+    }
+
+    #[test]
+    fn a_program_signs_in_and_says_who_is_signed_in_with_its_own_commands() {
+        assert_eq!(login_runner(&known("claude")).unwrap().line("claude"), "claude auth login");
+        assert_eq!(login_runner(&known("codex")).unwrap().line("codex"), "codex login");
+        assert_eq!(known("claude").account, words(&["auth", "status", "--json"]));
+        assert_eq!(known("codex").account, words(&["login", "status"]));
+        // The rest have no such commands that the office knows: signing in is done in their terminals.
+        assert!(built_in().iter().filter(|h| h.id != "claude" && h.id != "codex").all(|h| login_runner(h).is_none() && h.account.is_empty()));
+        // A row that names a program which runs another: the other comes before the command, its flags do not.
+        let wrapped = Harness { args: words(&["cli.mjs", "--quiet", "extra"]), ..row("mine", "Mine", "Mine", "node") };
+        assert_eq!(own_words(&wrapped, &words(&["auth", "status"])), words(&["cli.mjs", "auth", "status"]));
+        assert_eq!(own_words(&known("codex"), &words(&["login", "status"])), words(&["login", "status"]));
+    }
+
+    #[test]
+    fn who_is_signed_in_is_read_from_what_each_program_says() {
+        let said = |ok: bool, out: &str, err: &str| account_from(&Answer { ok, out: out.into(), err: err.into() });
+        let known = |signed_in: bool, label: &str| Account { signed_in: Some(signed_in), label: label.into() };
+        // Claude Code, as it prints it: over several lines, with more than is shown.
+        let claude = "{\n  \"loggedIn\": true,\n  \"authMethod\": \"claude.ai\",\n  \"apiProvider\": \"firstParty\",\n  \"configDirectory\": \"C:\\\\Users\\\\Someone\\\\.claude\",\n  \"email\": \"someone@example.com\",\n  \"orgId\": \"org-1\",\n  \"orgName\": \"Someone's Organisation\",\n  \"subscriptionType\": \"max\"\n}\n";
+        let account = said(true, claude, "");
+        assert_eq!(account, known(true, "Signed in as someone@example.com · Max"));
+        assert!(!account.label.contains("Organisation") && !account.label.contains("Users"));
+        assert_eq!(said(true, "{\"loggedIn\":true,\"authMethod\":\"api_key\"}", ""), known(true, "Signed in"));
+        assert_eq!(said(true, "{\"loggedIn\":true,\"subscriptionType\":\"pro\"}", ""), known(true, "Signed in · Pro"));
+        // Signed out, whether or not it also ends badly.
+        assert_eq!(said(false, "{\"loggedIn\": false, \"authMethod\": \"none\"}", ""), known(false, "Signed out"));
+        assert_eq!(said(true, "{\"loggedIn\": false}", ""), known(false, "Signed out"));
+        // Codex prints its line as an error would be printed, and ends well.
+        assert_eq!(said(true, "", "Logged in using ChatGPT\n"), known(true, "Logged in using ChatGPT"));
+        assert_eq!(said(true, "", "Logged in using an API key - sk-proj-***ABCD\n"), known(true, "Logged in using an API key"));
+        assert_eq!(said(false, "", "Not logged in\n"), known(false, "Signed out"));
+        assert_eq!(said(true, "\u{1b}[31mNot logged in\u{1b}[0m\n", ""), known(false, "Signed out"));
+        // Anything else is not known, and never taken for signed out.
+        for (ok, out, err) in [(false, "", "error: could not read config.toml"), (false, "", ""), (true, "", ""), (true, "{\"status\":\"ok\"}", ""), (false, "{ not json", "")] {
+            assert_eq!(said(ok, out, err), Account::default(), "{ok} {out:?} {err:?}");
+        }
+        // A long line is cut, and what colours it is not shown.
+        let long = said(true, &format!("\u{1b}[1mLogged in {}\u{1b}[0m", "x".repeat(300)), "");
+        assert!(long.signed_in == Some(true) && long.label.chars().count() <= 80 && !long.label.contains('\u{1b}'));
+    }
+
+    #[test]
+    fn a_program_asked_something_says_how_it_ended_and_on_which_side_it_printed() {
+        let shell = if cfg!(windows) { Found { program: "cmd.exe".into(), before: words(&["/d", "/c"]), through_shell: false } } else { Found { program: "/bin/sh".into(), before: words(&["-c"]), through_shell: false } };
+        let then = if cfg!(windows) { "&" } else { ";" };
+        let both = answer(&shell, &[format!("echo out-word{then} echo err-word 1>&2{then} exit 3")], 20).unwrap();
+        assert!(!both.ok && both.out.contains("out-word") && both.err.contains("err-word"), "{both:?}");
+        assert!(answer(&shell, &words(&["echo fine"]), 20).unwrap().ok);
+        assert_eq!(answer(&Found { program: "no-such-program-moshpit".into(), before: vec![], through_shell: false }, &[], 5), None);
     }
 
     #[test]

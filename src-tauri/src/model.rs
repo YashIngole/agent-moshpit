@@ -88,15 +88,23 @@ pub struct HarnessView {
     /// Empty when the office does not know a way.
     pub install_line: String,
     pub update_line: String,
+    /// Whether someone is signed in to it, as it says itself. `None` until it has been
+    /// asked, and for a program that cannot say.
+    pub signed_in: Option<bool>,
+    /// Who is signed in, or that nobody is, in a few words to show. Empty when not known.
+    /// It can name a person: it is for the window, and is not handed to agents.
+    pub account: String,
+    /// What runs to sign in, as a person would type it. Empty when the office knows no way.
+    pub login_line: String,
 }
 
-/// An install or an update, running in a terminal of its own.
+/// An install, an update or a sign-in, running in a terminal of its own.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JobView {
     pub id: String,
     pub harness: String,
     pub harness_name: String,
-    /// `install` or `update`.
+    /// `install`, `update` or `signin`.
     pub kind: String,
     pub running: bool,
     /// How it ended. `None` while it runs.

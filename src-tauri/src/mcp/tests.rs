@@ -238,3 +238,30 @@ fn another_program_is_refused_through_the_tool_even_without_launch_overrides() {
     handle.shutdown();
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn agents_are_told_about_a_program_but_not_who_is_signed_in_to_it() {
+    let view = HarnessView {
+        id: "claude".into(),
+        name: "Claude Code".into(),
+        tag: "Claude".into(),
+        installed: true,
+        launch: crate::launch::Provider::Claude,
+        version: "2.1.0".into(),
+        takes_task: true,
+        worktree: true,
+        latest: "2.1.1".into(),
+        outdated: true,
+        install_line: "npm install -g @anthropic-ai/claude-code".into(),
+        update_line: "claude update".into(),
+        signed_in: Some(true),
+        account: "Signed in as someone@example.com \u{b7} Max".into(),
+        login_line: "claude auth login".into(),
+    };
+    let told = program_for_agents(view);
+    let text = told.to_string();
+    for kept_back in ["someone@example.com", "signed_in", "account", "login"] {
+        assert!(!text.contains(kept_back), "{kept_back} in {text}");
+    }
+    assert_eq!((told["id"].as_str(), told["launch"].as_str(), told["outdated"].as_bool(), told["update_line"].as_str()), (Some("claude"), Some("claude"), Some(true), Some("claude update")));
+}

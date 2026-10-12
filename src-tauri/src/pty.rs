@@ -469,7 +469,7 @@ fn drawn_screen(screen: &mut vt100::Screen, history: usize) -> Vec<u8> {
 /// agent's session". They are true of this app when it was started from one (a
 /// developer running it from Claude Code, say) and false of the programs it
 /// starts, which would otherwise take themselves for a session inside a session.
-fn borrowed_names() -> Vec<String> {
+pub(crate) fn borrowed_names() -> Vec<String> {
     if std::env::var_os("CLAUDECODE").is_none() {
         return Vec::new();
     }

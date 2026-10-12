@@ -4,7 +4,7 @@ mod launch;
 mod protocol;
 
 use crate::engine::Handle;
-use crate::model::{now_ms, AgentView, NewAgent};
+use crate::model::{now_ms, AgentView, HarnessView, NewAgent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -285,7 +285,7 @@ impl Hub {
         match name {
             "get_context" => {
                 let parent = self.state.lock().unwrap().journal.tasks.iter().find(|t| t.to == caller && t.spawned).map(|t| t.from.clone());
-                Ok(json!({"session":own,"title_locked":handle.title_locked(caller),"parent_session_id":parent,"inbox":self.inbox(caller),"programs":handle.snapshot().harnesses.into_iter().filter(|h| launch::supported(&h.id)).collect::<Vec<_>>()}))
+                Ok(json!({"session":own,"title_locked":handle.title_locked(caller),"parent_session_id":parent,"inbox":self.inbox(caller),"programs":handle.snapshot().harnesses.into_iter().filter(|h| launch::supported(&h.id)).map(program_for_agents).collect::<Vec<_>>()}))
             }
             "rename_session" => {
                 let title = crate::harness::shorten(&string(args, "title", 60, false)?, 60);
@@ -381,6 +381,16 @@ impl Hub {
             _ => Err("Unknown Moshpit tool.".into()),
         }
     }
+}
+
+/// What an agent is told about a program it could start a session of.
+///
+/// Every field of the view is named here, so one added to it later is decided on, not
+/// handed over by default. Who is signed in is for the window: it can name a person,
+/// and an agent has no use for it.
+fn program_for_agents(view: HarnessView) -> Value {
+    let HarnessView { id, name, tag, installed, launch, version, takes_task, worktree, latest, outdated, install_line, update_line, signed_in: _, account: _, login_line: _ } = view;
+    json!({"id":id,"name":name,"tag":tag,"installed":installed,"launch":launch,"version":version,"takes_task":takes_task,"worktree":worktree,"latest":latest,"outdated":outdated,"install_line":install_line,"update_line":update_line})
 }
 
 /// A delegated session never runs with looser permissions than the session that asked for it.

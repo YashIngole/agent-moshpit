@@ -36,23 +36,39 @@ const SCREEN_HISTORY: usize = 500;
 /// How often npm is asked whether a program has a newer version.
 const UPDATES_EVERY: Duration = Duration::from_secs(12 * 60 * 60);
 
-/// Install a program, or bring it up to date.
+/// Install a program, bring it up to date, or sign someone in to it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JobKind {
     Install,
     Update,
+    SignIn,
 }
 
 impl JobKind {
+    /// What it is called in a terminal's id, and to the window.
     fn word(self) -> &'static str {
         match self {
             JobKind::Install => "install",
             JobKind::Update => "update",
+            JobKind::SignIn => "signin",
+        }
+    }
+
+    /// What it is called in a sentence.
+    fn name(self) -> &'static str {
+        match self {
+            JobKind::Install => "install",
+            JobKind::Update => "update",
+            JobKind::SignIn => "sign-in",
         }
     }
 }
 
-/// An install or an update, and how it went.
+/// How often a program believed signed out, with a desk of its own or its sign-in running,
+/// is asked again: every this many looks. Signing in happens inside those, and ends nothing.
+const ACCOUNT_EVERY: u64 = 10;
+
+/// An install, an update or a sign-in, and how it went.
 #[derive(Debug, Clone)]
 struct Job {
     id: String,
@@ -67,6 +83,8 @@ struct Job {
 struct Installed {
     found: Option<Found>,
     version: String,
+    /// Who is signed in to it, as it last said. See `Handle::wonder`.
+    account: harness::Account,
 }
 
 /// A desk whose program is not in the table this time: a row taken out, or a
@@ -123,6 +141,10 @@ struct Inner {
     stopping: AtomicBool,
     mcp: Mutex<Option<Arc<crate::mcp::Hub>>>,
     catalogs: crate::catalog::Cache,
+    /// The programs waiting to be asked who is signed in to them, and the way to add one.
+    /// One thread asks them, one at a time, and none waits twice.
+    asking: Mutex<HashSet<String>>,
+    accounts: Mutex<Sender<String>>,
 }
 
 /// The engine, as the rest of the app holds it. Cheap to clone.
@@ -189,9 +211,38 @@ pub fn start(shell: Arc<dyn Shell>, table: Vec<Harness>, saved: Vec<SavedDesk>, 
             }
         }
     });
-    let handle = Handle { inner: Arc::new(Inner { shell, out: Mutex::new(out), table, aside, terms, state: Mutex::new(state), home, stopping: AtomicBool::new(false), mcp: Mutex::new(None), catalogs: crate::catalog::Cache::default() }) };
+    let (accounts, wondered) = mpsc::channel::<String>();
+    let handle = Handle {
+        inner: Arc::new(Inner {
+            shell,
+            out: Mutex::new(out),
+            table,
+            aside,
+            terms,
+            state: Mutex::new(state),
+            home,
+            stopping: AtomicBool::new(false),
+            mcp: Mutex::new(None),
+            catalogs: crate::catalog::Cache::default(),
+            asking: Mutex::new(HashSet::new()),
+            accounts: Mutex::new(accounts),
+        }),
+    };
     *slot.lock().unwrap() = Some(handle.clone());
     handle.refresh_places();
+
+    // Asking a program who is signed in starts that program and waits for it: done by
+    // this thread alone, so never under the engine's lock and never two at once.
+    let asker = handle.clone();
+    std::thread::spawn(move || {
+        for id in wondered {
+            if asker.inner.stopping.load(Ordering::Relaxed) {
+                break;
+            }
+            asker.ask_account(&id);
+            asker.inner.asking.lock().unwrap().remove(&id);
+        }
+    });
 
     let looker = handle.clone();
     std::thread::spawn(move || {
@@ -413,11 +464,13 @@ impl Handle {
         let runner = match kind {
             JobKind::Install => harness::install_runner(&program),
             JobKind::Update => harness::update_runner(&program),
+            JobKind::SignIn => harness::login_runner(&program),
         };
         let Some(runner) = runner else {
             return Err(match kind {
                 JobKind::Install => format!("The office does not know how to install {}. Install it the way its makers say, then it will be offered here.", program.name),
                 JobKind::Update => format!("The office does not know how to update {}.", program.name),
+                JobKind::SignIn => format!("The office does not know how to sign in to {}. Start one of its desks and sign in from its terminal.", program.name),
             });
         };
         let (found, words) = match runner {
@@ -425,7 +478,7 @@ impl Handle {
                 let npm = harness::find("npm").ok_or_else(|| format!("{} is installed with npm, which was not found. Install Node.js from nodejs.org, then try again.", program.name))?;
                 (npm, words)
             }
-            Runner::Itself(words) => (self.locate(&program)?, words),
+            Runner::Itself(words) => (self.locate(&program)?, harness::own_words(&program, &words)),
             Runner::Command(words) => {
                 let first = words.first().cloned().unwrap_or_default();
                 let found = harness::find(&first).ok_or_else(|| format!("`{first}`, which installs {}, was not found.", program.name))?;
@@ -570,8 +623,8 @@ impl Handle {
     pub fn quit_words(&self) -> Option<String> {
         let state = self.inner.state.lock().unwrap();
         let n = state.office.busy();
-        let jobs: Vec<_> = state.jobs.iter().filter(|j| j.running).map(|j| format!("{} {}", self.kind(&j.harness).map_or(j.harness.as_str(), |h| h.name.as_str()), j.kind.word())).collect();
-        let job_warning = if jobs.is_empty() { String::new() } else { format!("Still running: {}. Quitting interrupts these installations or updates; you may need to run them again.", jobs.join(", ")) };
+        let jobs: Vec<_> = state.jobs.iter().filter(|j| j.running).map(|j| format!("{} {}", self.kind(&j.harness).map_or(j.harness.as_str(), |h| h.name.as_str()), j.kind.name())).collect();
+        let job_warning = if jobs.is_empty() { String::new() } else { format!("Still running: {}. Quitting interrupts {}; you may need to run {} again.", jobs.join(", "), if jobs.len() == 1 { "it" } else { "them" }, if jobs.len() == 1 { "it" } else { "them" }) };
         if n == 0 {
             return (!jobs.is_empty()).then_some(job_warning);
         }
@@ -620,6 +673,7 @@ impl Handle {
     /// The window came to the front, went behind, or closed.
     pub fn attention(&self, visible: bool, focused: bool) {
         let mut state = self.inner.state.lock().unwrap();
+        let came = visible && focused && !state.focused;
         state.focused = visible && focused;
         if !visible {
             state.watched.clear();
@@ -627,6 +681,12 @@ impl Handle {
         }
         if state.focused {
             self.see(&mut state);
+        }
+        // Back from signing in somewhere else, a browser say: a program believed signed out is asked again.
+        let out: Vec<String> = if came { self.signed_out(&state) } else { Vec::new() };
+        drop(state);
+        for id in out {
+            self.wonder(&id);
         }
     }
 
@@ -670,9 +730,15 @@ impl Handle {
             return;
         }
         self.final_session(&mut state, id);
+        let kind = state.office.get(id).map(|d| d.saved.harness.clone());
         let change = state.office.exited(id, ok, now_ms());
         self.tell(&state, change);
         self.publish(&mut state);
+        drop(state);
+        // Signing out ends a program, in any terminal. Its desk says so once it is known.
+        if let Some(kind) = kind {
+            self.wonder(&kind);
+        }
     }
 
     /// One look at every running program.
@@ -731,6 +797,19 @@ impl Handle {
             self.tell(&state, change);
         }
         self.publish(&mut state);
+        if state.looks.is_multiple_of(ACCOUNT_EVERY) {
+            // Signing in ends nothing, so there is no moment to ask at: asked now and then,
+            // and only while one of the program's desks, or its sign-in, is running.
+            let busy: Vec<String> = self
+                .signed_out(&state)
+                .into_iter()
+                .filter(|kind| state.office.desks().iter().any(|d| d.running && &d.saved.harness == kind) || state.jobs.iter().any(|j| j.running && j.kind == JobKind::SignIn && &j.harness == kind))
+                .collect();
+            drop(state);
+            for kind in busy {
+                self.wonder(&kind);
+            }
+        }
     }
 
     /// Flags come down at the desks whose terminals are on screen.
@@ -843,6 +922,9 @@ impl Handle {
                     worktree: !h.worktree.is_empty(),
                     install_line: harness::install_runner(h).map(|r| r.line(&h.program)).unwrap_or_default(),
                     update_line: harness::update_runner(h).map(|r| r.line(&h.program)).unwrap_or_default(),
+                    signed_in: here.filter(|_| installed).and_then(|i| i.account.signed_in),
+                    account: here.filter(|_| installed).map(|i| i.account.label.clone()).unwrap_or_default(),
+                    login_line: harness::login_runner(h).map(|r| r.line(&h.program)).unwrap_or_default(),
                 }
             })
             .collect();
@@ -881,11 +963,68 @@ impl Handle {
         };
         let found = harness::find(&kind.program);
         let version = found.as_ref().map(harness::version).unwrap_or_default();
+        let account = found.as_ref().and_then(|found| Self::account_of(kind, found));
         let mut state = self.inner.state.lock().unwrap();
         let entry = state.installed.entry(harness_id.to_string()).or_default();
         entry.found = found;
         entry.version = version;
+        if let Some(account) = account {
+            entry.account = account;
+        }
         self.publish(&mut state);
+    }
+
+    /// Who is signed in to a program, asked of the program itself. None when it has no
+    /// way of saying, did not answer in time, or said something that was not understood:
+    /// what was known before then stands. This starts the program and waits for it, so it
+    /// is never called under the engine's lock.
+    fn account_of(kind: &Harness, found: &Found) -> Option<harness::Account> {
+        if kind.account.is_empty() {
+            return None;
+        }
+        let said = harness::answer(found, &harness::own_words(kind, &kind.account), 15)?;
+        Some(harness::account_from(&said)).filter(|account| account.signed_in.is_some())
+    }
+
+    /// Ask one program who is signed in to it, and tell the window if that has changed.
+    fn ask_account(&self, harness_id: &str) {
+        let Ok(kind) = self.kind(harness_id) else {
+            return;
+        };
+        let found = self.inner.state.lock().unwrap().installed.get(harness_id).and_then(|i| i.found.clone());
+        let Some(account) = found.and_then(|found| Self::account_of(kind, &found)) else {
+            return;
+        };
+        let mut state = self.inner.state.lock().unwrap();
+        state.installed.entry(harness_id.to_string()).or_default().account = account;
+        self.publish(&mut state);
+    }
+
+    /// Have a program asked who is signed in to it, off this thread. One that cannot
+    /// say is not asked, and one already waiting to be asked is not asked twice.
+    fn wonder(&self, harness_id: &str) {
+        if self.inner.stopping.load(Ordering::Relaxed) || !self.kind(harness_id).is_ok_and(|kind| !kind.account.is_empty()) {
+            return;
+        }
+        if self.inner.asking.lock().unwrap().insert(harness_id.to_string()) {
+            let _ = self.inner.accounts.lock().unwrap().send(harness_id.to_string());
+        }
+    }
+
+    /// The programs on this computer that last said nobody is signed in to them.
+    fn signed_out(&self, state: &State) -> Vec<String> {
+        state.installed.iter().filter(|(_, here)| here.found.is_some() && here.account.signed_in == Some(false)).map(|(id, _)| id.clone()).collect()
+    }
+
+    /// Ask every program that can say who is signed in, again: someone is looking at them.
+    pub fn refresh_accounts(&self) {
+        let here: Vec<String> = {
+            let state = self.inner.state.lock().unwrap();
+            self.inner.table.iter().filter(|h| !h.account.is_empty() && state.installed.get(&h.id).is_some_and(|i| i.found.is_some())).map(|h| h.id.clone()).collect()
+        };
+        for id in here {
+            self.wonder(&id);
+        }
     }
 
     /// Ask npm for the newest version of every installed program it publishes.
@@ -932,8 +1071,15 @@ impl Handle {
                 return;
             }
             let version = harness::version(&found);
+            // Asked in the same pass and told in the same breath: once the last program has a
+            // version, the office has started nothing more of its own.
+            let account = self.kind(&id).ok().and_then(|kind| Self::account_of(kind, &found));
             let mut state = self.inner.state.lock().unwrap();
-            state.installed.entry(id).or_default().version = version;
+            let entry = state.installed.entry(id).or_default();
+            entry.version = version;
+            if let Some(account) = account {
+                entry.account = account;
+            }
             self.publish(&mut state);
         }
     }
@@ -1015,6 +1161,8 @@ mod tests {
             package: String::new(),
             update: vec![],
             install: vec![],
+            login: vec![],
+            account: vec![],
         }
     }
 
@@ -1155,6 +1303,57 @@ mod tests {
     }
 
     #[test]
+    fn a_program_says_who_is_signed_in_and_signs_in_in_a_terminal_of_its_own() {
+        let dir = std::env::temp_dir().join(format!("moshpit-account-{}-{}", std::process::id(), now_ms()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let said = dir.join("said.txt");
+        std::fs::write(&said, "Not logged in\n").unwrap();
+        // The stand-in says who is signed in by printing a file, and "signs in" by printing a word and ending.
+        let asked = |line: String| if cfg!(windows) { vec!["/d".to_string(), "/c".to_string(), line] } else { vec!["-c".to_string(), line] };
+        let mut kind = shell_kind();
+        kind.args = vec![];
+        kind.account = asked(format!("{} {}", if cfg!(windows) { "type" } else { "cat" }, said.display()));
+        kind.login = asked("echo signed-in-ok".into());
+        let engine = start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
+        let here = |engine: &Handle| engine.snapshot().harnesses.into_iter().find(|h| h.id == "shell").unwrap();
+        // Before it has been asked, nothing is claimed either way. It is asked as the office starts.
+        assert!(until(|| here(&engine).signed_in == Some(false)), "{:?}", here(&engine));
+        assert_eq!(here(&engine).account, "Signed out");
+        assert!(here(&engine).login_line.ends_with("echo signed-in-ok") || here(&engine).login_line.ends_with("\"echo signed-in-ok\""), "{}", here(&engine).login_line);
+
+        // Signing in runs its own command where it can be watched, and it is asked again when that ends.
+        std::fs::write(&said, "Logged in using a test\n").unwrap();
+        let id = engine.run_job("shell", JobKind::SignIn, 80, 24).unwrap();
+        assert_eq!(id, "job-signin-shell");
+        assert!(until(|| engine.snapshot().jobs.iter().any(|j| j.id == id && j.kind == "signin" && j.ok == Some(true))), "{:?}", engine.snapshot().jobs);
+        assert!(until(|| here(&engine).signed_in == Some(true)), "{:?}", here(&engine));
+        assert_eq!(here(&engine).account, "Logged in using a test");
+
+        // Asked again when someone looks. An answer that says neither leaves what was known:
+        // a program that could not be asked has not said that nobody is signed in.
+        std::fs::remove_file(&said).unwrap();
+        engine.refresh_accounts();
+        assert!(until(|| engine.inner.asking.lock().unwrap().is_empty()));
+        assert_eq!(here(&engine).signed_in, Some(true));
+        std::fs::write(&said, "Not logged in\n").unwrap();
+        engine.refresh_accounts();
+        assert!(until(|| here(&engine).signed_in == Some(false)), "{:?}", here(&engine));
+
+        // A program that cannot say is never asked, and has no way to sign in from here.
+        let plain = start(Arc::new(Quiet::default()), vec![shell_kind()], vec![], vec![]);
+        plain.refresh_accounts();
+        assert!(plain.inner.asking.lock().unwrap().is_empty());
+        assert!(until(|| !here(&plain).version.is_empty() || here(&plain).installed));
+        assert_eq!((here(&plain).signed_in, here(&plain).account.as_str(), here(&plain).login_line.as_str()), (None, "", ""));
+        assert!(plain.run_job("shell", JobKind::SignIn, 80, 24).unwrap_err().contains("sign in from its terminal"));
+        plain.shutdown();
+
+        engine.forget_job(&id);
+        engine.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn desks_from_before_come_back_asleep() {
         let shell = Arc::new(Quiet::default());
         let saved = vec![
@@ -1285,7 +1484,12 @@ mod tests {
         let engine = start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
         engine.inner.state.lock().unwrap().jobs.push(Job { id: "job-update-shell".into(), harness: "shell".into(), kind: JobKind::Update, running: true, ok: None });
         assert!(engine.quit_words().unwrap().contains("A Shell update"));
-        engine.inner.state.lock().unwrap().jobs[0].running = false;
+        assert!(engine.quit_words().unwrap().contains("Quitting interrupts it;"));
+        // A sign-in still waiting on a browser is named for what it is.
+        engine.inner.state.lock().unwrap().jobs.push(Job { id: "job-signin-shell".into(), harness: "shell".into(), kind: JobKind::SignIn, running: true, ok: None });
+        let words = engine.quit_words().unwrap();
+        assert!(words.contains("A Shell update, A Shell sign-in") && words.contains("Quitting interrupts them;"), "{words}");
+        engine.inner.state.lock().unwrap().jobs.iter_mut().for_each(|job| job.running = false);
         assert!(engine.quit_words().is_none());
         engine.shutdown();
     }

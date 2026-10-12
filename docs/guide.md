@@ -110,6 +110,8 @@ Choose a **Microphone** in setup, or leave it on **System default**. **Refresh m
 
 The default shortcut is **Ctrl+Shift+Space**. Hold it while you speak and let go to finish, or tap it to talk hands-free and tap it again to finish. Choose **Ctrl+Alt+Shift+Space** or **No shortcut** in the panel if your program uses that key. The shortcut is reserved only while voice is enabled; plain Space and the office's existing keys retain their behavior. Holding it does not start a second recording.
 
+**You can say an agent's first task instead of typing it.** In **New agent**, press the microphone beside **What should they do?**, or hold the shortcut anywhere in the form. The words go into the task box at the caret, spaced from what is already there, and **Undo** takes them back; a line under the box shows the words still being decided, the time, **Stop** and **Cancel**. From then on they are ordinary text: edit them, and they are kept with the rest of the form if you close it. **Start agent** while still listening finishes the recording first, so the last words are part of the task. Closing the form, or choosing a program that takes no task, stops the microphone. If voice is not set up yet, the microphone opens setup and the form keeps what you typed.
+
 Changing keyboard focus does not change the destination. Text goes only into the pane and live terminal session selected at recording start. Closing/putting away that pane, hiding it behind a zoomed pane, stopping/restarting its program, cancelling, changing voice settings, minimising or closing the window ends the recording and drops the words not yet typed. Closing to tray never keeps a hidden microphone running. A model download is different: it carries on while the window is minimized or closed to the tray, and only quitting the office cancels it. Terminal controls and line breaks are stripped. **Voice never presses Enter or runs/submits the text.** Review it in the terminal and send it yourself.
 
 Other languages come out as English-sounding words. On Intel and AMD computers the local engine needs a processor with AVX2 (Intel from 2013, AMD from 2015); on an older one the panel says so and points to the cloud, which works on any processor. A cloud engine needs the internet: when the provider cannot be reached, rejects the key, is out of credit or drops the connection, the card says which, and words already typed stay. On microphone failure, check OS microphone access and the default input device; the app stops capture and explains how to retry. Linux needs a working ALSA input; macOS asks for system consent.
@@ -196,7 +198,7 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | `Ctrl+Shift+/` | The list of keys (`?` on the floor) |
 | `Esc` | Close a side panel or a menu, when the keyboard is not in a terminal |
 | **Terminals** | |
-| `Ctrl+Shift+Space` | Voice, when enabled: hold to talk, or tap to start and tap to finish (configurable in Voice input) |
+| `Ctrl+Shift+Space` | Voice, when enabled: hold to talk, or tap to start and tap to finish (configurable in Voice input). Into the terminal in front, or the task in New agent |
 | `Alt+1` … `Alt+9` | The keyboard to pane 1 to 9 |
 | `Ctrl+Shift+]` / `Ctrl+Shift+[` | The keyboard to the next pane, or the one before |
 | `Ctrl+Shift+Enter` | Give this pane the room, and put the others back |

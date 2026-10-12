@@ -120,6 +120,20 @@ pub struct Target {
     pub run: u64,
 }
 
+/// The "desk" of a recording whose words go to a field in the window (New agent's task),
+/// not to a terminal. No desk has this for an id.
+const FIELD: &str = "\u{0}field";
+
+/// Where the words of such a recording go: a piece of text, and whether a space stands
+/// between it and what went before. False once the window no longer takes them.
+pub type FieldSink = Box<dyn Fn(&str, bool) -> bool + Send>;
+
+impl Target {
+    fn is_field(&self) -> bool {
+        self.agent == FIELD
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelView {
     pub id: &'static str,
@@ -159,6 +173,8 @@ pub struct View {
     pub transcribing_ms: Option<u64>,
     /// The words still being decided, after those already typed.
     pub partial: String,
+    /// The words of the recording shown go to a field in the window, not to a terminal.
+    pub field: bool,
     /// Why this computer cannot run the local engine; empty when it can. Cloud engines need nothing.
     pub unsupported: String,
     pub providers: Vec<ProviderView>,
@@ -169,6 +185,8 @@ struct Machine {
     view: View,
     epoch: u64,
     target: Option<Target>,
+    /// Where the words go when the recording is for a field in the window.
+    field: Option<FieldSink>,
     // 0 captures, 1 stops and settles, 2 cancels and discards.
     mode: Arc<AtomicU8>,
     /// Local models whose files passed their check.
@@ -192,6 +210,8 @@ impl Machine {
         self.mode.store(2, Ordering::Release);
         self.epoch += 1;
         self.target = None;
+        self.field = None;
+        self.view.field = false;
         self.view.phase = Phase::Idle;
         self.view.agent = None;
         self.view.started_ms = None;
@@ -312,7 +332,10 @@ impl Voice {
     }
     pub fn watch(&self, agents: &[String]) {
         let mut state = self.state.lock().unwrap();
-        if state.target.as_ref().is_some_and(|t| !agents.contains(&t.agent)) {
+        // A recording for a terminal ends when that terminal is covered or put away. One
+        // for a field in the window is in a panel, which covers every terminal: the window
+        // ends it when the field goes.
+        if state.target.as_ref().is_some_and(|t| !t.is_field() && !agents.contains(&t.agent)) {
             state.cancel();
         }
     }
@@ -325,7 +348,19 @@ impl Voice {
         self.state.lock().unwrap().stop()
     }
 
+    /// Record into a desk's terminal: its words are typed there as they are settled.
     pub fn start(&self, engine: Handle, agent: String, settings: Settings) -> Result<(), String> {
+        self.begin(engine, settings, Some(agent), None)
+    }
+
+    /// Record into a field in the window: each settled piece is handed to `sink`, with
+    /// whether a space stands before it. The same engine, the same rules about what a
+    /// word may contain, and the same ends: stopped, cancelled, or out of time.
+    pub fn start_field(&self, engine: Handle, settings: Settings, sink: FieldSink) -> Result<(), String> {
+        self.begin(engine, settings, None, Some(sink))
+    }
+
+    fn begin(&self, engine: Handle, settings: Settings, agent: Option<String>, field: Option<FieldSink>) -> Result<(), String> {
         if !settings.enabled {
             return Err("Turn on voice input in the Voice input panel first.".into());
         }
@@ -342,7 +377,10 @@ impl Voice {
                 }
             }
         }
-        let target = engine.voice_target(&agent).ok_or("Select a visible terminal whose program is running before recording.")?;
+        let target = match &agent {
+            Some(agent) => engine.voice_target(agent).ok_or("Select a visible terminal whose program is running before recording.")?,
+            None => Target { agent: FIELD.into(), run: crate::model::now_ms() },
+        };
         let mut state = self.state.lock().unwrap();
         if !state.window_open {
             return Err("Open the office window before recording.".into());
@@ -356,8 +394,10 @@ impl Voice {
         state.cancel();
         state.mode = Arc::new(AtomicU8::new(0));
         state.target = Some(target.clone());
+        state.view.field = field.is_some();
+        state.field = field;
         state.view.phase = Phase::Preparing;
-        state.view.agent = Some(agent);
+        state.view.agent = agent;
         state.view.engine = settings.engine;
         state.view.detail = match settings.engine.provider() {
             None => "Loading the local speech model…".into(),
@@ -375,7 +415,7 @@ impl Voice {
                 match outcome {
                     Ok(Ok(note)) => {
                         state.view.phase = Phase::Idle;
-                        state.view.message = note.unwrap_or_else(|| "Inserted. Press Enter in the terminal to send.".into());
+                        state.view.message = note.unwrap_or_else(|| if target.is_field() { "Added to the task.".into() } else { "Inserted. Press Enter in the terminal to send.".into() });
                     }
                     Ok(Err(why)) => {
                         state.view.phase = Phase::Error;
@@ -387,6 +427,7 @@ impl Voice {
                     }
                 }
                 state.target = None;
+                state.field = None;
                 state.view.started_ms = None;
                 state.view.level = 0;
                 state.view.transcribing_ms = None;
@@ -402,7 +443,10 @@ impl Voice {
     /// One recording, typed into its terminal as its words are settled. Ok carries a note to
     /// show instead of the usual one.
     fn record(&self, engine: &Handle, target: &Target, epoch: u64, mode: &Arc<AtomicU8>, settings: &Settings, model: &'static models::Model) -> Result<Option<String>, String> {
-        if mode.load(Ordering::Acquire) == 2 || !engine.voice_live(target) {
+        // A terminal can be covered or its program can end under a recording; a field is
+        // the window's, which cancels the recording itself when the field goes.
+        let live = || target.is_field() || engine.voice_live(target);
+        if mode.load(Ordering::Acquire) == 2 || !live() {
             return Err("Recording cancelled.".into());
         }
         // The engine starts (the model loads, or the socket connects) while the microphone
@@ -450,7 +494,7 @@ impl Voice {
         let began = Instant::now();
         let mut last_audio = Instant::now();
         while mode.load(Ordering::Acquire) == 0 && heard.len() < audio::MAX_SAMPLES && began.elapsed() < Duration::from_secs(audio::MAX_SECONDS as u64) {
-            if !engine.voice_live(target) {
+            if !live() {
                 self.cancel_agent(&target.agent);
                 break;
             }
@@ -545,7 +589,7 @@ impl Voice {
             // The engine did not answer in time: what it last showed is typed, and said to be.
             let last = std::mem::take(&mut words.tentative);
             words.type_text(&last, true)?;
-            note = Some("Inserted the last words as they were shown live; check them before pressing Enter.".into());
+            note = Some(if target.is_field() { "Added the last words as they were shown live; check them.".into() } else { "Inserted the last words as they were shown live; check them before pressing Enter.".into() });
         }
         if words.joiner.has_typed() {
             Ok(note)
@@ -692,9 +736,21 @@ impl Words<'_> {
         if !state.accepts(self.epoch, self.target) {
             return Err("Recording cancelled.".into());
         }
-        // The same text path as terminal keys. PTY generation is checked under the write
-        // lock; a restart cannot redirect text into its replacement.
-        self.engine.voice_write(self.target, piece.as_bytes(), space)?;
+        if self.target.is_field() {
+            // The same rules about what a word may hold as for a terminal: one line, and
+            // nothing that is not text.
+            let text = sanitize(&piece);
+            if text.is_empty() || text.len() > 32 * 1024 {
+                return Err("The voice text was empty or too long and discarded.".into());
+            }
+            if !state.field.as_ref().is_some_and(|sink| sink(&text, space)) {
+                return Err("The form was closed before the recording ended. What was already added stays.".into());
+            }
+        } else {
+            // The same text path as terminal keys. PTY generation is checked under the write
+            // lock; a restart cannot redirect text into its replacement.
+            self.engine.voice_write(self.target, piece.as_bytes(), space)?;
+        }
         self.joiner.typed();
         Ok(())
     }
@@ -812,6 +868,76 @@ mod tests {
         state.target = Some(target.clone());
         assert!(!state.accepts(0, &target));
         assert!(state.accepts(1, &target));
+    }
+
+    struct NoDesktop;
+    impl crate::engine::Shell for NoDesktop {
+        fn snapshot(&self, _: &crate::model::Snapshot) {}
+        fn notify(&self, _: &str, _: &str, _: &str) {}
+        fn save(&self, _: u64, _: &[crate::office::SavedDesk]) {}
+    }
+
+    #[test]
+    fn words_for_a_field_go_to_the_window_as_plain_text_and_stop_with_the_recording() {
+        let scratch = std::env::temp_dir().join(format!("moshpit-voice-field-{}", std::process::id()));
+        let voice = Voice::new(scratch.join("models"), scratch.join("keys.json"), |_| {});
+        let engine = crate::engine::start(Arc::new(NoDesktop), vec![], vec![], vec![]);
+        let got: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
+        let into = got.clone();
+        let open = Arc::new(AtomicBool::new(true));
+        let still = open.clone();
+        let target = Target { agent: FIELD.into(), run: 7 };
+        {
+            let mut state = voice.state.lock().unwrap();
+            state.target = Some(target.clone());
+            state.field = Some(Box::new(move |text: &str, space: bool| {
+                into.lock().unwrap().push((text.to_string(), space));
+                still.load(Ordering::Acquire)
+            }));
+            state.view.field = true;
+            state.view.phase = Phase::Listening;
+        }
+        let epoch = voice.state.lock().unwrap().epoch;
+        let mut words = Words { voice: &voice, engine: &engine, target: &target, epoch, joiner: Joiner::default(), tentative: String::new() };
+        // Each settled piece, with whether a space stands before it; nothing typed into any terminal.
+        words.take(Event::Committed { text: "Fix the checkout".into(), boundary: true }, false).unwrap();
+        words.take(Event::Committed { text: "total".into(), boundary: true }, false).unwrap();
+        words.take(Event::Committed { text: ", then test it.".into(), boundary: true }, false).unwrap();
+        // One line of text, whatever the engine said: no new line, and nothing that is not text.
+        words.take(Event::Committed { text: "Second\r\nline\u{1b}[31m red\u{3}".into(), boundary: true }, false).unwrap();
+        assert_eq!(*got.lock().unwrap(), vec![("Fix the checkout".to_string(), false), ("total".to_string(), true), (", then test it.".to_string(), false), ("Second line red".to_string(), true)]);
+        // What is still being decided is shown, not added.
+        words.take(Event::Tentative("and one more".into()), false).unwrap();
+        assert_eq!((got.lock().unwrap().len(), voice.view().partial.as_str()), (4, "and one more"));
+
+        // Covering every terminal, as the panel the field is in does, does not end it.
+        voice.watch(&[]);
+        assert!(voice.state.lock().unwrap().accepts(epoch, &target));
+        // The window no longer taking words ends it, and says so.
+        open.store(false, Ordering::Release);
+        assert!(words.take(Event::Committed { text: "late".into(), boundary: true }, false).unwrap_err().contains("form was closed"));
+        // Cancelled, nothing more is added, and it is no longer a recording for a field.
+        open.store(true, Ordering::Release);
+        voice.cancel();
+        let before = got.lock().unwrap().len();
+        assert!(words.take(Event::Committed { text: "after cancel".into(), boundary: true }, false).is_err());
+        assert_eq!(got.lock().unwrap().len(), before);
+        let state = voice.state.lock().unwrap();
+        assert!(state.field.is_none() && !state.view.field && state.target.is_none());
+        drop(state);
+
+        // A recording for a terminal still ends when that terminal is covered.
+        let pane = Target { agent: "desk".into(), run: 1 };
+        {
+            let mut state = voice.state.lock().unwrap();
+            state.mode = Arc::new(AtomicU8::new(0));
+            state.target = Some(pane.clone());
+        }
+        let epoch = voice.state.lock().unwrap().epoch;
+        voice.watch(&[]);
+        assert!(!voice.state.lock().unwrap().accepts(epoch, &pane));
+        engine.shutdown();
+        let _ = std::fs::remove_dir_all(&scratch);
     }
 
     #[test]

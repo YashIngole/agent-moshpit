@@ -797,6 +797,12 @@ class Office {
     this.#report()
   }
 
+  /** The terminal a recording goes into: the one given the room, else the one the keyboard is in. */
+  get voicePane(): string {
+    const id = this.zoomed || this.focused
+    return id && this.open.has(id) ? id : ''
+  }
+
   // ── installing and updating ────────────────────────────────────────────
 
   /** Agents to start once the program they need has been installed, by the install's id. */

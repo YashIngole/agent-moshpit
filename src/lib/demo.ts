@@ -12,7 +12,7 @@ import { version as appVersion } from '../../package.json'
 import type { Bridge, OnTerminal } from './bridge'
 import type { Agent, Harness, Job, ModelChoice, NewAgentSpec, Phase, Snapshot } from './types'
 import { shorten, titleFrom, uniqueTitle } from './words'
-import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, engineName, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
+import { cleanVoice, DEFAULT_VOICE, EMPTY_VOICE, engineName, type FieldText, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
 
 const MIN = 60_000
 
@@ -176,17 +176,31 @@ export function demoBridge(): Bridge {
   let settled = 0
   const voiceChange = (patch: Partial<VoiceView>) => { voice = { ...voice, ...patch, sequence: voice.sequence + 1 } }
   const providerName = (id: VoiceProvider) => engineName(id)
+  // Where the words of a recording for a field in the window go; a terminal's are typed.
+  let sink: ((message: FieldText) => void) | null = null
+  /** The field is told, last and once, that its recording is over. */
+  const endField = () => {
+    const end = sink
+    sink = null
+    end?.({ text: '', space: false, done: true })
+  }
   const cancelVoice = () => {
     voiceEpoch += 1
     clearTimeout(recordingLimit)
     clearInterval(hearing)
-    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', detail: '', busy: false, level: 0, transcribing_ms: null, partial: '' })
+    voiceChange({ phase: 'idle', agent: null, started_ms: null, message: '', detail: '', busy: false, level: 0, transcribing_ms: null, partial: '', field: false })
+    endField()
   }
-  const typeSettled = (target: string, upTo: number) => {
+  /** Settled pieces go where the recording is for: `null` is the field in the window. */
+  const typeSettled = (target: string | null, upTo: number) => {
     while (settled < upTo) {
-      const text = (settled ? ' ' : '') + cleanVoice(spoken[settled]!.join(' '))
-      seen.typed.push({ agent: target, data: text })
-      print(target, text)
+      const words = cleanVoice(spoken[settled]!.join(' '))
+      if (target === null) sink?.({ text: words, space: settled > 0, done: false })
+      else {
+        const text = (settled ? ' ' : '') + words
+        seen.typed.push({ agent: target, data: text })
+        print(target, text)
+      }
       settled += 1
     }
   }
@@ -194,24 +208,68 @@ export function demoBridge(): Bridge {
     clearTimeout(recordingLimit)
     clearInterval(hearing)
     voiceChange({ phase: 'error', agent: null, started_ms: null, busy: false, partial: '', detail: '', level: 0, transcribing_ms: null, message })
+    endField()
   }
   const finishVoice = () => {
     if (voice.phase !== 'listening' && voice.phase !== 'preparing') throw 'Voice is not listening.'
     clearTimeout(recordingLimit)
     clearInterval(hearing)
     const epoch = voiceEpoch
-    const target = voice.agent!
+    const target = voice.field ? null : voice.agent!
     voiceChange({ phase: 'transcribing', level: 0, transcribing_ms: Date.now() })
     setTimeout(() => {
-      if (epoch !== voiceEpoch || !agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) return
+      if (epoch !== voiceEpoch || (target !== null && (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size))) return
       if (['silence', 'short', 'inference-error'].includes(voiceScene) && !settled) {
         failVoice(voiceScene === 'silence' ? 'No clear speech was heard. Check the microphone and try again.' : voiceScene === 'short' ? 'That recording was too short. Speak for at least half a second, then stop.' : 'The local speech engine stopped unexpectedly. Words already typed stay. Try again.')
         return
       }
       // The engine settles the rest of what it heard: a whole piece, even one cut short.
       typeSettled(target, Math.max(settled, Math.ceil(heard / 4), 1))
-      voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, partial: '', message: 'Inserted. Press Enter in the terminal to send.' })
+      voiceChange({ phase: 'idle', agent: target, started_ms: null, busy: false, partial: '', message: target === null ? 'Added to the task.' : 'Inserted. Press Enter in the terminal to send.' })
+      endField()
     }, 300)
+  }
+  /** Start a recording: for a terminal, or with `onText` for a field in the window. */
+  const startVoice = async (target: string | null, onText: ((message: FieldText) => void) | null) => {
+    if (!voiceSettings.enabled) throw 'Turn on voice input in the Voice input panel first.'
+    const engine = voiceSettings.engine
+    if (engine === 'local' && voice.unsupported) throw `${voice.unsupported} Choose a cloud provider in Voice input instead.`
+    if (engine !== 'local' && !voice.providers.some(p => p.id === engine && p.configured)) throw `Add your ${providerName(engine)} key in Voice input first.`
+    if (target !== null && (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size)) throw 'Select a visible terminal whose program is running before recording.'
+    if (voice.busy) throw 'The previous recording is finishing. Try again in a moment.'
+    if (engine === 'local' && !voice.models.some(m => m.id === voiceSettings.local_model && m.ready)) throw 'Download the local speech model in Voice input first, then try again.'
+    cancelVoice()
+    if (voiceSettings.microphone && !['Built-in microphone', 'USB microphone'].includes(voiceSettings.microphone)) {
+      voiceChange({ phase: 'error', field: target === null, message: 'The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.' }); return
+    }
+    if (voiceScene === 'mic-error') { voiceChange({ phase: 'error', field: target === null, message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
+    const epoch = voiceEpoch
+    heard = 0
+    settled = 0
+    sink = onText
+    voiceChange({ phase: 'preparing', agent: target, field: target === null, engine, busy: true, detail: engine === 'local' ? 'Loading the local speech model…' : `Connecting to ${providerName(engine)}…` })
+    await new Promise(resolve => setTimeout(resolve, 150))
+    if (epoch !== voiceEpoch) return
+    if (engine !== 'local') {
+      const name = providerName(engine)
+      const fault = voiceScene === 'auth' ? `${name} did not accept the key. Check it, or add it again, in Voice input.`
+        : voiceScene === 'quota' ? `${name} says the account is out of credit or over its limit. Add credit with ${name}, or switch engine in Voice input.`
+        : voiceScene === 'offline' ? `${name} could not be reached. Check your connection, or use the local engine in Voice input.` : ''
+      if (fault) { failVoice(fault); return }
+    }
+    voiceChange({ phase: 'listening', started_ms: Date.now(), detail: '', microphone: voiceSettings.microphone ?? 'Built-in microphone', level: voiceScene === 'silence' ? 0 : 36 })
+    recordingLimit = setTimeout(finishVoice, 300_000)
+    if (voiceScene === 'silence') return
+    // Words show as they are heard; a piece is typed once the engine settles it, two words later.
+    const words = spoken.flat()
+    hearing = setInterval(() => {
+      if (epoch !== voiceEpoch || heard >= words.length) return
+      heard += 1
+      if (engine === 'local' && voiceScene === 'worker-crash' && heard === 7) { failVoice('The local speech engine stopped unexpectedly. Words already typed stay. Try again.'); return }
+      if (heard >= (settled + 1) * 4 + 2 && (voice.agent || voice.field)) typeSettled(voice.field ? null : voice.agent, settled + 1)
+      voiceChange({ partial: cleanVoice(words.slice(settled * 4, heard).join(' ')) })
+    }, 300)
+  
   }
   const listeners = new Set<(snapshot: Snapshot) => void>()
   const followers = new Map<string, Set<OnTerminal>>()
@@ -430,44 +488,17 @@ export function demoBridge(): Bridge {
       return { devices: ['Built-in microphone', 'USB microphone'], default: 'Built-in microphone' }
     },
     voiceConfig: async settings => { cancelVoice(); voiceSettings = { ...settings } },
-    voiceStart: async target => {
-      if (!voiceSettings.enabled) throw 'Turn on voice input in the Voice input panel first.'
-      const engine = voiceSettings.engine
-      if (engine === 'local' && voice.unsupported) throw `${voice.unsupported} Choose a cloud provider in Voice input instead.`
-      if (engine !== 'local' && !voice.providers.some(p => p.id === engine && p.configured)) throw `Add your ${providerName(engine)} key in Voice input first.`
-      if (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size) throw 'Select a visible terminal whose program is running before recording.'
-      if (voice.busy) throw 'The previous recording is finishing. Try again in a moment.'
-      if (engine === 'local' && !voice.models.some(m => m.id === voiceSettings.local_model && m.ready)) throw 'Download the local speech model in Voice input first, then try again.'
-      cancelVoice()
-      if (voiceSettings.microphone && !['Built-in microphone', 'USB microphone'].includes(voiceSettings.microphone)) {
-        voiceChange({ phase: 'error', message: 'The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.' }); return
+    voiceStart: target => startVoice(target, null),
+    voiceStartField: async onText => {
+      // However it goes, the field hears that it is over exactly once.
+      let over = false
+      const once = (message: FieldText) => {
+        if (over) return
+        over = message.done
+        onText(message)
       }
-      if (voiceScene === 'mic-error') { voiceChange({ phase: 'error', message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
-      const epoch = voiceEpoch
-      heard = 0
-      settled = 0
-      voiceChange({ phase: 'preparing', agent: target, engine, busy: true, detail: engine === 'local' ? 'Loading the local speech model…' : `Connecting to ${providerName(engine)}…` })
-      await new Promise(resolve => setTimeout(resolve, 150))
-      if (epoch !== voiceEpoch) return
-      if (engine !== 'local') {
-        const name = providerName(engine)
-        const fault = voiceScene === 'auth' ? `${name} did not accept the key. Check it, or add it again, in Voice input.`
-          : voiceScene === 'quota' ? `${name} says the account is out of credit or over its limit. Add credit with ${name}, or switch engine in Voice input.`
-          : voiceScene === 'offline' ? `${name} could not be reached. Check your connection, or use the local engine in Voice input.` : ''
-        if (fault) { failVoice(fault); return }
-      }
-      voiceChange({ phase: 'listening', started_ms: Date.now(), detail: '', microphone: voiceSettings.microphone ?? 'Built-in microphone', level: voiceScene === 'silence' ? 0 : 36 })
-      recordingLimit = setTimeout(finishVoice, 300_000)
-      if (voiceScene === 'silence') return
-      // Words show as they are heard; a piece is typed once the engine settles it, two words later.
-      const words = spoken.flat()
-      hearing = setInterval(() => {
-        if (epoch !== voiceEpoch || heard >= words.length) return
-        heard += 1
-        if (engine === 'local' && voiceScene === 'worker-crash' && heard === 7) { failVoice('The local speech engine stopped unexpectedly. Words already typed stay. Try again.'); return }
-        if (heard >= (settled + 1) * 4 + 2 && voice.agent) typeSettled(voice.agent, settled + 1)
-        voiceChange({ partial: cleanVoice(words.slice(settled * 4, heard).join(' ')) })
-      }, 300)
+      try { await startVoice(null, once) }
+      finally { if (sink !== once) once({ text: '', space: false, done: true }) }
     },
     voiceStop: async () => finishVoice(),
     voiceCancel: async () => cancelVoice(),

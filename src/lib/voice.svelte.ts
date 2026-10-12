@@ -1,5 +1,6 @@
 import { bridge } from './bridge'
-import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, keyProblem, type VoiceInputs, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
+import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, keyProblem, type VoiceField, type VoiceInputs, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
+import { office } from './office.svelte'
 import { terms } from './terms'
 import { tick } from 'svelte'
 
@@ -15,6 +16,9 @@ class Voice {
   panel = false
   /** "Inserted", shown for a moment after a recording's words are typed. */
   notice = $state('')
+  /** A field in the window that takes dictation while it is there: the task in New agent.
+   *  With one, a recording is for it; the panel it is in covers every terminal. */
+  form = $state.raw<VoiceField | null>(null)
   active = $derived(['preparing', 'listening', 'transcribing'].includes(this.view.phase))
   /** The chosen engine can be used: its model is downloaded, or its provider has a key. */
   ready = $derived(this.settings.engine === 'local'
@@ -29,6 +33,10 @@ class Voice {
   /** Let go after holding while the start was still on its way: stop once it arrives. */
   #stopOnStart = false
   #noticeTimer: ReturnType<typeof setTimeout> | undefined
+  /** Counts recordings for a field: a piece of one that was cancelled is not added. */
+  #fieldRun = 0
+  /** Settles when the field's recording is over and every piece of it has come. */
+  #fieldOver: Promise<void> = Promise.resolve()
 
   start() {
     this.#alive = true
@@ -77,6 +85,8 @@ class Voice {
     const inserted = ['preparing', 'listening', 'transcribing'].includes(this.view.phase) && view.phase === 'idle' && !!view.message
     this.view = view
     if (inserted) this.#notify(view.message)
+    // A recording for a field that is no longer there has nowhere to put its words.
+    if (view.field && !this.form && !this.acting && ['preparing', 'listening'].includes(view.phase)) this.cancel()
     // Stop is a button; return its keyboard to the same terminal after insertion.
     // A user who moved elsewhere while waiting keeps their focus.
     if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) {
@@ -108,8 +118,57 @@ class Voice {
     if (this.view.phase === 'listening') this.#restoreFocus = !!document.activeElement?.closest('.voice-status, .mic')
     this.acting = true
     try {
-      await this.act(() => this.view.phase === 'listening' ? bridge.voiceStop() : bridge.voiceStart(agent))
+      await this.act(() => this.view.phase === 'listening' ? bridge.voiceStop() : this.form ? this.#startField(this.form) : this.#startPane(agent))
     } finally { this.acting = false }
+  }
+  #startPane(agent: string) {
+    // Say again which terminals are in front of the user: a recording starts only into one
+    // of those, and the core must not be going by an older picture of the room.
+    office.reportWatched()
+    return bridge.voiceStart(agent)
+  }
+  async #startField(form: VoiceField) {
+    const run = ++this.#fieldRun
+    let over = () => {}
+    this.#fieldOver = new Promise<void>(resolve => { over = resolve })
+    form.begin()
+    try {
+      await bridge.voiceStartField(message => {
+        if (message.done) over()
+        else if (run === this.#fieldRun && this.form === form) form.take(message.text, message.space)
+      })
+    } catch (error) {
+      over()
+      throw error
+    }
+    // The field went while the recording was starting.
+    if (this.form !== form) this.cancel()
+  }
+  /** A field offers to take dictation for as long as it is there. Call what is given back
+   *  when it goes: a recording for it ends then. */
+  offer(form: VoiceField) {
+    // What a terminal's recording said is not this field's to show.
+    if (this.problem || this.view.phase === 'error') {
+      this.problem = ''
+      this.cancel()
+    }
+    this.dismissNotice()
+    this.form = form
+    return () => {
+      if (this.form !== form) return
+      this.form = null
+      this.problem = ''
+      this.dismissNotice()
+      if (this.view.field) this.cancel()
+    }
+  }
+  /** Finish the recording for the field and wait until its last words are in it. */
+  async settle() {
+    for (let i = 0; this.acting && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 30))
+    if (!this.view.field || !(this.active || this.view.busy)) return
+    const over = this.#fieldOver
+    await this.finish()
+    await Promise.race([over, new Promise(resolve => setTimeout(resolve, 20_000))])
   }
   /** The shortcut went down: start a recording, or finish the one going. Held, it is
    *  push-to-talk (see `release`); tapped, the recording goes on until the next tap. */
@@ -166,7 +225,8 @@ class Voice {
     this.#held = null
     this.#stopOnStart = false
     this.#request += 1
-    this.view = { ...this.view, phase: 'idle', agent: null, started_ms: null, message: '', level: 0, transcribing_ms: null }
+    this.#fieldRun += 1
+    this.view = { ...this.view, phase: 'idle', agent: null, started_ms: null, message: '', level: 0, transcribing_ms: null, field: false }
     void bridge.voiceCancel().then(() => this.refresh()).catch(() => {
       if (this.#alive) this.problem = 'Voice cancellation could not be confirmed. Close the window to stop capture.'
     })

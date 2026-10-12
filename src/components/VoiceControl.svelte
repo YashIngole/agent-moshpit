@@ -2,14 +2,16 @@
   import { office } from '../lib/office.svelte'
   import { voice } from '../lib/voice.svelte'
   import { shortcutLabel } from '../lib/voice'
-  const agent = $derived(office.agents.find(a => a.id === office.focused && a.running && office.open.has(a.id)))
-  const setup = $derived(!voice.settings.enabled || !voice.ready || !agent || !!office.panel)
+  const agent = $derived(office.agents.find(a => a.id === office.voicePane && a.running))
+  /** Somewhere for the words: a terminal in front, or a field that takes them (New agent's task). */
+  const setup = $derived(!voice.settings.enabled || !voice.ready || (!voice.form && (!agent || !!office.panel)))
+  const into = $derived(voice.form ? 'the task' : agent?.title)
   const label = $derived(voice.view.phase === 'listening' ? 'Stop recording' : voice.active ? 'Voice input in progress' : setup ? 'Set up voice input' : 'Start voice input')
 </script>
 
   <button type="button" class="mic" class:listening={voice.view.phase === 'listening'}
     aria-label={label}
-    title={voice.active ? 'Recording controls are below the bar' : setup ? 'Open voice input setup' : voice.settings.shortcut === 'none' ? `Talk into ${agent?.title}` : `Talk into ${agent?.title}: click, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak`}
+    title={voice.active ? 'Recording controls are below the bar' : setup ? 'Open voice input setup' : voice.settings.shortcut === 'none' ? `Talk into ${into}` : `Talk into ${into}: click, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak`}
     disabled={voice.changing || voice.acting || (voice.view.phase !== 'listening' && (voice.active || voice.view.busy))}
     onclick={() => setup && !voice.active ? office.openVoice() : voice.view.phase === 'listening' ? void voice.finish() : void voice.toggle(agent?.id ?? '')}>
     {#if voice.view.phase === 'listening'}

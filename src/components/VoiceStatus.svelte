@@ -12,12 +12,13 @@
   const target = $derived(office.agents.find(a => a.id === voice.view.agent)?.title ?? 'the selected terminal')
   const seconds = $derived(Math.max(0, Math.floor((now - (voice.view.started_ms ?? now)) / 1000)))
   const error = $derived(voice.view.phase === 'error' || !!voice.problem)
-  const agent = $derived(office.agents.find(a => a.id === office.focused && a.running && office.open.has(a.id)))
+  const agent = $derived(office.agents.find(a => a.id === office.voicePane && a.running))
   const shortcut = $derived(voice.settings.shortcut === 'none' ? '' : shortcutLabel(voice.settings.shortcut))
 </script>
 
-<!-- Over the work, never in the column: showing it must not resize the terminals under it. -->
-{#if voice.active || error || voice.notice}
+<!-- Over the work, never in the column: showing it must not resize the terminals under it.
+     A recording for a field in a form is shown in that form, under the field. -->
+{#if !voice.form && !voice.view.field && (voice.active || error || voice.notice)}
   <div class="voice-status" class:error class:listening={voice.view.phase === 'listening'}>
     <div class="head">
       <p class="state" role="status" aria-live="polite">

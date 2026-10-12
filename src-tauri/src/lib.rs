@@ -892,6 +892,38 @@ fn voice_start(app: AppHandle, handle: State<'_, Handle>, voice: State<'_, voice
     voice.start(handle.inner().clone(), agent, settings)
 }
 
+/// A settled piece of a recording that is for a field in the window, and whether a space
+/// stands between it and the piece before.
+#[derive(Clone, serde::Serialize)]
+struct FieldText {
+    text: String,
+    space: bool,
+    /// Nothing follows: the recording is over, however it ended.
+    done: bool,
+}
+
+/// The window's end of a recording for a field. Let go of by the core when the recording
+/// ends, is cancelled or never starts, it says so last, after every piece: the window can
+/// wait for a recording's words to be all there.
+struct FieldEnd(Channel<FieldText>);
+impl Drop for FieldEnd {
+    fn drop(&mut self) {
+        let _ = self.0.send(FieldText { text: String::new(), space: false, done: true });
+    }
+}
+
+/// Record into a field in the window (the task in New agent) instead of a terminal. Each
+/// settled piece is sent down `on_text`; the recording ends as any other does.
+#[tauri::command]
+fn voice_start_field(app: AppHandle, handle: State<'_, Handle>, voice: State<'_, voice::Voice>, chosen: State<'_, Chosen>, on_text: Channel<FieldText>) -> Result<(), String> {
+    if !app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(true)) {
+        return Err("Open the office window before recording.".into());
+    }
+    let settings = chosen.now.lock().unwrap().voice.clone();
+    let end = FieldEnd(on_text);
+    voice.start_field(handle.inner().clone(), settings, Box::new(move |text: &str, space: bool| end.0.send(FieldText { text: text.to_string(), space, done: false }).is_ok()))
+}
+
 #[tauri::command]
 fn voice_stop(voice: State<'_, voice::Voice>) -> Result<(), String> { voice.stop() }
 #[tauri::command]
@@ -999,7 +1031,7 @@ pub fn run() {
             update_now,
             app_version,
             pick_folder,
-            voice_view, voice_inputs, voice_config, voice_start, voice_stop, voice_cancel,
+            voice_view, voice_inputs, voice_config, voice_start, voice_start_field, voice_stop, voice_cancel,
             voice_download, voice_cancel_download, voice_remove, voice_key_set, voice_key_check, voice_key_remove
         ])
         .on_window_event(|window, event| {

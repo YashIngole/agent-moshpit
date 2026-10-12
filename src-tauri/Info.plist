@@ -2,5 +2,5 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Agent Moshpit uses your microphone only when you start voice input for a terminal. Audio stays on this computer unless you choose a cloud provider with your own key.</string>
+  <string>Agent Moshpit uses your microphone only when you start voice input, for a terminal or for a new agent's task. Audio stays on this computer unless you choose a cloud provider with your own key.</string>
 </dict></plist>

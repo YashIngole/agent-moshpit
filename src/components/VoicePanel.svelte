@@ -70,7 +70,7 @@
       {:else if voice.inputsProblem}<p>Refresh microphones to check your input.</p>
       {:else if missingMic}<p>Choose an available microphone to finish setup.</p>
       {:else if !voice.settings.microphone && !voice.inputs.default}<p>Choose a microphone below, or connect one and refresh.</p>
-      {:else}<p>Ready. Close setup, select a running terminal, and press Voice{voice.settings.shortcut !== 'none' ? `, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak` : ''}.</p>{/if}
+      {:else}<p>Ready. Close setup, select a running terminal, and press Voice{voice.settings.shortcut !== 'none' ? `, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak` : ''}. In New agent, the microphone beside the task takes what you say as the task.</p>{/if}
     </div>
     {#if bridge.demo}<p class="note">Demo: simulated audio, downloads and keys. No microphone or network is used.</p>{/if}
 

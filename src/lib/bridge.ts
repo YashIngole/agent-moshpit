@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { demoBridge } from './demo'
 import type { Editor, ModelCatalog, NewAgentSpec, Newer, Settings, Snapshot, StartupProblem } from './types'
-import type { VoiceInputs, VoiceProvider, VoiceSettings, VoiceView } from './voice'
+import type { FieldText, VoiceInputs, VoiceProvider, VoiceSettings, VoiceView } from './voice'
 
 /**
  * What a terminal sends. `kept` is true for the first piece only: the screen as
@@ -106,6 +106,9 @@ export interface Bridge {
   voiceInputs(): Promise<VoiceInputs>
   voiceConfig(settings: VoiceSettings): Promise<void>
   voiceStart(agent: string): Promise<void>
+  /** Record into a field in the window, not a terminal. Each settled piece comes to `onText`,
+   *  in order, and then one that says the recording is over: nothing follows it. */
+  voiceStartField(onText: (message: FieldText) => void): Promise<void>
   voiceStop(): Promise<void>
   voiceCancel(): Promise<void>
   voiceDownload(model: string): Promise<void>
@@ -216,6 +219,11 @@ function tauriBridge(): Bridge {
     voiceInputs: () => invoke<VoiceInputs>('voice_inputs'),
     voiceConfig: settings => invoke('voice_config', { settings }),
     voiceStart: agent => invoke('voice_start', { agent }),
+    voiceStartField: onText => {
+      const channel = new Channel<FieldText>()
+      channel.onmessage = onText
+      return invoke('voice_start_field', { onText: channel })
+    },
     voiceStop: () => invoke('voice_stop'),
     voiceCancel: () => invoke('voice_cancel'),
     voiceDownload: model => invoke('voice_download', { model }),

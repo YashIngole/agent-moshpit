@@ -97,8 +97,9 @@
   function officeKey(event: KeyboardEvent): boolean {
     const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = event
     const pane = office.focused && office.open.has(office.focused) ? office.focused : ''
+    // Into the terminal in front, or into the task of an agent being seated.
     if (voiceKey(event, voice.settings)) {
-      if (!event.repeat) void voice.press(pane)
+      if (!event.repeat) void voice.press(office.voicePane)
       return true
     }
     // Back to the floor and back again. Not Escape: a program in a terminal uses that itself.

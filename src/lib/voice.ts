@@ -45,11 +45,22 @@ export interface VoiceView {
   transcribing_ms: number | null
   /** The words still being decided, after those already typed. */
   partial: string
+  /** The recording shown is for a field in the window (the task in New agent), not a terminal. */
+  field: boolean
   /** Why this computer cannot run the local engine; empty when it can. Cloud engines need nothing. */
   unsupported: string
   providers: VoiceProviderView[]
 }
-export const EMPTY_VOICE: VoiceView = { sequence: 0, phase: 'idle', agent: null, started_ms: null, message: '', engine: 'local', detail: '', models: [], downloading: null, received: 0, download_error: '', verifying: false, busy: false, level: 0, microphone: '', transcribing_ms: null, partial: '', unsupported: '', providers: [] }
+export const EMPTY_VOICE: VoiceView = { sequence: 0, phase: 'idle', agent: null, started_ms: null, message: '', engine: 'local', detail: '', models: [], downloading: null, received: 0, download_error: '', verifying: false, busy: false, level: 0, microphone: '', transcribing_ms: null, partial: '', field: false, unsupported: '', providers: [] }
+/** A settled piece of a recording for a field, and whether a space stands between it and the
+ *  piece before. `done` comes last, once, however the recording ended: nothing follows it. */
+export interface FieldText { text: string; space: boolean; done: boolean }
+/** A field in the window that takes dictation while it is there. */
+export interface VoiceField {
+  /** A recording is starting: show where its words will go. */
+  begin(): void
+  take(text: string, space: boolean): void
+}
 
 /** What the panel says about each provider. Prices change, so they are linked, not quoted. */
 export const PROVIDERS: Record<VoiceProvider, { model: string; keys: string; pricing: string; privacy: string }> = {
@@ -96,6 +107,19 @@ export function voiceKeyUp(event: Pick<KeyboardEvent, 'code'>, settings: VoiceSe
 }
 export function shortcutLabel(shortcut: VoiceSettings['shortcut']): string {
   return shortcut === 'none' ? 'No shortcut' : shortcut === 'altspace' ? 'Ctrl+Alt+Shift+Space' : 'Ctrl+Shift+Space'
+}
+/**
+ * A dictated piece as it goes into a text field at the caret, between `before` and `after`.
+ * A piece that carries on from the last one (`continues`) has the space the engine says it
+ * has: an engine can settle half a word at a time. One that starts somewhere fresh takes a
+ * space unless it starts the text, follows a space, an opening bracket or a slash, or opens
+ * with punctuation. When a word follows the caret, a space is put between, behind the caret
+ * (`back`), so the next piece still joins this one. Never two spaces.
+ */
+export function joinPiece(before: string, after: string, piece: string, space: boolean, continues: boolean): { text: string; back: number } {
+  const lead = !before || /\s$/.test(before) ? false : continues ? space : !/[([{“‘\/]$/.test(before) && !/^[,.;:!?)\]}%]/.test(piece)
+  const trail = /^[^\s,.;:!?)\]}]/.test(after)
+  return { text: (lead ? ' ' : '') + piece + (trail ? ' ' : ''), back: trail ? 1 : 0 }
 }
 /** Demo mirrors the terminal's plain-text safety boundary. The native boundary is authoritative. */
 export function cleanVoice(text: string): string {

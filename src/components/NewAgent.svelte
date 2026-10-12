@@ -4,7 +4,10 @@
   import { onMount, tick, untrack } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { office } from '../lib/office.svelte'
+  import { voice } from '../lib/voice.svelte'
+  import { joinPiece, shortcutLabel } from '../lib/voice'
   import LaunchSettings from './LaunchSettings.svelte'
+  import VoiceLine from './VoiceLine.svelte'
   import type { LaunchOptions } from '../lib/types'
 
   let { cwd: initialCwd, harness: initialHarness = '', launch: initialLaunch }: { cwd: string; harness?: string; launch?: LaunchOptions } = $props()
@@ -68,6 +71,56 @@
 
   onMount(() => taskField?.focus())
 
+  // ── saying the task instead of typing it ──────────────────────────────
+  /** Voice is on and its engine is there to use; until then the microphone opens its setup. */
+  const canTalk = $derived(voice.settings.enabled && voice.ready)
+  const listening = $derived(voice.view.phase === 'listening')
+  /** The text before the caret when the last spoken piece went in. The next piece carries on
+   *  from it only while the caret is still there: moved, it starts afresh where it was put. */
+  let spokenTo: string | null = null
+
+  /** A settled piece of a recording goes in at the caret, as typing it would. */
+  function take(text: string, space: boolean) {
+    const field = taskField
+    if (!field) return
+    const start = field.selectionStart
+    const end = field.selectionEnd
+    const before = field.value.slice(0, start)
+    const last = end === field.value.length
+    const piece = joinPiece(before, field.value.slice(end), text, space, before === spokenTo)
+    // Typed in, so Undo takes it back. A field the keyboard is not in is changed directly.
+    if (document.activeElement !== field || !document.execCommand('insertText', false, piece.text)) {
+      field.setRangeText(piece.text, start, end, 'end')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      if (last) field.scrollTop = field.scrollHeight
+    }
+    const caret = start + piece.text.length - piece.back
+    field.setSelectionRange(caret, caret)
+    spokenTo = field.value.slice(0, caret)
+  }
+
+  // The task box takes dictation for as long as it is there: closing the form, or choosing
+  // a program that takes no task, ends a recording for it.
+  $effect(() => {
+    const field = taskField
+    if (!field) return
+    return untrack(() =>
+      voice.offer({
+        begin: () => {
+          spokenTo = null
+          if (document.activeElement !== field) field.focus()
+        },
+        take
+      })
+    )
+  })
+
+  function talk() {
+    if (!canTalk) office.openVoice()
+    else if (listening) void voice.finish()
+    else void voice.toggle('')
+  }
+
   async function browse() {
     const picked = await bridge.pickFolder().catch(() => null)
     if (picked) {
@@ -78,6 +131,12 @@
 
   async function start() {
     if (starting) return
+    // Still dictating: the recording is finished first, so its last words are in the task.
+    if (voice.form) {
+      starting = true
+      await voice.settle()
+      starting = false
+    }
     problem = ''
     folderProblem = false
     if (!kind) {
@@ -179,7 +238,26 @@
 
     {#if kind?.takes_task}
       <div>
-        <label class="label" for="new-task">What should they do? <span class="optional">optional</span></label>
+        <div class="label said">
+          <label for="new-task">What should they do? <span class="optional">optional</span></label>
+          <!-- It does not take the keyboard: the caret stays in the task, where the words go. -->
+          <button
+            type="button"
+            class="talk"
+            class:listening
+            aria-label={!canTalk ? 'Set up voice input' : listening ? 'Stop dictating' : 'Dictate the task'}
+            title={!canTalk ? 'Say the task instead of typing it: set up voice input' : listening ? 'Stop, and add the last words' : voice.settings.shortcut === 'none' ? 'Say the task instead of typing it' : `Say the task instead of typing it: click, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak`}
+            disabled={canTalk && (voice.changing || voice.acting || (!listening && (voice.active || voice.view.busy)))}
+            onmousedown={event => event.preventDefault()}
+            onclick={talk}
+          >
+            {#if listening}
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1" /></svg>
+            {:else}
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3" /><path d="M4 9v1a6 6 0 0 0 12 0V9M10 16v2M7 18h6" /></svg>
+            {/if}
+          </button>
+        </div>
         <textarea
           id="new-task"
           class="field"
@@ -188,6 +266,7 @@
           bind:value={task}
           bind:this={taskField}
         ></textarea>
+        <VoiceLine back={() => taskField?.focus()} />
       </div>
     {:else if kind}
       <p class="heads-up">{kind.name} takes its task in its own terminal. They start in the folder and wait for you there.</p>
@@ -406,6 +485,44 @@
     margin-inline-start: var(--s-1);
     font-weight: 400;
     color: var(--ink-2);
+  }
+  /* The task's label, and the microphone that fills it in, at the two ends of one line. */
+  .said {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+  }
+  .talk {
+    display: grid;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin: -4px -4px -4px 0;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--r-1);
+    background: transparent;
+    color: var(--ink-2);
+  }
+  .talk:hover:not(:disabled) {
+    background: var(--inset);
+    color: var(--ink);
+  }
+  .talk:disabled {
+    opacity: 0.55;
+  }
+  .talk.listening {
+    border-color: var(--work);
+    color: var(--work);
+  }
+  .talk svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
   }
   /* Actions have their own row, so they never cover a field or its error. */
   footer {

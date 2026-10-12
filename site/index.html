@@ -65,7 +65,8 @@
   <body>
     <a class="skip" href="#download">Skip to the downloads</a>
 
-    <header class="bar">
+    <!-- "at-top": the bar's download button is out of sight while the opening shows its own (site.js). -->
+    <header class="bar at-top">
       <a class="brand" href="#top" aria-label="Agent Moshpit, top of the page">
         <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
           <rect x="2" y="2" width="60" height="60" rx="15" fill="#13161a" stroke="#2c323a" stroke-width="2.5" />
@@ -79,9 +80,7 @@
         </svg>
         <span>agent moshpit</span>
       </a>
-      <nav class="ways" aria-label="On this page">
-        <a href="#see">what you see</a>
-        <a href="#facts">the facts</a>
+      <nav class="ways" aria-label="Site">
         <a href="/guides/">guides</a>
         <a href="https://github.com/YashIngole/agent-moshpit">github</a>
       </nav>
@@ -89,166 +88,141 @@
     </header>
 
     <main id="top">
-      <section class="opening">
-        <h1>A small office for your coding agents.</h1>
-        <p class="lede">
-          Claude Code, Codex, Antigravity CLI and the rest run as the real programs, each in a terminal of its own inside one window.
-          Each is drawn as a person at a desk, so one look tells you who is working, who is done, and who has a hand up because they need you.
-        </p>
-
-        <div class="get">
-          <a class="button big" href="#download">
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13.5h10" /></svg>
-            Download
-          </a>
-          <p class="also">Free and open source. Available for <a href="#windows">Windows</a>, <a href="#macos">macOS</a> and <a href="#linux">Linux</a>.</p>
+      <header class="opening">
+        <div class="pitch">
+          <h1>A small office for your coding agents.</h1>
+          <div>
+            <p class="lede">
+              Claude Code, Codex and the rest run as the real CLIs, each in a terminal of its own and drawn as a person at a desk.
+              When one needs you, their hand goes up.
+            </p>
+            <div class="get">
+              <a class="button big" href="#download">Download</a>
+              <p class="also">Free and open source. Windows, macOS and Linux.</p>
+            </div>
+          </div>
         </div>
 
+        <!-- A picture of the app's window; site.js puts the app itself in its place (site/demo). -->
         <figure class="window" id="window">
           <div class="glass">
-            <picture>
-              <source media="(max-width: 620px)" srcset="img/terminals-narrow.webp" width="840" height="1120" />
-              <img
-                src="img/terminals.webp"
-                width="2480"
-                height="1600"
-                alt="The Agent Moshpit window. On the left, the floor: agents drawn as people at desks, each with a name, a status and the program it is. Beside it, the terminals of the agents being watched, each headed by its agent. An amber chip in the bar at the top names the one agent who needs you and opens their terminal."
-                fetchpriority="high"
-              />
-            </picture>
-          </div>
-          <figcaption>
-            <span class="tag">demo data</span>
-            <span id="window-words">The app's window. The amber chip at the top says who needs you.</span>
-          </figcaption>
-        </figure>
-      </section>
-
-      <section class="room" id="see" aria-labelledby="see-sign">
-        <div class="sign">
-          <h2 id="see-sign">what you see<span class="slash">/</span></h2>
-          <span>6 states</span>
-        </div>
-        <ul class="cast" aria-label="What each status looks like">
-          <li>
-            <img src="img/pose-needs.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b class="needs-word"><i class="dot needs"></i>needs you</b>
-            <span>A hand up. It has stopped on a question only you can answer.</span>
-          </li>
-          <li>
-            <img src="img/pose-working.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b><i class="dot work"></i>working</b>
-            <span>Typing, with code on the screen.</span>
-          </li>
-          <li>
-            <img src="img/pose-done.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b><i class="dot done"></i>done</b>
-            <span>Leaning back. It finished something you have not looked at yet.</span>
-          </li>
-          <li>
-            <img src="img/pose-idle.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b><i class="dot idle"></i>idle</b>
-            <span>Sitting at a prompt, with nothing to do.</span>
-          </li>
-          <li>
-            <img src="img/pose-trouble.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b><i class="dot trouble"></i>trouble</b>
-            <span>Hands on their head. The program stopped with an error.</span>
-          </li>
-          <li>
-            <img src="img/pose-away.webp" width="416" height="306" alt="" loading="lazy" decoding="async" />
-            <b><i class="dot away"></i>away</b>
-            <span>Asleep. Not running; the desk keeps where they left off.</span>
-          </li>
-        </ul>
-        <div class="split">
-          <div class="prose">
-            <h3>Their terminal is the real thing.</h3>
-            <p>
-              Click a desk and their terminal opens beside the floor. Everything under a pane's header is the program's own screen: its prompt, its slash commands, its approvals.
-              The office draws none of it. You answer a question where the program asks it.
-            </p>
-            <p>
-              Open as many as you like, side by side or in a grid. Close the window and the agents keep working; the tray icon and a notification tell you when one needs you.
-            </p>
-          </div>
-          <figure class="shot">
             <img
               src="img/office.webp"
               width="2480"
-              height="2242"
-              loading="lazy"
-              decoding="async"
-              alt="The floor by itself: three rooms, shop, api and infra, with seven agents at their desks. One has a hand up, one is leaning back with a green tick, one has their hands on their head beside a red screen, and one is asleep."
+              height="1600"
+              alt="The Agent Moshpit window. Three rooms, shop, api and infra, with seven agents drawn as people at their desks, each with a name and a status. One has a hand up, and an amber band across the top names them and offers to open their terminal. One is leaning back with a green tick, one has their hands on their head beside a red screen, and one is asleep."
+              fetchpriority="high"
             />
-            <figcaption><span class="tag">demo data</span> The floor by itself: a room for each project, a desk for each agent.</figcaption>
-          </figure>
-        </div>
+          </div>
+          <figcaption id="window-words">The app's own window, showing its demo data. The amber band names the agent who needs you.</figcaption>
+        </figure>
+      </header>
+
+      <section id="see" aria-labelledby="see-h">
+        <h2 id="see-h">What each pose means</h2>
+        <ul class="cast">
+          <li>
+            <img src="img/pose-needs.webp" width="326" height="236" alt="" loading="lazy" decoding="async" />
+            <b class="status needs">needs you</b>
+            <span>A hand up. It has stopped on a question only you can answer.</span>
+          </li>
+          <li>
+            <img src="img/pose-working.webp" width="328" height="236" alt="" loading="lazy" decoding="async" />
+            <b class="status work">working</b>
+            <span>Typing, with code on the screen.</span>
+          </li>
+          <li>
+            <img src="img/pose-done.webp" width="326" height="236" alt="" loading="lazy" decoding="async" />
+            <b class="status done">done</b>
+            <span>Leaning back. It finished something you have not looked at yet.</span>
+          </li>
+          <li>
+            <img src="img/pose-idle.webp" width="326" height="236" alt="" loading="lazy" decoding="async" />
+            <b class="status idle">idle</b>
+            <span>Sitting at a prompt, with nothing to do.</span>
+          </li>
+          <li>
+            <img src="img/pose-trouble.webp" width="338" height="248" alt="" loading="lazy" decoding="async" />
+            <b class="status trouble">trouble</b>
+            <span>Hands on their head. The program stopped with an error.</span>
+          </li>
+          <li>
+            <img src="img/pose-away.webp" width="326" height="236" alt="" loading="lazy" decoding="async" />
+            <b class="status away">away</b>
+            <span>Asleep. Not running; the desk keeps where they left off.</span>
+          </li>
+        </ul>
       </section>
 
-      <section class="room" id="facts" aria-labelledby="facts-sign">
-        <div class="sign">
-          <h2 id="facts-sign">the facts<span class="slash">/</span></h2>
-        </div>
+      <section id="facts" aria-labelledby="facts-h">
+        <h2 id="facts-h">The facts</h2>
         <dl class="facts">
           <div>
-            <dt>Free</dt>
-            <dd>No price, no paid tier, no account to make.</dd>
-          </div>
-          <div>
-            <dt>MIT licensed</dt>
-            <dd>All of the source is <a href="https://github.com/YashIngole/agent-moshpit">on GitHub</a>. Read it, build it, change it.</dd>
-          </div>
-          <div>
-            <dt>Your own CLIs, your own sign-ins</dt>
-            <dd>It starts the <code>claude</code>, <code>codex</code> or <code>agy</code> you already have, the way your terminal does. It keeps no API key and no model setting.</dd>
-          </div>
-          <div>
-            <dt>Sends nothing about you</dt>
-            <dd>The app has no telemetry or analytics. It checks for CLI and app updates; those checks <a href="https://github.com/YashIngole/agent-moshpit#what-it-sends">can be turned off</a>. Voice is optional: on your computer, its model downloads only when you ask and audio stays there; or, if you choose, a cloud provider hears it with your own key.</dd>
-          </div>
-          <div>
-            <dt>Fourteen programs, and yours</dt>
+            <dt>The real programs</dt>
             <dd>
-              <ul class="programs"><li>Claude Code</li><li>Codex</li><li>Antigravity CLI</li><li>Hermes</li><li>Gemini CLI</li><li>OpenCode</li><li>Copilot CLI</li><li>Amp</li><li>Qwen Code</li><li>Crush</li><li>Cursor CLI</li><li>Aider</li><li>Goose</li><li>Droid</li></ul>
+              It starts the <code>claude</code> or <code>codex</code> you already have, the way your terminal does, with your own sign-ins and settings.
+              Everything under a pane's header is the program's own screen, and you answer a question where the program asks it.
+            </dd>
+          </div>
+          <div>
+            <dt>Fourteen CLIs, and yours</dt>
+            <dd>
+              Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid.
               Add any other with <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/programs.md#adding-a-program-of-your-own">a few lines of JSON</a>.
             </dd>
           </div>
           <div>
-            <dt>Where it has been used</dt>
-            <dd>On Windows 11, every day. The macOS and Linux builds pass the same automated checks and have not been used by hand yet. <a href="https://github.com/YashIngole/agent-moshpit/issues">Say what breaks</a>.</dd>
+            <dt>Close the window; they keep working</dt>
+            <dd>The agents carry on from the tray. When one needs you, the tray icon gets an amber dot and a notification names the agent.</dd>
+          </div>
+          <div>
+            <dt>No account, no telemetry</dt>
+            <dd>
+              The app has no analytics. It asks npm and GitHub whether newer versions are out, which <a href="https://github.com/YashIngole/agent-moshpit#what-it-sends">can be turned off</a>.
+              Voice input is off until you turn it on, and runs on your computer unless you choose a cloud provider and give it your own key.
+            </dd>
+          </div>
+          <div>
+            <dt>What it does not do</dt>
+            <dd>
+              It shows only the agents you start from it. It merges nothing and shows no diffs: that stays with git and the CLI.
+              Every known gap is in the <a href="https://github.com/YashIngole/agent-moshpit/blob/main/docs/limits.md">list of limits</a>.
+            </dd>
           </div>
         </dl>
       </section>
 
-      <section class="room" id="download" aria-labelledby="download-sign">
-        <div class="sign">
-          <h2 id="download-sign">download<span class="slash">/</span></h2>
-          <span>3 systems</span>
-        </div>
+      <!-- One link for each installer file: #download a.file. The commands to paste: #download .line code. -->
+      <section id="download" aria-labelledby="download-h">
+        <h2 id="download-h">Download</h2>
+        <p class="note">You need at least one agent CLI, installed and signed in the way its makers say. The office can install the ones published on npm for you.</p>
         <div class="systems">
           <article class="system" id="windows">
             <h3>Windows</h3>
-            <p class="needs-os">Windows 11, 64-bit. Windows 10 is untried.</p>
+            <p class="needs-os">Windows 11, 64-bit, where it is used every day. Windows 10 is untried.</p>
             <ul class="files">
               <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64-setup.exe"><b>Installer</b><code>.exe</code></a></li>
               <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_windows_x64.msi"><b>MSI package</b><code>.msi</code></a></li>
             </ul>
             <p class="first"><b>The first time:</b> Windows says it protected your PC. Choose <i>More info</i>, then <i>Run anyway</i>.</p>
             <p class="or">Or in PowerShell, which asks nothing:</p>
-            <div class="line"><code>irm https://agentmoshpit.com/install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" hidden>copy</button></div>
+            <div class="line"><code>irm https://<wbr />agentmoshpit.com/<wbr />install.ps1 | iex</code><button type="button" class="copy" data-copy="irm https://agentmoshpit.com/install.ps1 | iex" aria-label="Copy the PowerShell command" hidden>copy</button></div>
           </article>
           <article class="system" id="macos">
             <h3>macOS</h3>
-            <p class="needs-os">macOS 10.15 or later, Apple Silicon or Intel.</p>
+            <p class="needs-os">macOS 10.15 or later, Apple Silicon or Intel. Checked by CI, not yet used by hand.</p>
             <p class="or first-way">Paste this into Terminal:</p>
-            <div class="line usual"><code>curl -fsSL https://agentmoshpit.com/install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" hidden>copy</button></div>
+            <div class="line usual"><code>curl -fsSL https://<wbr />agentmoshpit.com/<wbr />install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" aria-label="Copy the command for macOS" hidden>copy</button></div>
             <p class="first">It puts Agent Moshpit in Applications and opens it. The <a href="install.sh">script</a> is short, if you want to read it first.</p>
-            <p class="first">There is a .dmg too, for <a href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_aarch64.dmg">Apple Silicon</a> and for <a href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_x64.dmg">Intel</a>. macOS refuses to open an app from one until you allow it under <i>System Settings</i>, <i>Privacy &amp; Security</i>. The command has no such step.</p>
+            <ul class="files">
+              <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_aarch64.dmg"><b>Apple Silicon</b><code>.dmg</code></a></li>
+              <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_darwin_x64.dmg"><b>Intel</b><code>.dmg</code></a></li>
+            </ul>
+            <p class="first"><b>From a .dmg:</b> macOS refuses to open the app until you allow it under <i>System Settings</i>, <i>Privacy &amp; Security</i>. The command has no such step.</p>
           </article>
           <article class="system" id="linux">
             <h3>Linux</h3>
-            <p class="needs-os">64-bit, with WebKitGTK 4.1.</p>
+            <p class="needs-os">64-bit, with WebKitGTK 4.1. Checked by CI, not yet used by hand.</p>
             <ul class="files">
               <li><a class="file usual" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.AppImage"><b>Any distribution</b><code>.AppImage</code></a></li>
               <li><a class="file" href="https://github.com/YashIngole/agent-moshpit/releases/latest/download/agent-moshpit_linux_amd64.deb"><b>Debian, Ubuntu</b><code>.deb</code></a></li>
@@ -256,32 +230,27 @@
             </ul>
             <p class="first"><b>The first time:</b> an AppImage has to be made runnable: <code>chmod +x</code> the file, then start it.</p>
             <p class="or">Or in a terminal, which picks the right one:</p>
-            <div class="line"><code>curl -fsSL https://agentmoshpit.com/install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" hidden>copy</button></div>
+            <div class="line"><code>curl -fsSL https://<wbr />agentmoshpit.com/<wbr />install.sh | sh</code><button type="button" class="copy" data-copy="curl -fsSL https://agentmoshpit.com/install.sh | sh" aria-label="Copy the command for Linux" hidden>copy</button></div>
           </article>
         </div>
         <p class="after">
           The app is not signed with a paid certificate yet, which is why Windows asks the first time and why macOS is given a command instead of a file to click.
-          <a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads and the release notes</a> are on GitHub.
-          You also need at least one agent CLI, installed and signed in the way its makers say; the office can install the ones published on npm for you.
+          <a href="https://github.com/YashIngole/agent-moshpit/releases/latest">All downloads and the release notes</a> are on GitHub. If the macOS or Linux build fails you, <a href="https://github.com/YashIngole/agent-moshpit/issues">say what breaks</a>.
         </p>
-      </section>
-
-      <section class="room" id="guides" aria-labelledby="guides-sign">
-        <div class="sign">
-          <h2 id="guides-sign">guides<span class="slash">/</span></h2>
-          <span>4 pages</span>
-        </div>
-        <ul class="guides">
-          <li><a href="/guides/run-multiple-claude-code-agents/"><b>How to run multiple Claude Code agents at once</b><span>Five ways, from more terminal tabs to one window made for it.</span></a></li>
-          <li><a href="/guides/which-agent-is-waiting/"><b>Get told when Claude Code or Codex is waiting for you</b><span>The bell, the hooks and the settings, on Windows, macOS and Linux.</span></a></li>
-          <li><a href="/guides/claude-code-and-codex-side-by-side/"><b>Claude Code and Codex side by side in one window</b><span>Both at once in the same project, without stepping on each other.</span></a></li>
-          <li><a href="/guides/coding-agents-on-windows/"><b>Several coding agents on Windows, without tmux or WSL</b><span>What runs natively, what needs WSL, and what to use instead.</span></a></li>
-        </ul>
       </section>
     </main>
 
     <footer class="foot">
-      <p>
+      <nav class="reading" aria-labelledby="guides-h">
+        <h2 id="guides-h">Guides</h2>
+        <ul>
+          <li><a href="/guides/run-multiple-claude-code-agents/">How to run multiple Claude Code agents at once</a></li>
+          <li><a href="/guides/which-agent-is-waiting/">Get told when Claude Code or Codex is waiting for you</a></li>
+          <li><a href="/guides/claude-code-and-codex-side-by-side/">Claude Code and Codex side by side in one window</a></li>
+          <li><a href="/guides/coding-agents-on-windows/">Several coding agents on Windows, without tmux or WSL</a></li>
+        </ul>
+      </nav>
+      <p class="ends">
         <span class="who">agent moshpit</span>
         <a href="/guides/">guides</a>
         <a href="https://github.com/YashIngole/agent-moshpit">source</a>

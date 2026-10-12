@@ -1,10 +1,13 @@
 /*
- * agentmoshpit.com. The page is the app's own office after hours: the same
- * graphite rooms on a faint grid, the same type, the same four colours that
- * mean something. The values are the ones in src/styles/tokens.css.
+ * agentmoshpit.com. The page is the dark between the app's rooms: the same
+ * graphite, the same two voices of type, the same four colours that mean
+ * something. The one room on it is the app itself, running at the top.
+ * The values are the ones in src/styles/tokens.css.
  *
  * Amber means "needs you" and nothing else, here as in the app: it appears in
- * the pictures of the app and beside the words "needs you", never on a button.
+ * the app's own window and beside the words "needs you", never on a button.
+ * Geist Mono is the office speaking as a building (the bar, buttons, status,
+ * commands, file names); Geist is everything a person reads as a sentence.
  */
 @font-face {
   font-family: 'Geist Variable';
@@ -25,14 +28,12 @@
   color-scheme: dark;
 
   --bg: #0a0c0f;
-  --carpet: #111418;
-  --grid: rgba(255, 255, 255, 0.028);
   --wall: #252b33;
   --chrome: #0d0f12;
-  --panel: #13161a;
   --inset: #1b1f25;
   --line: #20252c;
   --select: #2c3a55;
+  --term: #0b0d10;
 
   --ink: #e7eaf0;
   --ink-2: #a0a8b4;
@@ -41,12 +42,9 @@
   --needs: #ffb224;
   --done: #3ccf91;
   --trouble: #ff5f56;
+  --trouble-ink: #ff7b73;
   --work: #82aaff;
   --quiet: #808a98;
-
-  --shadow: rgba(0, 0, 0, 0.45);
-  --shadow-strong: rgba(0, 0, 0, 0.62);
-  --lift: 0 1px 2px var(--shadow), 0 12px 32px -10px var(--shadow-strong);
 
   --button: #e7eaf0;
   --button-ink: #0a0c0f;
@@ -63,9 +61,12 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --quick: 180ms;
 
-  /* the page's own measures */
+  /* The page's own measures: one column with one left edge, one gap between its
+     parts, and a line of writing about seventy letters long. */
   --edge: clamp(16px, 4vw, 40px);
   --wide: 1240px;
+  --gap: clamp(64px, 9vw, 120px);
+  --measure: 35em;
 }
 
 *,
@@ -76,7 +77,7 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: calc(var(--bar) + 20px);
+  scroll-padding-top: calc(var(--bar) + 24px);
   scrollbar-width: thin;
   scrollbar-color: var(--wall) transparent;
   -webkit-text-size-adjust: 100%;
@@ -98,6 +99,7 @@ h2,
 h3,
 p,
 ul,
+ol,
 dl,
 dd,
 figure {
@@ -128,11 +130,15 @@ a:hover {
 
 code {
   font-family: var(--mono);
-  font-size: 0.9em;
+  font-size: 0.875em;
 }
 
 i {
   font-style: normal;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 ::selection {
@@ -178,6 +184,16 @@ i {
   top: 8px;
 }
 
+/* Said to a screen reader, and not drawn. */
+.unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ── the bar: the app's own, with the page's ways in it ─────────────────── */
 
 .bar {
@@ -186,9 +202,10 @@ i {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   height: var(--bar);
-  padding: 0 var(--edge);
+  /* Its line runs the width of the window; what is on it keeps to the page's column. */
+  padding-inline: max(var(--edge), calc((100% - var(--wide)) / 2));
   border-bottom: 1px solid var(--line);
   background: var(--chrome);
 }
@@ -198,7 +215,8 @@ i {
   flex: none;
   align-items: center;
   gap: 10px;
-  margin-right: auto;
+  min-height: 32px;
+  margin-right: 12px;
   font-family: var(--mono);
   font-size: 15px;
   font-weight: 600;
@@ -216,10 +234,13 @@ i {
 .ways {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 .ways a {
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
   border-radius: var(--r-1);
   color: var(--ink-2);
   font-family: var(--mono);
@@ -230,9 +251,12 @@ i {
     color var(--quick) var(--ease),
     background var(--quick) var(--ease);
 }
+.ways a:hover,
+.ways a[aria-current] {
+  color: var(--ink);
+}
 .ways a:hover {
   background: var(--inset);
-  color: var(--ink);
 }
 
 .button {
@@ -240,10 +264,8 @@ i {
   flex: none;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   min-height: 32px;
   padding: 0 12px;
-  border: 1px solid transparent;
   border-radius: var(--r-1);
   background: var(--button);
   color: var(--button-ink);
@@ -263,43 +285,59 @@ i {
   transform: translateY(1px);
 }
 .button.big {
-  min-height: 48px;
-  padding: 0 20px 0 16px;
-  gap: 10px;
-  font-size: 0.9375rem;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 0.875rem;
 }
-.button svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+
+.bar .button {
+  margin-left: auto;
+  transition:
+    background var(--quick) var(--ease),
+    transform var(--quick) var(--ease),
+    opacity var(--quick) var(--ease),
+    visibility 0s;
+}
+/* While the opening's own download button is in sight, the bar does not say it again. */
+.bar.at-top .button {
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity var(--quick) var(--ease),
+    visibility 0s var(--quick);
 }
 
 /* ── the opening: what it is, the way to get it, and the thing itself ───── */
 
-.opening {
+.opening,
+main section,
+.foot {
   max-width: calc(var(--wide) + 2 * var(--edge));
-  margin: 0 auto;
-  padding: clamp(40px, 7vw, 88px) var(--edge) 0;
+  margin-inline: auto;
+  padding-inline: var(--edge);
+}
+
+.opening {
+  padding-top: clamp(28px, 4.4vw, 52px);
+}
+
+.pitch {
+  display: grid;
+  gap: 18px clamp(32px, 5vw, 64px);
 }
 
 h1 {
-  max-width: 16ch;
-  font-size: clamp(2.5rem, 1.1rem + 5.6vw, 5rem);
+  font-size: clamp(2.25rem, 0.9rem + 3.4vw, 4rem);
   font-weight: 650;
-  line-height: 1.02;
+  line-height: 1.03;
   letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
 .lede {
-  max-width: 62ch;
-  margin-top: clamp(18px, 2.4vw, 28px);
+  max-width: 31em;
   color: var(--ink-2);
-  font-size: clamp(1.0625rem, 0.95rem + 0.45vw, 1.25rem);
+  font-size: 1.125rem;
   line-height: 1.5;
   text-wrap: pretty;
 }
@@ -308,31 +346,34 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px 20px;
-  margin-top: clamp(24px, 3vw, 36px);
+  gap: 12px 18px;
+  margin-top: clamp(18px, 2.2vw, 24px);
 }
 .also {
   color: var(--ink-3);
-  font-size: 0.9375rem;
-}
-.also a {
-  color: var(--ink-2);
-}
-.also a:hover {
-  color: var(--ink);
+  font-size: 0.875rem;
 }
 
+@media (min-width: 1000px) {
+  .pitch {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+    align-items: end;
+  }
+}
+
+/* The app's own window. A picture of it first; the app itself once it is drawn (site.js). */
 .window {
-  margin-top: clamp(36px, 5vw, 64px);
+  margin-top: clamp(24px, 3.2vw, 36px);
 }
 .glass {
   position: relative;
   overflow: hidden;
-  aspect-ratio: 2480 / 1600;
+  /* As much of the office as the first screenful has room for, under the words above it. */
+  height: clamp(480px, calc(100vh - 340px), 760px);
+  height: clamp(480px, calc(100svh - 340px), 760px);
   border: 1px solid var(--wall);
   border-radius: var(--r-3);
   background: var(--chrome);
-  box-shadow: var(--lift);
 }
 .glass img,
 .glass iframe {
@@ -344,252 +385,245 @@ h1 {
 }
 .glass img {
   object-fit: cover;
-  object-position: top left;
+  object-position: left top;
 }
+/* Until the office is drawn the app is not there to be seen, clicked or tabbed into. */
 .glass iframe {
+  visibility: hidden;
   opacity: 0;
   transition: opacity 420ms var(--ease);
   color-scheme: dark;
 }
 .window.live .glass iframe {
+  visibility: visible;
   opacity: 1;
 }
 
 figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
+  max-width: 40em;
   margin-top: 12px;
   color: var(--ink-3);
   font-size: 0.875rem;
-  line-height: 1.4;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
-.tag {
-  flex: none;
-  padding: 1px 8px;
-  border: 1px solid var(--wall);
-  border-radius: 999px;
-  color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: 0.75rem;
+/* Under the window, one line the width of the window. */
+.window figcaption {
+  max-width: none;
 }
 
-/* ── rooms: the sections of the page, drawn as the app draws a project ──── */
-
-.room {
-  max-width: var(--wide);
-  margin: clamp(56px, 8vw, 104px) auto 0;
-  padding: 14px clamp(16px, 2.6vw, 28px) clamp(20px, 3vw, 32px);
-  border: 1px solid var(--wall);
-  border-radius: var(--r-3);
-  background:
-    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 28px 28px,
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 28px 28px,
-    var(--carpet);
+/* A page narrower than the app's window looks at the window more closely: its
+   left side at a size that can be read, running off the page's right edge. */
+@media (max-width: 959.98px) {
+  .glass {
+    height: auto;
+    aspect-ratio: 620 / 440;
+    margin-right: calc(-1 * var(--edge));
+    border-right: 0;
+    border-radius: var(--r-3) 0 0 var(--r-3);
+  }
+  .glass img {
+    inset: 0 auto auto 0;
+    width: 200%;
+    max-width: none;
+    height: auto;
+  }
 }
-@media (max-width: 1320px) {
-  .room {
-    margin-left: var(--edge);
-    margin-right: var(--edge);
+@media (max-width: 619.98px) {
+  .glass {
+    aspect-ratio: 412 / 440;
+  }
+  .glass img {
+    width: 301%;
   }
 }
 
-.sign {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: clamp(20px, 3vw, 32px);
+/* ── the parts of the page ──────────────────────────────────────────────── */
+
+main section {
+  margin-top: var(--gap);
 }
-.sign h2 {
-  font-family: var(--mono);
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.3;
+
+h2 {
+  font-size: clamp(1.5rem, 1.3rem + 0.7vw, 1.75rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
 }
-.slash {
-  color: var(--ink-3);
-}
-.sign > span {
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 0.75rem;
+main section > h2 + * {
+  margin-top: clamp(20px, 2.6vw, 32px);
 }
 
 h3 {
-  font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  font-size: 1.25rem;
   font-weight: 650;
   line-height: 1.2;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.016em;
   text-wrap: balance;
 }
 
-/* what you see */
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 9fr) minmax(0, 14fr);
-  gap: clamp(24px, 4vw, 56px);
-  align-items: start;
-}
-.prose p {
-  max-width: 58ch;
-  margin-top: 12px;
+/* A sentence under a heading that the part depends on. */
+main section > h2 + .note {
+  max-width: var(--measure);
+  margin-top: 10px;
   color: var(--ink-2);
   text-wrap: pretty;
 }
-.prose h3:not(:first-child) {
-  margin-top: clamp(28px, 3.6vw, 44px);
+.note + * {
+  margin-top: clamp(24px, 3vw, 36px);
 }
 
+/* What each pose means: one person for each status, as the app draws them. */
 .cast {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 20px clamp(12px, 2vw, 28px);
-  margin-bottom: clamp(32px, 4.4vw, 56px);
-  padding-bottom: clamp(24px, 3vw, 36px);
-  border-bottom: 1px solid var(--line);
+  gap: 32px clamp(16px, 2.4vw, 32px);
 }
 .cast li {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   color: var(--ink-2);
   font-size: 0.875rem;
-  line-height: 1.4;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
+/* The pictures are twice this size, and not all cut to the same box: each is fitted into one. */
 .cast img {
-  width: 100%;
-  max-width: 208px;
-  margin: 0 0 6px -6px;
+  width: 163px;
+  aspect-ratio: 163 / 118;
+  margin: 0 0 6px -8px;
+  object-fit: contain;
+  object-position: left bottom;
 }
-.cast b {
+
+/* A status as the app writes it: a dot and its word, never one without the other. */
+.status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   color: var(--ink);
   font-family: var(--mono);
   font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
 }
-.cast .needs-word {
+.status::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--quiet);
+}
+.status.needs {
   color: var(--needs);
   font-weight: 650;
 }
-.dot {
-  display: block;
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.dot.needs {
+.status.needs::before {
   background: var(--needs);
 }
-.dot.work {
+.status.work::before {
   background: var(--work);
 }
-.dot.done {
+.status.done::before {
   background: var(--done);
 }
-.dot.trouble {
+.status.trouble {
+  color: var(--trouble-ink);
+}
+.status.trouble::before {
   background: var(--trouble);
 }
-.dot.idle {
-  background: var(--quiet);
-}
-.dot.away {
+.status.away::before {
   border: 1.5px solid var(--quiet);
+  background: none;
 }
 
-.shot img {
-  border: 1px solid var(--wall);
-  border-radius: var(--r-2);
-  background: var(--chrome);
+/* The facts, and a list of guides: a line each, what it is on the left and the rest beside it. */
+.facts > div:last-child,
+.guides li:last-child a {
+  border-bottom: 1px solid var(--line);
 }
-
-/* the facts */
-.facts {
+.facts > div,
+.guides a,
+.reading {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 clamp(24px, 4vw, 56px);
-}
-.facts > div {
-  display: grid;
-  grid-template-columns: minmax(0, 15ch) minmax(0, 1fr);
-  gap: 4px 20px;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: 4px clamp(24px, 4vw, 56px);
   align-items: baseline;
-  padding: 16px 0;
+}
+.facts > div,
+.guides a {
+  padding: 18px 0;
   border-top: 1px solid var(--line);
 }
-.facts > div:nth-child(-n + 2) {
-  border-top: 0;
-  padding-top: 0;
-}
-.facts dt {
-  font-size: 1.0625rem;
-  font-weight: 650;
-  line-height: 1.3;
+.facts dt,
+.guides b,
+.reading h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
   letter-spacing: -0.012em;
   text-wrap: balance;
 }
-.facts dd {
-  max-width: 52ch;
+.facts dd,
+.guides span {
+  max-width: var(--measure);
   color: var(--ink-2);
-  font-size: 0.9375rem;
   text-wrap: pretty;
 }
 .facts dd a,
 .after a,
-.prose a {
+.first a,
+.text a,
+.asked a,
+.compare a {
   color: var(--ink);
 }
 .facts code,
-.first code {
+.first code,
+.text code,
+.asked code,
+.compare code {
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--inset);
   color: var(--ink);
 }
 
-.programs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
+.guides a {
+  text-decoration: none;
 }
-.programs li {
-  padding: 1px 7px;
-  border: 1px solid var(--wall);
-  border-radius: 5px;
-  background: var(--panel);
-  color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  white-space: nowrap;
+.guides a:hover b {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
 /* download */
 .systems {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(20px, 3vw, 40px);
+  gap: 44px clamp(28px, 4vw, 56px);
 }
 .system {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
-  scroll-margin-top: calc(var(--bar) + 80px);
+  /* Side by side, a link to one system lands with the heading and the sentence above them in view. */
+  scroll-margin-top: calc(var(--bar) + 96px);
 }
 .needs-os {
   margin-top: 4px;
   color: var(--ink-3);
   font-size: 0.875rem;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
+
+/* An installer: its name, and the kind of file it is. */
 .files {
-  display: grid;
-  gap: 6px;
   margin-top: 16px;
 }
 .file {
@@ -598,23 +632,16 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  padding: 0 12px 0 14px;
-  border: 1px solid var(--wall);
-  border-radius: var(--r-1);
-  background: var(--panel);
+  border-bottom: 1px solid var(--line);
   text-decoration: none;
-  transition:
-    background var(--quick) var(--ease),
-    border-color var(--quick) var(--ease);
 }
-.file:hover {
-  border-color: var(--ink-3);
-  background: var(--inset);
+.files:not(.across) li:first-child .file:not(.usual) {
+  border-top: 1px solid var(--line);
 }
 .file b {
   overflow: hidden;
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -623,29 +650,42 @@ h3 {
   color: var(--ink-3);
   font-size: 0.8125rem;
 }
-/* Each system's usual file. All three look alike: no system comes first. */
+.file:hover b {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+/* Each system's usual way in is the one filled button in its column. */
 .file.usual {
-  border-color: transparent;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-1);
   background: var(--button);
   color: var(--button-ink);
+  transition: background var(--quick) var(--ease);
 }
 .file.usual:hover {
   background: var(--button-hover);
 }
+.file.usual b {
+  font-weight: 650;
+  text-decoration: none;
+}
 .file.usual code {
   color: inherit;
-  opacity: 0.66;
+  opacity: 0.7;
 }
-/* A command to paste, where one does the job of an installer. */
+
+/* A command to paste, shown as the app shows one: mono, on a terminal's own dark. */
 .or {
-  margin-top: 16px;
+  margin-top: 20px;
   color: var(--ink-2);
   font-size: 0.875rem;
 }
 .or.first-way {
   margin-top: 16px;
   color: var(--ink);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 .line {
@@ -653,24 +693,21 @@ h3 {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  margin-top: 6px;
+  margin-top: 8px;
   padding: 0 6px 0 14px;
   border: 1px solid var(--wall);
   border-radius: var(--r-1);
-  background: var(--bg);
+  background: var(--term);
 }
 .line code {
   flex: 1;
   min-width: 0;
-  padding: 10px 0;
+  padding: 11px 0;
   color: var(--ink);
   font-size: 0.8125rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
   user-select: all;
-}
-.line.usual {
-  border-color: var(--ink-3);
 }
 .copy {
   flex: none;
@@ -678,10 +715,10 @@ h3 {
   padding: 0 10px;
   border: 1px solid var(--wall);
   border-radius: 5px;
-  background: var(--panel);
+  background: none;
   color: var(--ink-2);
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition:
     background var(--quick) var(--ease),
@@ -701,10 +738,11 @@ h3 {
   background: var(--button-hover);
 }
 .first {
-  margin-top: 14px;
+  margin-top: 12px;
   color: var(--ink-3);
   font-size: 0.875rem;
   line-height: 1.5;
+  text-wrap: pretty;
 }
 .first b {
   color: var(--ink-2);
@@ -714,11 +752,9 @@ h3 {
   color: var(--ink-2);
 }
 .after {
-  max-width: 78ch;
-  margin-top: clamp(24px, 3vw, 36px);
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-3);
+  max-width: var(--measure);
+  margin-top: clamp(32px, 4vw, 48px);
+  color: var(--ink-2);
   font-size: 0.875rem;
   text-wrap: pretty;
 }
@@ -726,67 +762,106 @@ h3 {
 /* ── the foot ───────────────────────────────────────────────────────────── */
 
 .foot {
-  max-width: calc(var(--wide) + 2 * var(--edge));
-  margin: clamp(56px, 8vw, 104px) auto 0;
-  padding: 0 var(--edge) 48px;
+  margin-top: var(--gap);
+  padding-bottom: 56px;
   color: var(--ink-3);
   font-size: 0.8125rem;
 }
-.foot p:first-child {
+.foot > :first-child {
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+/* The guides, on the home page: their names, each a way in. */
+.reading {
+  color: var(--ink-2);
+  font-size: 1rem;
+}
+.reading h2 {
+  color: var(--ink);
+}
+.reading a {
+  display: inline-block;
+  padding: 3px 0;
+  text-decoration-color: transparent;
+}
+.reading a:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+.reading + .ends {
+  margin-top: 40px;
+}
+
+.ends {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 20px;
+  align-items: center;
+  gap: 4px 20px;
   font-family: var(--mono);
 }
-.foot .who {
+.ends .who {
   margin-right: auto;
   color: var(--ink-2);
   font-weight: 600;
 }
-.foot a {
+.ends a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   color: var(--ink-2);
 }
+.ends a:hover {
+  color: var(--ink);
+}
 .fine {
-  max-width: 78ch;
+  max-width: 40em;
   margin-top: 14px;
   line-height: 1.5;
+  text-wrap: pretty;
 }
 
 /* ── narrower windows ───────────────────────────────────────────────────── */
 
-@media (max-width: 900px) {
+@media (max-width: 999.98px) {
   .cast {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .facts {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .facts > div:nth-child(2) {
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
-  }
   .systems {
     grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
+    max-width: 560px;
+  }
+  /* One under another, a system's own heading is where a link to it lands. */
+  .system {
+    scroll-margin-top: 0;
   }
 }
 
-@media (max-width: 620px) {
-  .ways a:not(:last-child) {
-    display: none;
-  }
-  .facts > div {
+@media (max-width: 719.98px) {
+  .facts > div,
+  .guides a,
+  .reading {
     grid-template-columns: minmax(0, 1fr);
   }
-  /* A narrow page gets the picture of a narrow window, where desks are rows. */
-  .window .glass {
-    aspect-ratio: 840 / 1120;
+  .reading h2 {
+    margin-bottom: 6px;
+  }
+}
+
+@media (max-width: 559.98px) {
+  /* The bar keeps the name and the download; the ways are at the foot of the page. */
+  .ways {
+    display: none;
+  }
+  .ends .who {
+    flex-basis: 100%;
   }
   .cast {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cast img {
+    width: 100%;
+    max-width: 163px;
   }
 }
 
@@ -798,74 +873,96 @@ h3 {
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }
 
 /* ── guides: the pages under /guides ────────────────────────────────────────
- * One column, the width of a page of writing. The same rooms and signs; a
- * section's heading is inside its room, and the sign above it is only a label.
+ * The same bar, type and left edge as the home page, set for reading: a column
+ * the width of a page of writing, with pictures and tables a little wider.
  */
 
 body.guide {
-  --wide: 920px;
+  --gap: clamp(44px, 6vw, 72px);
+  --read: 920px;
 }
-body.guide .room {
-  width: calc(100% - 2 * var(--edge));
-  margin: clamp(16px, 2.4vw, 24px) auto 0;
-}
-body.guide .opening + .room {
-  margin-top: clamp(36px, 5vw, 56px);
+body.guide .opening > *,
+body.guide main section > * {
+  max-width: var(--read);
 }
 
 .crumbs {
-  margin-bottom: clamp(16px, 2.4vw, 28px);
+  margin-bottom: clamp(10px, 1.6vw, 16px);
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 0.8125rem;
 }
 .crumbs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   color: var(--ink-2);
   text-decoration: none;
 }
 .crumbs a:hover {
   color: var(--ink);
 }
+.slash {
+  color: var(--ink-3);
+}
 
 body.guide h1 {
-  max-width: 20ch;
-  font-size: clamp(2rem, 1.3rem + 3vw, 3.25rem);
+  max-width: 20em;
+  font-size: clamp(2rem, 1.3rem + 2.8vw, 3.25rem);
   line-height: 1.06;
   letter-spacing: -0.03em;
 }
+body.guide .lede {
+  max-width: var(--measure);
+  margin-top: clamp(16px, 2.2vw, 24px);
+}
+/* When the page was checked, and against which versions: one quiet line. */
 .checked {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 8px;
-  margin-top: clamp(18px, 2.4vw, 28px);
-}
-
-.sign b {
+  margin-top: clamp(16px, 2.2vw, 24px);
+  color: var(--ink-3);
   font-family: var(--mono);
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.checked .tag {
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+.checked .tag:not(:last-child)::after {
+  content: '·';
+  margin: 0 8px;
 }
 
-.text {
-  max-width: 68ch;
+/* "demo data", as the app's own bar says it over the same pictures. */
+.tag {
+  padding: 1px 8px;
+  border: 1px solid var(--wall);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+figcaption .tag {
+  margin-right: 6px;
+}
+
+body.guide .text {
+  max-width: var(--measure);
 }
 .text > * + * {
   margin-top: 14px;
 }
-.text h2 {
-  font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
-  font-weight: 650;
-  line-height: 1.15;
-  letter-spacing: -0.022em;
-  text-wrap: balance;
-}
 .text h3 {
-  margin-top: 28px;
+  margin-top: 30px;
   font-size: 1.125rem;
   letter-spacing: -0.012em;
 }
@@ -885,29 +982,15 @@ body.guide h1 {
 .text li::marker {
   color: var(--ink-3);
 }
-.text a,
-.asked a,
-.compare a {
-  color: var(--ink);
-}
 .text b,
 .text strong {
   color: var(--ink);
   font-weight: 600;
 }
-.text code,
-.asked code,
-.compare code {
-  padding: 1px 5px;
-  border-radius: 5px;
-  background: var(--inset);
-  color: var(--ink);
-}
 kbd {
   padding: 1px 6px;
   border: 1px solid var(--wall);
   border-radius: 5px;
-  background: var(--panel);
   color: var(--ink);
   font-family: var(--mono);
   font-size: 0.8125em;
@@ -916,13 +999,12 @@ kbd {
 
 /* Something to type or to put in a file. */
 pre.code {
-  max-width: 100%;
   margin: 16px 0 0;
   padding: 12px 14px;
   overflow-x: auto;
   border: 1px solid var(--wall);
   border-radius: var(--r-1);
-  background: var(--bg);
+  background: var(--term);
   color: var(--ink);
   font-family: var(--mono);
   font-size: 0.8125rem;
@@ -938,17 +1020,23 @@ pre.code code {
   margin-top: 16px;
   color: var(--ink-3);
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .where + pre.code {
   margin-top: 6px;
 }
 
+.shot img {
+  border: 1px solid var(--wall);
+  border-radius: var(--r-2);
+  background: var(--chrome);
+}
 body.guide .shot,
 body.guide .shot + .text {
   margin-top: clamp(20px, 3vw, 32px);
 }
 body.guide .text + .line {
+  max-width: var(--measure);
   margin-top: 14px;
 }
 body.guide .line + .text,
@@ -965,7 +1053,7 @@ body.guide .fits + .text {
   width: 100%;
   min-width: 620px;
   border-collapse: collapse;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.4;
 }
 .compare th,
@@ -986,7 +1074,7 @@ body.guide .fits + .text {
   border-top: 0;
   color: var(--ink-3);
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 .compare tbody th {
@@ -998,75 +1086,58 @@ body.guide .fits + .text {
 }
 
 .text + .asked,
-.text + .guides {
+.text + .guides,
+.text + .files {
   margin-top: clamp(18px, 2.4vw, 26px);
 }
 
 /* Questions people ask, as they ask them. */
 .asked dt {
   margin-top: 22px;
-  font-size: 1.0625rem;
-  font-weight: 650;
-  line-height: 1.3;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
   letter-spacing: -0.012em;
 }
 .asked dt:first-child {
   margin-top: 0;
 }
 .asked dd {
-  max-width: 68ch;
+  max-width: var(--measure);
   margin-top: 6px;
   color: var(--ink-2);
   text-wrap: pretty;
 }
 
-/* The way to the other guides. */
-.guides {
+/* Where a guide ends: the three systems' usual files in a row, none before the others. */
+.files.across {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-.guides a {
-  display: grid;
-  align-content: start;
-  gap: 4px;
-  height: 100%;
-  padding: 14px 16px;
+.files.across .file {
+  padding: 0 14px;
   border: 1px solid var(--wall);
   border-radius: var(--r-1);
-  background: var(--panel);
-  text-decoration: none;
   transition:
     background var(--quick) var(--ease),
     border-color var(--quick) var(--ease);
 }
-.guides a:hover {
+.files.across .file:hover {
   border-color: var(--ink-3);
   background: var(--inset);
 }
-.guides b {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.012em;
-  text-wrap: balance;
+.files.across .file:hover b {
+  text-decoration: none;
 }
-.guides span {
-  color: var(--ink-2);
+body.guide .after {
+  max-width: 40em;
+  margin-top: 16px;
+  color: var(--ink-3);
   font-size: 0.875rem;
-  line-height: 1.45;
-  text-wrap: pretty;
 }
 
-/* The three usual files in a row, where a guide ends. */
-.files.across {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: clamp(16px, 2.4vw, 24px);
-}
-
-@media (max-width: 620px) {
-  .guides,
+@media (max-width: 619.98px) {
   .files.across {
     grid-template-columns: minmax(0, 1fr);
   }

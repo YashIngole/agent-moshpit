@@ -1,70 +1,57 @@
-// agentmoshpit.com: two small things, and the page is whole without either.
+// agentmoshpit.com: three small things, and the page is whole without any of them.
 //
 // 1. The picture of the app at the top is replaced by the app's own window, running
 //    here with its demo data (site/demo, made by `npm run build:site`).
 // 2. Each install command gets a button that copies it.
+// 3. The bar's download button waits until the opening's own is out of sight.
 //
 // This script sends nothing anywhere and stores nothing.
 ;(() => {
   'use strict'
 
   // ── a command to paste: a button that copies it ──
-  for (const button of document.querySelectorAll('button.copy[data-copy]')) {
-    if (!navigator.clipboard) continue
-    button.hidden = false
-    button.addEventListener('click', () => {
-      navigator.clipboard.writeText(button.dataset.copy).then(
-        () => {
-          button.textContent = 'copied'
-          setTimeout(() => (button.textContent = 'copy'), 1600)
-        },
-        () => {}
-      )
-    })
+  const buttons = [...document.querySelectorAll('button.copy[data-copy]')]
+  if (buttons.length && navigator.clipboard) {
+    // Said aloud to a screen reader; the button's own word changes for everyone else.
+    const said = document.createElement('p')
+    said.className = 'unseen'
+    said.setAttribute('role', 'status')
+    document.body.append(said)
+    for (const button of buttons) {
+      button.hidden = false
+      button.addEventListener('click', () => {
+        navigator.clipboard.writeText(button.dataset.copy).then(
+          () => {
+            button.textContent = 'copied'
+            said.textContent = 'Copied.'
+            setTimeout(() => {
+              button.textContent = 'copy'
+              said.textContent = ''
+            }, 1600)
+          },
+          () => {
+            // The browser would not write to the clipboard: select the command, ready for Ctrl+C.
+            const command = button.parentElement.querySelector('code')
+            if (command) getSelection().selectAllChildren(command)
+            said.textContent = 'Could not copy. The command is selected.'
+          }
+        )
+      })
+    }
+  }
+
+  // ── one download button in sight at a time ──
+  // The bar's is hidden in the markup while the page opens on its own (class "at-top").
+  const bar = document.querySelector('.bar.at-top')
+  const first = document.querySelector('.get .button')
+  if (bar && first && 'IntersectionObserver' in window) {
+    const under = getComputedStyle(bar).height
+    new IntersectionObserver(([seen]) => bar.classList.toggle('at-top', seen.isIntersecting), { rootMargin: `-${under} 0px 0px 0px` }).observe(first)
+  } else if (bar) {
+    bar.classList.remove('at-top')
   }
 
   // ── the app itself, where the picture of it is ──
-
-  /**
-   * Keep the page where the reader has it for a moment. The app brings a desk it opens
-   * into view, and inside a frame that would move this page too. The first thing the
-   * reader does themselves ends the hold.
-   */
-  function hold(ms) {
-    const [left, top] = [scrollX, scrollY]
-    const html = document.documentElement
-    const signs = ['wheel', 'touchstart', 'keydown', 'pointerdown']
-    const back = () => scrollTo({ left, top, behavior: 'instant' })
-    const free = () => {
-      removeEventListener('scroll', back)
-      signs.forEach(sign => removeEventListener(sign, free))
-      html.style.scrollBehavior = ''
-    }
-    html.style.scrollBehavior = 'auto'
-    addEventListener('scroll', back)
-    signs.forEach(sign => addEventListener(sign, free, { passive: true }))
-    setTimeout(free, ms)
-  }
-
-  /** Open three terminals beside the floor, as in the picture this takes the place of. */
-  function watch(app) {
-    const office = app.contentDocument
-    const desk = n => office.querySelector(`.floor button[data-desk="demo-${n}"]`)
-    try {
-      hold(1200)
-      desk(2)?.click()
-      for (const n of [5, 6]) desk(n)?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true, view: app.contentWindow }))
-      // A terminal that opens takes the keyboard. Nobody asked it to here: the page keeps it,
-      // and the floor goes back to its first room.
-      setTimeout(() => {
-        office.activeElement?.blur?.()
-        app.blur()
-        office.querySelector('.floor')?.scrollTo(0, 0)
-      }, 350)
-    } catch {
-      // the floor alone is still the app
-    }
-  }
 
   function live() {
     const frame = document.getElementById('window')
@@ -78,7 +65,8 @@
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const app = document.createElement('iframe')
     app.title = 'Agent Moshpit, running with demo data'
-    app.loading = 'lazy'
+    // The words under the window say how to use it, and the key that leaves a terminal.
+    app.setAttribute('aria-describedby', caption.id)
     app.src = `demo/?demo=office${still ? '&still' : ''}`
     app.addEventListener('load', () => {
       // Shown only once the office is drawn; a missing demo leaves the picture as it is.
@@ -91,9 +79,14 @@
           ready = false
         }
         if (ready) {
-          watch(app)
           frame.classList.add('live')
-          caption.textContent = 'This is the app itself, running here with its demo data. Click a desk, or type in a terminal.'
+          // A terminal keeps Tab for its program, as in the app: the caption names the key that leaves one.
+          const key = document.createElement('kbd')
+          key.textContent = 'Ctrl+`'
+          caption.replaceChildren('This is the app itself, running here with its demo data. Press “open their terminal” or click any desk; ', key, ' puts the terminals away again.')
+          // The picture has done its job: it is no longer there to be read out a second time.
+          const picture = glass.querySelector('img')
+          if (picture) setTimeout(() => (picture.hidden = true), 600)
         } else if (++tries < 40) {
           setTimeout(drawn, 150)
         } else {

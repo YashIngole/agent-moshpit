@@ -125,11 +125,15 @@ interface Seen {
   opened: { agent: string | null; path: string; line: number | null; editor: string }[]
   /** How many pretend keys were kept. The keys themselves are not. */
   keys: number
+  /** Each program started in a terminal that was there before, and the size it was started at. */
+  started: { agent: string; cols: number; rows: number }[]
+  /** Each size a terminal's program was told. */
+  sized: { agent: string; cols: number; rows: number }[]
 }
 
 export function demoBridge(): Bridge {
   const params = new URLSearchParams(location.search)
-  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0 }
+  const seen: Seen = { updates: 0, watched: [], visible: [], typed: [], opened: [], keys: 0, started: [], sized: [] }
   ;(window as unknown as { __demo: Seen }).__demo = seen
   const still = params.has('still')
   let agents = scene(params.get('demo') ?? 'office')
@@ -302,9 +306,12 @@ export function demoBridge(): Bridge {
       if (!still) setTimeout(() => turn(fresh.id, spec.prompt ? 'working' : 'idle'), 900)
       return fresh.id
     },
-    wake: async id => {
+    wake: async (id, cols, rows) => {
       const who = agents.find(a => a.id === id)
-      if (who && !who.running) turn(id, 'idle')
+      if (who && !who.running) {
+        seen.started.push({ agent: id, cols, rows })
+        turn(id, 'idle')
+      }
     },
     follow: async (id, fn) => {
       const who = agents.find(a => a.id === id)
@@ -321,9 +328,9 @@ export function demoBridge(): Bridge {
       const who = agents.find(a => a.id === id)
       if (data === '\r' && who?.phase === 'needs_you') turn(id, 'working')
     },
-    resize: () => {},
+    resize: (id, cols, rows) => void seen.sized.push({ agent: id, cols, rows }),
     stop: id => { if (voice.agent === id) cancelVoice(); turn(id, 'asleep') },
-    restart: async id => { if (voice.agent === id) cancelVoice(); turn(id, 'idle') },
+    restart: async (id, cols, rows) => { if (voice.agent === id) cancelVoice(); seen.started.push({ agent: id, cols, rows }); turn(id, 'idle') },
     showFolder: async () => {},
     editors: async () => (params.has('noeditor') ? [] : [{ id: 'cursor', name: 'Cursor' }, { id: 'zed', name: 'Zed' }]),
     openFile: async (agent, path, line, editor) => {

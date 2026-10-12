@@ -157,6 +157,35 @@ try {
   await page.getByRole('button', { name: 'Put this terminal away' }).first().click()
   check('panes close down to one', await until(async () => (await panes(page)) === 1))
 
+  // ── a program started in a pane that is already there ──
+  // It is started at that pane's size and told it again: the pane's size has not changed,
+  // so nothing else would ever say it. (A guess at the whole room's width drew it garbled.)
+  const sizing = await open('demo=office&still')
+  await desk(sizing, 2).click()
+  await desk(sizing, 3).click({ modifiers: ['ControlOrMeta'] })
+  await until(async () => (await panes(sizing)) === 2)
+  const awayPane = sizing.locator('.pane[data-pane="demo-3"]')
+  const sizeOf = () => awayPane.locator('.term-host').getAttribute('data-size')
+  // The floor narrows to the strip as the second pane opens, so the pane is fitted twice.
+  let paneSize = ''
+  await until(async () => {
+    const before = await sizeOf()
+    await sleep(200)
+    paneSize = (await sizeOf()) ?? ''
+    return paneSize !== '' && paneSize === before
+  })
+  await awayPane.getByRole('button', { name: 'Carry on' }).click()
+  await until(() => sizing.evaluate(() => window.__demo.started.length > 0))
+  const startedAt = await sizing.evaluate(() => window.__demo.started.map(s => `${s.agent} ${s.cols}x${s.rows}`).join(', '))
+  check('a program carried on in a pane is started at the size of that pane', startedAt === `demo-3 ${paneSize}`, `${startedAt} against a pane of ${paneSize}`)
+  check('and is told the size again once it runs', await until(() => sizing.evaluate(size => window.__demo.sized.filter(s => s.agent === 'demo-3' && `${s.cols}x${s.rows}` === size).length >= 2, paneSize)), JSON.stringify(await sizing.evaluate(() => window.__demo.sized)))
+  await awayPane.getByRole('button', { name: /^More for/ }).click()
+  await sizing.getByRole('menuitem', { name: /Restart their program/ }).click()
+  await until(() => sizing.evaluate(() => window.__demo.started.length > 1))
+  const restartedAt = await sizing.evaluate(() => window.__demo.started.slice(1).map(s => `${s.agent} ${s.cols}x${s.rows}`).join(', '))
+  check('a restart from the menu starts it at the size of its pane too', restartedAt === `demo-3 ${paneSize}`, `${restartedAt} against a pane of ${paneSize}`)
+  await sizing.context().close()
+
   // ── the floor and back ──
   await page.keyboard.press('Control+Backquote')
   check('Ctrl+` goes back to the floor', await until(async () => (await panes(page)) === 0))

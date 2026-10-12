@@ -19,6 +19,13 @@ export interface TermHandle {
   find(text: string, downward?: boolean): boolean
   /** Forget where the last search stopped. */
   resetFind(): void
+  /** The size it is drawn at, columns then rows. Null until it has been fitted to its pane. */
+  size(): [number, number] | null
+  /**
+   * Tell its program the pane's size again, whether or not it has changed: a program
+   * started in a pane that was already there has not been told yet.
+   */
+  resync(): void
 }
 
 export const terms = new Map<string, TermHandle>()

@@ -7,7 +7,7 @@
   import { WebLinksAddon } from '@xterm/addon-web-links'
   import { Terminal, type ITheme } from '@xterm/xterm'
   import '@xterm/xterm/css/xterm.css'
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { webAddress } from '../lib/links'
   import { termItems } from '../lib/menus'
@@ -35,6 +35,9 @@
   let following = $state(false)
   let connect: () => void = () => {}
   let refit: () => void = () => {}
+  let resync: () => void = () => {}
+  /** Whether its program was running at the last look, to see it start. */
+  let wasLive = untrack(() => live)
 
   /** The terminal's colours, read from the stylesheet so both come from one place. */
   function theme(): ITheme {
@@ -145,6 +148,8 @@
     let answering = false
     let unfollow: (() => void) | undefined
     let sized = ''
+    /** Whether it has been fitted to its pane at least once, so its columns and rows are real. */
+    let fitted = false
     let pending: ReturnType<typeof setTimeout> | undefined
     /** Where the last search found something: a line, and the column it starts at. */
     let found: { row: number; col: number } | null = null
@@ -156,7 +161,9 @@
       } catch {
         return
       }
+      fitted = true
       const now = `${made.cols}x${made.rows}`
+      host.dataset.size = now
       if (now !== sized) {
         sized = now
         bridge.resize(id, made.cols, made.rows)
@@ -280,6 +287,8 @@
         found = null
         made.clearSelection()
       },
+      size: () => (fitted ? [made.cols, made.rows] : null),
+      resync: () => resync(),
       find: (text, downward = false) => {
         const needle = text.toLowerCase()
         if (!needle) return false
@@ -336,6 +345,12 @@
     }
 
     refit = sizeSoon
+    // A program started in a pane that was already there draws at whatever size it was
+    // started with, and the pane, whose size has not changed, would never say otherwise.
+    resync = () => {
+      sized = ''
+      size()
+    }
     size()
     connect()
 
@@ -372,6 +387,12 @@
   // Its program has started: follow it, if it could not be followed before.
   $effect(() => {
     if (live && !following) connect()
+  })
+
+  // Its program has started in this pane: told the pane's size, whoever started it.
+  $effect(() => {
+    if (live && !wasLive) resync()
+    wasLive = live
   })
 
   // Bigger or smaller text: the terminal is fitted to its pane again, and the program told its new size.

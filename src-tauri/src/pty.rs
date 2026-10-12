@@ -104,6 +104,9 @@ struct Term {
     /// The size its program last drew at, columns then rows. None for a screen kept
     /// from before, which is already drawn.
     size: Option<(u16, u16)>,
+    /// The size a window last asked for, columns then rows, kept even while nothing
+    /// runs here: the next program started in front of that window draws at it.
+    asked: Option<(u16, u16)>,
 }
 
 /// Called when a program ends: the desk's id, and whether it ended well.
@@ -124,7 +127,15 @@ impl Terminals {
     /// Start a program in a new terminal under this id. Whoever was watching the
     /// terminal that had this id before keeps watching, and sees the screen wiped.
     pub fn start(self: &Arc<Self>, id: &str, launch: Launch) -> Result<u32, String> {
-        let size = PtySize { rows: launch.rows.max(2), cols: launch.cols.max(8), pixel_width: 0, pixel_height: 0 };
+        // A window already showing this terminal has said how big it is. What the launch
+        // carries is a guess made before any pane was there, and a pane whose size has not
+        // changed never says it again: a program started at the guess draws for another width.
+        let watched = {
+            let terms = self.terms.lock().unwrap();
+            terms.get(id).and_then(|t| if t.screen.lock().unwrap().sinks.is_empty() { None } else { t.asked })
+        };
+        let (cols, rows) = watched.unwrap_or((launch.cols, launch.rows));
+        let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
         let pair = native_pty_system().openpty(size).map_err(|e| format!("No terminal could be made for it: {e}"))?;
 
         let mut command = CommandBuilder::new(&launch.program);
@@ -181,7 +192,7 @@ impl Terminals {
                 now.sinks.retain(|(_, send)| send(b"\x1bc"));
             }
             let size = Some((size.cols, size.rows));
-            terms.insert(id.to_string(), Term { live: Some(Live { master: pair.master, writer: writer.clone(), killer, pid }), screen: screen.clone(), run, size });
+            terms.insert(id.to_string(), Term { live: Some(Live { master: pair.master, writer: writer.clone(), killer, pid }), screen: screen.clone(), run, size, asked: watched });
         }
 
         std::thread::spawn(move || {
@@ -229,7 +240,7 @@ impl Terminals {
             *runs
         };
         let screen = Screen { kept: printed.iter().copied().collect(), ..Screen::default() };
-        self.terms.lock().unwrap().entry(id.to_string()).or_insert(Term { live: None, screen: Arc::new(Mutex::new(screen)), run, size: None });
+        self.terms.lock().unwrap().entry(id.to_string()).or_insert(Term { live: None, screen: Arc::new(Mutex::new(screen)), run, size: None, asked: None });
     }
 
     /// What each terminal shows, as it is drawn, with up to `history` lines above it,
@@ -323,8 +334,10 @@ impl Terminals {
     pub fn resize(&self, id: &str, cols: u16, rows: u16) {
         let mut terms = self.terms.lock().unwrap();
         let Some(term) = terms.get_mut(id) else { return; };
-        let Some(live) = term.live.as_ref() else { return; };
         let size = PtySize { rows: rows.max(2), cols: cols.max(8), pixel_width: 0, pixel_height: 0 };
+        // Kept whether or not a program is here to be told: see `start`.
+        term.asked = Some((size.cols, size.rows));
+        let Some(live) = term.live.as_ref() else { return; };
         // The same size again changes nothing, and the program draws nothing.
         if live.master.get_size().is_ok_and(|now| now.rows == size.rows && now.cols == size.cols) { return; }
         // Prepare for the redraw, then let the reader drain output during the native resize.
@@ -361,6 +374,14 @@ impl Terminals {
                 let _ = live.killer.kill();
             }
         }
+    }
+
+    /// The size the running program's terminal has, columns then rows.
+    #[cfg(test)]
+    fn sized(&self, id: &str) -> Option<(u16, u16)> {
+        let terms = self.terms.lock().unwrap();
+        let size = terms.get(id)?.live.as_ref()?.master.get_size().ok()?;
+        Some((size.cols, size.rows))
     }
 
     pub fn running(&self, id: &str) -> bool {
@@ -568,6 +589,46 @@ mod tests {
         terms.remove("a");
         assert!(!terms.running("a"));
         assert!(terms.attach("a", Box::new(|_: &[u8]| true)).is_err());
+    }
+
+    #[test]
+    fn a_program_started_in_front_of_a_window_draws_at_the_size_that_window_asked_for() {
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        let terms = Terminals::new(Arc::new(move |id: &str, _: bool| {
+            let _ = tx.lock().unwrap().send(id.to_string());
+        }));
+        let ended = || rx.recv_timeout(Duration::from_secs(20)).unwrap();
+        // A shell, so the terminal is still there to be measured after it starts.
+        let guess = || Launch { cols: 155, rows: 48, ..shell() };
+
+        // Nobody is watching: the launch's own guess is all there is.
+        terms.start("a", guess()).unwrap();
+        assert_eq!(terms.sized("a"), Some((155, 48)));
+        terms.stop("a");
+        ended();
+        assert!(!terms.running("a"));
+
+        // A pane shows what it printed, and says its size while nothing runs there.
+        let (sink, _seen) = watcher();
+        let token = terms.attach("a", sink).unwrap();
+        terms.resize("a", 63, 31);
+        terms.start("a", guess()).unwrap();
+        assert_eq!(terms.sized("a"), Some((63, 31)), "started at the guess, not at the pane's size");
+        terms.stop("a");
+        ended();
+
+        // And again, without the pane saying anything in between: its size has not changed.
+        terms.start("a", guess()).unwrap();
+        assert_eq!(terms.sized("a"), Some((63, 31)));
+        terms.stop("a");
+        ended();
+
+        // The pane is put away: what it asked for is no longer anybody's size.
+        terms.detach("a", token);
+        terms.start("a", guess()).unwrap();
+        assert_eq!(terms.sized("a"), Some((155, 48)));
+        terms.remove("a");
     }
 
     #[test]

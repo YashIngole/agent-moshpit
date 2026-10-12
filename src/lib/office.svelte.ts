@@ -4,6 +4,7 @@ import { tick } from 'svelte'
 import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
 import { groupProjects } from './projects'
+import { terms } from './terms'
 import { EMPTY, close, even, has, ids, moveColumnEdge, moveRowEdge, only, open, parse, swap, trade, type Layout } from './layout'
 import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 import { mixed as manyPrograms } from './words'
@@ -412,8 +413,13 @@ class Office {
 
   // ── terminals ──────────────────────────────────────────────────────────
 
-  /** A first guess at a terminal's size, for a program started before its pane exists. */
-  #size(): [number, number] {
+  /**
+   * The size to start a program at: its pane's own, when its terminal is showing, else a
+   * first guess for a program started before its pane exists.
+   */
+  #size(id?: string): [number, number] {
+    const shown = id ? terms.get(id)?.size() : null
+    if (shown) return shown
     const width = Math.max(480, window.innerWidth - (this.terminals ? this.floorWidth : FLOOR_WIDTH.terminals))
     const cols = Math.min(200, Math.max(60, Math.floor(width / 8.4) - 4))
     const rows = Math.min(70, Math.max(18, Math.floor((window.innerHeight - 120) / 19)))
@@ -448,7 +454,8 @@ class Office {
     if (!agent || agent.running) return
     this.problem = ''
     try {
-      await bridge.wake(id, ...this.#size())
+      await bridge.wake(id, ...this.#size(id))
+      terms.get(id)?.resync()
     } catch (error) {
       this.problem = typeof error === 'string' ? error : `${agent.title} could not be started.`
     }
@@ -460,7 +467,8 @@ class Office {
     if (!agent) return
     this.problem = ''
     try {
-      await bridge.restart(id, ...this.#size())
+      await bridge.restart(id, ...this.#size(id))
+      terms.get(id)?.resync()
     } catch (error) {
       this.problem = typeof error === 'string' ? error : `${agent.title} could not be started again.`
     }
@@ -709,6 +717,8 @@ class Office {
     if (then) this.#pending.set(id, { spec: then, settled: 0 })
     this.panel = null
     this.#place(id, true)
+    // Run again in a pane still open from the last time: told that pane's size.
+    terms.get(id)?.resync()
   }
 
   async update(harness: string) {
@@ -717,6 +727,7 @@ class Office {
       const id = await bridge.update(harness, ...this.#size())
       this.panel = null
       this.#place(id, true)
+      terms.get(id)?.resync()
     } catch (error) {
       this.problem = typeof error === 'string' ? error : 'That could not be updated.'
     }
@@ -749,7 +760,8 @@ class Office {
 
   async #startInPlaceOf(jobId: string, spec: NewAgentSpec) {
     try {
-      const id = await bridge.newAgent(spec, ...this.#size())
+      // The agent takes the install's pane, so it starts at that pane's size.
+      const id = await bridge.newAgent(spec, ...this.#size(jobId))
       this.rememberFolder(spec.cwd)
       this.lastHarness = spec.harness
       if (this.focused === jobId) this.focused = id

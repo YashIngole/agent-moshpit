@@ -112,6 +112,10 @@ try {
     await page.keyboard.press('Enter')
   }
   const desk = title => page.locator('.floor button[data-desk]', { hasText: title })
+  /** The size a pane's terminal is drawn at, as "COLSxROWS". */
+  const drawnAt = async title => (await page.locator('.pane', { hasText: title }).locator('.term-host').getAttribute('data-size')) ?? ''
+  /** The size the program in a pane says it was started at: the last one it printed, read across wrapped lines. */
+  const startedAt = async title => [...(await screen(title).catch(() => '')).replace(/\s+/g, '').matchAll(/FAKEAGENTREADYin.*?at(\d+x\d+)/g)].at(-1)?.[1] ?? ''
   const state = async title => (await desk(title).getAttribute('class')) ?? ''
   /** Seat a stand-in through the form, as a person would. */
   const seat = async ({ program = 'Fake Agent', task = '', folder = work, name }) => {
@@ -253,6 +257,9 @@ try {
   check('a stopped program leaves its desk, away', await until(async () => (await state('Second')).includes('asleep'), 8000), await state('Second'))
   await page.locator('.pane', { hasText: 'Second' }).getByRole('button', { name: 'Start again' }).click()
   check('and starts again in the same pane', await until(async () => (await state('Second')).match(/idle|starting|working/) !== null, 8000))
+  // One of two panes: a guess at the whole room's width would be about twice too wide.
+  await until(async () => (await startedAt('Second')) !== '', 8000)
+  check('at the size of that pane, not at a guess', (await startedAt('Second')) === (await drawnAt('Second')), `started at ${await startedAt('Second')}, drawn at ${await drawnAt('Second')}`)
 
   // ── renaming, and starting again from the menu ───────────────────────────
   await desk('Second').focus()
@@ -273,6 +280,7 @@ try {
       return text.includes('FAKE AGENT READY') && !text.includes('before the restart')
     }, 10000)
   )
+  check('at the size of that pane too', (await startedAt('Second, renamed')) === (await drawnAt('Second, renamed')), `started at ${await startedAt('Second, renamed')}, drawn at ${await drawnAt('Second, renamed')}`)
   await desk('Second, renamed').focus()
   await page.keyboard.press('F2')
   await page.getByRole('dialog', { name: /Rename/ }).getByRole('textbox').fill('')

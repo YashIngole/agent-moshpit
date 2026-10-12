@@ -28,6 +28,8 @@ impl Fixture {
         kind.args = if cfg!(windows) { vec!["/d".into(), "/q".into()] } else { vec![] };
         kind.package.clear(); kind.update.clear(); kind.task = TaskArg::None;
         kind.trust = TrustFrom::None; kind.session = SessionFrom::Unknown; kind.resume.clear();
+        // A shell has nobody signed in to it and titles its terminal with where it is.
+        kind.login.clear(); kind.account.clear(); kind.topic = harness::TopicFrom::None;
         let handle = engine::start(Arc::new(Quiet::default()), vec![kind], vec![], vec![]);
         let make = |cwd: &Path| NewAgent { harness: "shell".into(), cwd: cwd.to_string_lossy().into_owned(), prompt: String::new(), title: String::new(), worktree: false, launch: Default::default() };
         let a = handle.new_agent(make(&dir), 80, 24).unwrap();
@@ -87,6 +89,49 @@ fn queued_tasks_are_owned_idempotent_and_survive_restart() {
     assert_eq!(restored.task(&f.a, &task.id).unwrap().summary, "Reviewed the tests");
     assert!(!restored.connected(&f.a));
     restored.shutdown();
+}
+
+#[test]
+fn a_removed_desk_no_longer_holds_its_tasks_open_against_whoever_asked() {
+    let f = Fixture::new();
+    let task = f.queued();
+    f.call(&f.b, "accept_task", json!({"task_id":task.id})).unwrap();
+    // Three more it will never report on: the asker is now at its limit of four.
+    for n in 0..3 {
+        f.call(&f.a, "send_task", json!({"session_id":f.b,"prompt":format!("Task {n}"),"request_key":format!("more-{n}")})).unwrap();
+    }
+    assert!(f.call(&f.a, "send_task", json!({"session_id":f.b,"prompt":"One too many","request_key":"fifth"})).unwrap_err().contains("four unfinished"));
+    // The desk is taken away. What it had been asked is over, and said to be.
+    f.hub.abandoned(&f.b);
+    let ended = f.hub.task(&f.a, &task.id).unwrap();
+    assert_eq!(ended.status, TaskStatus::Failed);
+    assert!(ended.summary.contains("removed before it reported"), "{}", ended.summary);
+    assert_eq!(f.call(&f.a, "check_inbox", json!({})).unwrap()["results"].as_array().unwrap().len(), 4);
+    // And the asker can delegate again.
+    f.call(&f.a, "send_task", json!({"session_id":f.b,"prompt":"After the removal","request_key":"sixth"})).unwrap();
+    // A task that had already been reported keeps its result; one the desk itself asked for is not its to end.
+    let reported = f.call(&f.a, "send_task", json!({"session_id":f.b,"prompt":"Reported on","request_key":"seventh"})).unwrap()["task"]["id"].as_str().unwrap().to_string();
+    f.call(&f.b, "report_result", json!({"task_id":reported,"status":"completed","summary":"Done properly"})).unwrap();
+    let asked_by_b = f.call(&f.b, "send_task", json!({"session_id":f.a,"prompt":"The other way","request_key":"back"})).unwrap()["task"]["id"].as_str().unwrap().to_string();
+    f.hub.abandoned(&f.b);
+    assert_eq!(f.hub.task(&f.a, &reported).unwrap().summary, "Done properly");
+    assert_eq!(f.hub.task(&f.a, &asked_by_b).unwrap().status, TaskStatus::Queued);
+    // It is kept: the office started again sees the same.
+    let restored = Hub::start(f.handle.clone(), f.dir.join("coordination.json")).unwrap();
+    assert_eq!(restored.task(&f.a, &task.id).unwrap().status, TaskStatus::Failed);
+    restored.shutdown();
+}
+
+#[test]
+fn a_session_is_told_how_it_was_launched_and_not_how_another_was() {
+    let f = Fixture::new();
+    let sessions = f.call(&f.a, "list_sessions", json!({})).unwrap()["sessions"].as_array().unwrap().clone();
+    let told = |id: &str| sessions.iter().find(|s| s["session"]["id"] == id).unwrap()["session"].clone();
+    assert!(told(&f.a).get("launch").is_some());
+    // Another desk's extra instructions, folders, tool rules and arguments are its own business.
+    assert!(told(&f.b).get("launch").is_none(), "{}", told(&f.b));
+    assert!(told(&f.b)["title"].is_string() && told(&f.b)["cwd"].is_string());
+    assert!(f.call(&f.a, "get_context", json!({})).unwrap()["session"].get("launch").is_some());
 }
 
 #[test]

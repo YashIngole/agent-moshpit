@@ -56,7 +56,9 @@ pub struct Desk {
     pub activity: String,
     /// Agent descriptions supplement observed status; never hide an approval or failure.
     reported_activity: String,
-    agent_named: bool,
+    /// What its program called the conversation at the last look, this run. `None` until
+    /// it has been heard: only a change of name while it runs is somebody naming it.
+    heard_name: Option<String>,
     pub running: bool,
     /// When its program was last started.
     pub started_ms: Millis,
@@ -114,7 +116,19 @@ pub struct Office {
 impl Office {
     /// Everyone from the last run, asleep: nothing is started until its desk is opened.
     pub fn restore(saved: Vec<SavedDesk>, now: Millis) -> Self {
-        let desks = saved.into_iter().filter(|s| !s.id.is_empty()).map(|saved| Desk::new(saved, Phase::Asleep, now)).collect();
+        let desks = saved
+            .into_iter()
+            .filter(|s| !s.id.is_empty())
+            .map(|mut saved| {
+                // An earlier office took the name Claude Code makes up for every conversation
+                // (its folder and two characters) for the conversation's own. The desk gets
+                // back the name it was seated with.
+                if !saved.title_locked && !saved.auto_title.is_empty() && made_up_name(&saved.title, &saved.cwd) {
+                    saved.title = saved.auto_title.clone();
+                }
+                Desk::new(saved, Phase::Asleep, now)
+            })
+            .collect();
         Office { desks }
     }
 
@@ -168,6 +182,7 @@ impl Office {
             desk.worked = false;
             desk.activity.clear();
             desk.reported_activity.clear();
+            desk.heard_name = None;
             desk.turn(Phase::Starting, now);
         }
     }
@@ -277,6 +292,11 @@ impl Office {
             // its own, with pauses): still not work, and its end is nothing to flag.
             Signal::Working if desk.drawing_its_opening(now) => None,
             Signal::Working => {
+                // A new stretch of work: what the agent said it was doing in the last one is
+                // no longer what it is doing. It says again, if it does.
+                if !desk.worked {
+                    desk.reported_activity.clear();
+                }
                 desk.worked = true;
                 desk.activity.clear();
                 desk.turn(Phase::Working, now)
@@ -363,16 +383,41 @@ impl Office {
         }
     }
 
-    /// A name the program gave the conversation. The user's own name wins.
-    pub fn suggest_title(&mut self, id: &str, title: &str) -> bool {
+    /// What the program has put in its terminal's title as the topic of the conversation.
+    /// It names a desk that still has the name the office seated it with, and no other:
+    /// a name from the user or from the agent stands, and a desk named once keeps its
+    /// name when the topic moves on.
+    pub fn topic(&mut self, id: &str, topic: &str) -> bool {
         let Some(desk) = self.get_mut(id) else {
             return false;
         };
-        let title = harness::shorten(title, 60);
-        if desk.saved.title_locked || desk.agent_named || title.is_empty() || desk.saved.title == title {
+        let topic = harness::shorten(topic, 60);
+        if desk.saved.title_locked || desk.saved.auto_title.is_empty() || desk.saved.title != desk.saved.auto_title || topic.is_empty() || topic == desk.saved.title {
             return false;
         }
-        desk.saved.title = title;
+        desk.saved.title = topic;
+        true
+    }
+
+    /// What the program calls the conversation, and whether somebody gave it that name
+    /// (`by_user`) or the program made it up, which is nobody's name for anything.
+    ///
+    /// A name that changes while the program runs was typed there by the user (`/rename`),
+    /// and is theirs for the desk as well: it is kept as one they gave it. The name it
+    /// started with is only noted, since that is the desk's own, handed over at the start,
+    /// or one from long before that the office may since have been told otherwise about.
+    pub fn session_named(&mut self, id: &str, name: &str, by_user: bool) -> bool {
+        let Some(desk) = self.get_mut(id) else {
+            return false;
+        };
+        let name = harness::shorten(name, 60);
+        let renamed = desk.heard_name.as_ref().is_some_and(|before| *before != name);
+        desk.heard_name = Some(name.clone());
+        if !by_user || !renamed || name.is_empty() || desk.saved.title == name {
+            return false;
+        }
+        desk.saved.title = name;
+        desk.saved.title_locked = true;
         true
     }
 
@@ -383,7 +428,6 @@ impl Office {
         let Some(desk) = self.get_mut(id) else {
             return false;
         };
-        desk.agent_named = false;
         let title = harness::shorten(title, 60);
         if title.is_empty() {
             let auto = if desk.saved.auto_title.is_empty() { harness::shorten(fallback, 60) } else { desk.saved.auto_title.clone() };
@@ -411,11 +455,13 @@ impl Office {
         true
     }
 
+    /// A name the agent gave its own desk. It stands until the user gives another: being
+    /// no longer the name the desk was seated with, no topic replaces it.
     pub fn agent_title(&mut self, id: &str, title: &str) {
         if let Some(desk) = self.get_mut(id) {
-            if !desk.saved.title_locked {
-                desk.saved.title = harness::shorten(title, 60);
-                desk.agent_named = true;
+            let title = harness::shorten(title, 60);
+            if !desk.saved.title_locked && !title.is_empty() {
+                desk.saved.title = title;
             }
         }
     }
@@ -479,7 +525,7 @@ impl Desk {
             since_ms: now,
             activity: String::new(),
             reported_activity: String::new(),
-            agent_named: false,
+            heard_name: None,
             running: false,
             started_ms: 0,
             worked: false,
@@ -521,6 +567,14 @@ impl Desk {
         let note = if to == Phase::Done && self.activity.is_empty() { self.reported_activity.clone() } else { self.activity.clone() };
         Some(Transition { id: self.saved.id.clone(), title: self.saved.title.clone(), from, to, note })
     }
+}
+
+/// Whether a title is the name Claude Code makes up for a conversation nobody named:
+/// its folder, in small letters with dashes, and two more characters (`shop-b3`).
+fn made_up_name(title: &str, cwd: &str) -> bool {
+    let folder: String = crate::status::base_name(cwd).to_lowercase().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    let folder = folder.trim_matches('-');
+    !folder.is_empty() && title.strip_prefix(folder).and_then(|rest| rest.strip_prefix('-')).is_some_and(|tail| tail.len() == 2 && tail.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 }
 
 /// Words a title does not end on: "Fix the total when a" reads as cut off.
@@ -619,6 +673,98 @@ mod tests {
         office.agent_activity("a", "Typed the orders routes; 14 tests pass");
         let ended = office.observe("a", &Signal::Finished, false, 9_000).unwrap();
         assert_eq!((ended.to, ended.note.as_str()), (Phase::Done, "Typed the orders routes; 14 tests pass"));
+    }
+
+    #[test]
+    fn what_an_agent_said_it_was_doing_does_not_outlast_that_stretch_of_work() {
+        let mut office = office();
+        office.observe("a", &Signal::Working, false, 300);
+        office.agent_activity("a", "Reading checkout tests");
+        // Still its account of things once it is done, and at rest after that.
+        office.observe("a", &Signal::Finished, true, 5_000);
+        assert_eq!((phase(&office), office.views(&[])[0].activity.as_str()), (Phase::Idle, "Reading checkout tests"));
+        // The next thing it is asked to do is not that.
+        office.observe("a", &Signal::Working, false, 9_000);
+        assert_eq!(office.views(&[])[0].activity, "");
+        // Nor is it what the next notice that it is done says.
+        assert_eq!(office.observe("a", &Signal::Finished, false, 12_000).unwrap().note, "");
+        // Within one stretch, quiet and then at work again, it stays.
+        office.observe("a", &Signal::Working, false, 13_000);
+        office.agent_activity("a", "Running the tests");
+        office.observe("a", &Signal::Quiet, false, 14_000);
+        office.observe("a", &Signal::Working, false, 15_000);
+        assert_eq!(office.views(&[])[0].activity, "Running the tests");
+    }
+
+    #[test]
+    fn a_desk_with_the_name_it_was_seated_with_takes_the_topic_its_program_gives() {
+        let mut office = office();
+        // Still "Fix the total", the name the office made for it.
+        assert!(office.topic("a", "Checkout coupon rounding"));
+        assert_eq!(office.get("a").unwrap().saved.title, "Checkout coupon rounding");
+        // Named once, it keeps its name when the topic moves on.
+        assert!(!office.topic("a", "Something else entirely"));
+        // A name the agent gives its own desk replaces a topic, and no topic replaces that.
+        office.agent_title("a", "Coupon fix, with tests");
+        assert!(!office.topic("a", "Yet another topic"));
+        assert_eq!(office.get("a").unwrap().saved.title, "Coupon fix, with tests");
+        // It is kept when the office starts again, and still nothing replaces it.
+        let mut back = Office::restore(office.saved(), 500);
+        back.started("a", false, false, 600);
+        assert!(!back.topic("a", "Topic after the restart"));
+        assert!(!back.session_named("a", "shop-b3", false));
+        assert_eq!(back.get("a").unwrap().saved.title, "Coupon fix, with tests");
+        // The user's own name is never replaced, by a topic or by the agent.
+        assert!(back.rename("a", "Mine", ""));
+        back.agent_title("a", "The agent's idea");
+        assert!(!back.topic("a", "A topic"));
+        assert_eq!(back.get("a").unwrap().saved.title, "Mine");
+        // A desk from before names were kept has no name of the office's to replace.
+        back.add(SavedDesk { id: "old".into(), auto_title: String::new(), title: "Named long ago".into(), ..desk("old") }, 100);
+        assert!(!back.topic("old", "A topic"));
+        // An agent cannot leave its desk with no name.
+        back.rename("a", "", "");
+        back.agent_title("a", "  ");
+        assert_eq!(back.get("a").unwrap().saved.title, "Fix the total");
+    }
+
+    #[test]
+    fn the_name_claude_makes_up_is_nobodys_name_and_one_typed_there_is_the_users() {
+        let mut office = office();
+        // Made from the folder and two characters, by the program: not a name for the desk.
+        assert!(!office.session_named("a", "shop-b3", false));
+        assert!(!office.session_named("a", "shop-b3", false));
+        assert_eq!(office.get("a").unwrap().saved.title, "Fix the total");
+        // Typed there by the user while it runs: theirs, for the desk as well, and kept as theirs.
+        assert!(office.session_named("a", "Coupons", true));
+        let named = office.get("a").unwrap();
+        assert_eq!((named.saved.title.as_str(), named.saved.title_locked), ("Coupons", true));
+        assert!(!office.session_named("a", "Coupons", true));
+        // Emptied in the office, it goes back to its own name, and what the program still calls it is not taken again.
+        assert!(office.rename("a", "", ""));
+        assert!(!office.session_named("a", "Coupons", true));
+        assert_eq!(office.get("a").unwrap().saved.title, "Fix the total");
+        // The name a program starts with is only noted: the desk's own, handed over, or one from another day.
+        office.started("a", false, false, 2_000);
+        assert!(!office.session_named("a", "An old name from another day", true));
+        assert_eq!(office.get("a").unwrap().saved.title, "Fix the total");
+        assert!(office.session_named("a", "Renamed today", true));
+        assert_eq!(office.get("a").unwrap().saved.title, "Renamed today");
+    }
+
+    #[test]
+    fn a_desk_an_earlier_office_named_after_claudes_made_up_name_gets_its_own_back() {
+        let kept = |title: &str, auto: &str, cwd: &str, locked: bool| SavedDesk { title: title.into(), auto_title: auto.into(), cwd: cwd.into(), title_locked: locked, ..desk("a") };
+        let title = |saved: SavedDesk| Office::restore(vec![saved], 1).get("a").unwrap().saved.title.clone();
+        assert_eq!(title(kept("fixops-b3", "Claude in FixOps", "C:\\Users\\Someone\\FixOps", false)), "Claude in FixOps");
+        assert_eq!(title(kept("pack-the-impossible-c8", "Claude in pack-the-impossible", "/home/someone/pack-the-impossible/", false)), "Claude in pack-the-impossible");
+        assert_eq!(title(kept("my-app-0z", "Fix the login", "C:/code/My App", false)), "Fix the login");
+        // A name somebody gave, or one that only looks a little like it, is left alone.
+        assert_eq!(title(kept("fixops-b3", "Claude in FixOps", "C:/Users/Someone/FixOps", true)), "fixops-b3");
+        assert_eq!(title(kept("fixops-beta", "Claude in FixOps", "C:/Users/Someone/FixOps", false)), "fixops-beta");
+        assert_eq!(title(kept("FixOps-B3", "Claude in FixOps", "C:/Users/Someone/FixOps", false)), "FixOps-B3");
+        assert_eq!(title(kept("other-b3", "Claude in FixOps", "C:/Users/Someone/FixOps", false)), "other-b3");
+        assert_eq!(title(kept("Coupon fix", "Claude in FixOps", "C:/Users/Someone/FixOps", false)), "Coupon fix");
     }
 
     #[test]
@@ -847,10 +993,10 @@ mod tests {
         let mut office = office();
         assert!(office.set_session("a", "s-1"));
         assert!(!office.set_session("a", "s-1"));
-        assert!(office.suggest_title("a", "Checkout total, fixed"));
+        assert!(office.topic("a", "Checkout total, fixed"));
         assert!(office.rename("a", "Mine", ""));
         // Once the user has named it, the program's idea of a name is ignored.
-        assert!(!office.suggest_title("a", "Something else"));
+        assert!(!office.topic("a", "Something else"));
         let back = Office::restore(office.saved(), 500);
         let desk = back.get("a").unwrap();
         assert_eq!((desk.phase, desk.running, desk.saved.title.as_str(), desk.saved.session.as_deref()), (Phase::Asleep, false, "Mine", Some("s-1")));
@@ -866,7 +1012,7 @@ mod tests {
         assert!(office.rename("a", "  ", "Claude in shop"));
         assert_eq!((office.get("a").unwrap().saved.title.as_str(), office.get("a").unwrap().saved.title_locked), ("Fix the total", false));
         // The program may name it again.
-        assert!(office.suggest_title("a", "Checkout total, fixed"));
+        assert!(office.topic("a", "Checkout total, fixed"));
         assert!(office.rename("a", "", "Claude in shop"));
         assert_eq!(office.get("a").unwrap().saved.title, "Fix the total");
         // Already its own name, and not locked: nothing changes.

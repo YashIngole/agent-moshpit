@@ -310,7 +310,12 @@ fn wants_an_answer(notice: &str) -> bool {
 pub struct ClaudeSession {
     pub session_id: String,
     pub cwd: String,
+    /// What the conversation is called. Since Claude Code 2.1.196 it always has a name:
+    /// one somebody gave it, or one made from its folder and two more characters.
     pub name: String,
+    /// Where the name came from: `user` when it was given (`--name`, `/rename`), `derived`
+    /// when Claude Code made it up. Empty in versions that only ever kept a given name.
+    pub name_source: String,
     /// `busy`, `idle` or `waiting`, as of Claude Code 2.1.290.
     pub status: String,
     /// What it is waiting for: "dialog open", "input needed", and a few more.
@@ -362,13 +367,57 @@ pub fn codex_session(home: &Path, title: &str) -> Option<String> {
 }
 
 pub fn session_prefix(title: &str) -> Option<&str> {
-    let title = title.trim();
+    // The id is the first thing in the title; a thread's title may follow it after a bar,
+    // and while Codex works, a mark that turns stands after each.
+    let title = unmarked(title.split(" | ").next().unwrap_or(title));
     let prefix = title.strip_suffix("...").or_else(|| title.strip_suffix('…')).unwrap_or(title);
     (prefix.len() >= 24 && prefix.len() <= 36 && prefix.bytes().enumerate().all(|(i, b)| if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() })).then_some(prefix)
 }
 
 pub fn session_title_matches(title: &str, id: &str) -> bool {
     session_prefix(title).is_some_and(|prefix| id.starts_with(prefix))
+}
+
+// ── what a program calls what it is doing ──────────────────────────────────
+
+/// A title without the mark a program puts before or after it to show it is at work or
+/// at rest: `✳ Fix the total`, `◐ Fix the total`, `01a1304a-... ⠧`.
+fn unmarked(title: &str) -> &str {
+    let mark = |word: &str| word.chars().count() == 1 && !word.chars().all(|c| c.is_alphanumeric());
+    let mut title = title.trim();
+    if let Some((first, rest)) = title.split_once(' ') {
+        if mark(first) {
+            title = rest.trim_start();
+        }
+    }
+    if let Some((rest, last)) = title.rsplit_once(' ') {
+        if mark(last) {
+            title = rest.trim_end();
+        }
+    }
+    title
+}
+
+/// The topic a program has put in its terminal's title, if that is what is there.
+///
+/// Claude Code titles its terminal with a few words about the conversation once it has
+/// been given something to do (`✳ Claude Code`, then `◐ Fix the checkout total`). Codex
+/// does when asked for its thread's title, after its session id and a bar. A title that
+/// is the program's own name, a path, or an id is not a topic. `names` are what the
+/// program is called.
+pub fn topic(title: &str, names: &[&str]) -> Option<String> {
+    let last = unmarked(title.rsplit(" | ").next().unwrap_or(title));
+    let id = |text: &str| text.len() >= 8 && text.trim_end_matches(['.', '…']).chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+    // Its name, or its name after its maker's: "Codex", "OpenAI Codex".
+    let own = |text: &str| names.iter().any(|name| name.eq_ignore_ascii_case(text) || (text.split_whitespace().count() == 2 && text.to_lowercase().ends_with(&format!(" {}", name.to_lowercase()))));
+    // Where a program is, or the folder it is in, as a console or a shell titles a terminal.
+    let path = |text: &str| text.starts_with(['/', '~']) || text.as_bytes().get(1) == Some(&b':') || (!text.contains(' ') && text.contains(['\\', '/'])) || text.to_lowercase().ends_with(".exe");
+    if last.chars().count() < 2 || path(last) || id(last) || own(last) {
+        return None;
+    }
+    // Nothing a terminal could act on, and no longer than a desk's name is.
+    let plain: String = last.chars().filter(|c| !c.is_control()).collect();
+    Some(crate::harness::shorten(&plain, 60)).filter(|topic| topic.chars().any(char::is_alphanumeric))
 }
 
 fn session_in(root: &Path, title: &str) -> Option<String> {
@@ -684,6 +733,44 @@ mod tests {
         let read: ClaudeSession =
             serde_json::from_str(r#"{"pid":1992,"sessionId":"d647","cwd":"C:\\p","name":"Roadmap","status":"busy","kind":"interactive","updatedAt":1}"#).unwrap();
         assert_eq!((read.session_id.as_str(), read.name.as_str(), read.status.as_str()), ("d647", "Roadmap", "busy"));
+    }
+
+    #[test]
+    fn a_topic_is_read_from_a_terminal_title_and_nothing_else_is_taken_for_one() {
+        let claude = ["Claude Code", "Claude", "claude"];
+        // As Claude Code titles its terminal, at rest and at work (read from the real program).
+        assert_eq!(topic("✳ Fix the checkout total", &claude).as_deref(), Some("Fix the checkout total"));
+        assert_eq!(topic("◐ Fix the checkout total", &claude).as_deref(), Some("Fix the checkout total"));
+        assert_eq!(topic("◑ Ok", &claude).as_deref(), Some("Ok"));
+        assert_eq!(topic("✳ Fix the /api/orders route", &claude).as_deref(), Some("Fix the /api/orders route"));
+        for not_a_topic in ["✳ Claude Code", "◐ Claude Code", "claude", "C:\\Users\\Someone\\.local\\bin\\claude.exe", "C:\\Users\\Some One\\code", "/usr/local/bin/claude", "~/code/shop", "code/shop", "", "✳", "✳ ", "x"] {
+            assert_eq!(topic(not_a_topic, &claude), None, "{not_a_topic:?}");
+        }
+        // As Codex does, asked for its session's id and then its thread's title.
+        let codex = ["Codex", "Codex", "codex"];
+        assert_eq!(topic("01a1304a-63b5-7c03-9346-a1d17... | Reply with ok", &codex).as_deref(), Some("Reply with ok"));
+        for not_a_topic in ["01a1304a-63b5-7c03-9346-a1d17... ⠧ | 01a1304a-63b5-7c03-9346-a1d17209f731 ⠧", "01a1304a-63b5-7c03-9346-a1d17...", "01a1304a-63b5-7c03-9346-a1d17209f731", "codex", "OpenAI Codex"] {
+            assert_eq!(topic(not_a_topic, &codex), None, "{not_a_topic:?}");
+        }
+        // Cut to the length of a desk's name, with nothing a terminal could act on left in it.
+        let long = topic(&format!("✳ {}\u{7}", "word ".repeat(40)), &claude).unwrap();
+        assert!(long.chars().count() <= 60 && !long.contains('\u{7}'), "{long:?}");
+        // The session's id is still read from the start of such a title, mark or no mark.
+        assert_eq!(session_prefix("01a1304a-63b5-7c03-9346-a1d17... | Reply with ok"), Some("01a1304a-63b5-7c03-9346-a1d17"));
+        assert_eq!(session_prefix("01a1304a-63b5-7c03-9346-a1d17... ⠧ | 01a1304a-63b5-7c03-9346-a1d17209f731 ⠧"), Some("01a1304a-63b5-7c03-9346-a1d17"));
+        assert_eq!(session_prefix("01a1304a-63b5-7c03-9346-a1d17209f731"), Some("01a1304a-63b5-7c03-9346-a1d17209f731"));
+        assert!(session_title_matches("01a1304a-63b5-7c03-9346-a1d17... | Reply with ok", "01a1304a-63b5-7c03-9346-a1d17209f731"));
+        assert_eq!(session_prefix("✳ Fix the checkout total"), None);
+    }
+
+    #[test]
+    fn claude_says_where_a_conversations_name_came_from() {
+        let read = |text: &str| serde_json::from_str::<ClaudeSession>(text).unwrap();
+        let made_up = read(r#"{"pid":1,"sessionId":"s","cwd":"C:\\code\\shop","name":"shop-b3","nameSource":"derived","nameSince":1,"status":"idle"}"#);
+        assert_eq!((made_up.name.as_str(), made_up.name_source.as_str()), ("shop-b3", "derived"));
+        assert_eq!(read(r#"{"sessionId":"s","name":"Coupons","nameSource":"user"}"#).name_source, "user");
+        // A version that only ever kept a name somebody gave says nothing of where it came from.
+        assert_eq!(read(r#"{"sessionId":"s","name":"Coupons"}"#).name_source, "");
     }
 
     #[test]

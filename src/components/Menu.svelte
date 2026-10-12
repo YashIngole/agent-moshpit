@@ -11,12 +11,15 @@
   let asking = $state<MenuItem | undefined>(untrack(() => menu.asking))
   const renamed = $derived(menu.renaming ? office.agents.find(a => a.id === menu.renaming) : undefined)
   let name = $state('')
+  /** The name the box opened with. Only a name the user changed is theirs to save. */
+  let opened = ''
   /** Where it is drawn: where it was asked for, kept inside the window. */
   let left = $state(untrack(() => menu.x))
   let top = $state(untrack(() => menu.y))
 
   onMount(() => {
-    name = renamed?.title ?? ''
+    opened = renamed?.title ?? ''
+    name = opened
     void place()
   })
 
@@ -42,7 +45,9 @@
   }
 
   function save() {
-    if (menu.renaming && name.trim() !== renamed?.title) office.rename(menu.renaming, name)
+    // Against the name it opened with, not the desk's name now: an agent may have named
+    // its desk while the box was open, and Enter on an untouched box must not undo that.
+    if (menu.renaming && name.trim() !== opened) office.rename(menu.renaming, name)
     office.closeMenu()
   }
 
@@ -112,7 +117,8 @@
       </div>
     </div>
   {:else}
-    {#each menu.items as item (item.label)}
+    <!-- By place, not by label: two desks may have the same name, and both are listed. -->
+    {#each menu.items as item, at (at)}
       {#if item.divided}<hr />{/if}
       <button type="button" role="menuitem" class:danger={item.danger} aria-keyshortcuts={item.keys} onclick={() => choose(item)}>
         <span class="line">{item.label}{#if item.keys}<kbd>{item.keys}</kbd>{/if}</span>

@@ -5,10 +5,28 @@ pub const ENDPOINT: &str = "MOSHPIT_MCP_ENDPOINT";
 pub const TOKEN: &str = "MOSHPIT_MCP_TOKEN";
 pub fn supported(harness: &str) -> bool { matches!(harness, "claude" | "codex") }
 
+/// The office's own tools that only say something about the session's own desk, or
+/// read what it was sent: its name, what it is doing, its inbox, a task's result. A
+/// session uses these without the user being asked each time. A stopped desk raising
+/// its hand to ask "may I rename myself?" would be the office interrupting the user
+/// about the office. Starting another session, sending one a task and asking for
+/// attention are not among them: those stay the program's, and the user's, to allow.
+const OWN_DESK: [&str; 8] = ["get_context", "rename_session", "set_activity", "list_sessions", "check_inbox", "accept_task", "get_task", "report_result"];
+
 pub fn arguments(harness: &str, executable: &str, mut args: Vec<String>, prefix: usize) -> Vec<String> {
     let mut tail = args.split_off(prefix.min(args.len()));
     let mut extra = match harness {
-        "claude" => vec!["--mcp-config".into(), json!({"mcpServers":{"agent_moshpit":{"type":"stdio","command":executable,"args":["--mcp"],"env":{ENDPOINT:format!("${{{ENDPOINT}}}"),TOKEN:format!("${{{TOKEN}}}")}}}}).to_string()],
+        "claude" => {
+            let mut extra = vec!["--mcp-config".into(), json!({"mcpServers":{"agent_moshpit":{"type":"stdio","command":executable,"args":["--mcp"],"env":{ENDPOINT:format!("${{{ENDPOINT}}}"),TOKEN:format!("${{{TOKEN}}}")}}}}).to_string()];
+            let own = OWN_DESK.iter().map(|tool| format!("mcp__agent_moshpit__{tool}"));
+            // Beside the desk's own allowed tools where it has some: one list, not two that
+            // a program might read as the second replacing the first.
+            match args.iter().position(|word| word == "--allowedTools" || word == "--allowed-tools") {
+                Some(at) => { args.splice(at + 1..at + 1, own); }
+                None => { extra.push("--allowedTools".into()); extra.extend(own); }
+            }
+            extra
+        }
         "codex" => {
             let settings = [
                 format!("mcp_servers.agent_moshpit.command={}", json!(executable)),
@@ -35,7 +53,16 @@ mod tests {
         let config: serde_json::Value = serde_json::from_str(&claude[1]).unwrap();
         assert_eq!(config["mcpServers"]["agent_moshpit"]["command"], exe);
         assert_eq!(config["mcpServers"]["agent_moshpit"]["env"][TOKEN], "${MOSHPIT_MCP_TOKEN}");
-        assert_eq!(&claude[2..], ["--resume", "conversation"]);
+        // Its own desk's tools are allowed without asking; the conversation still comes last.
+        assert_eq!(claude[2], "--allowedTools");
+        assert_eq!(&claude[3..3 + OWN_DESK.len()], OWN_DESK.map(|tool| format!("mcp__agent_moshpit__{tool}")));
+        assert!(!claude.iter().any(|word| word.ends_with("start_session") || word.ends_with("send_task") || word.ends_with("request_attention")));
+        assert_eq!(&claude[claude.len() - 2..], ["--resume", "conversation"]);
+        // A desk with allowed tools of its own keeps them, in the one list.
+        let mine = arguments("claude", exe, vec!["--allowedTools".into(), "Read".into(), "--resume".into(), "conversation".into()], 2);
+        assert_eq!(mine.iter().filter(|word| *word == "--allowedTools").count(), 1);
+        assert_eq!((mine[0].as_str(), mine[1].as_str(), mine[1 + OWN_DESK.len()].as_str()), ("--allowedTools", "mcp__agent_moshpit__get_context", "Read"));
+        assert_eq!(&mine[mine.len() - 2..], ["--resume", "conversation"]);
         let codex = arguments("codex", exe, vec!["resume".into(), "conversation".into()], 0);
         assert!(codex[1].contains("C:\\\\Program Files"));
         assert_eq!(&codex[8..], ["resume", "conversation"]);

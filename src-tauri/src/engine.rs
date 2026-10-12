@@ -643,6 +643,10 @@ impl Handle {
     /// Take the desk away, ending its program. The conversation is the program's to keep.
     pub fn dismiss(&self, id: &str) {
         self.mcp_revoke(id);
+        // What it was asked to do by another session will not be reported now.
+        if let Some(hub) = self.inner.mcp.lock().unwrap().as_ref() {
+            hub.abandoned(id);
+        }
         self.inner.terms.remove(id);
         let mut state = self.inner.state.lock().unwrap();
         state.office.remove(id);
@@ -769,7 +773,8 @@ impl Handle {
                     if signal != Signal::Silent {
                         signal = status::claude_signal(&session).unwrap_or(signal);
                     }
-                    state.office.suggest_title(&id, &session.name);
+                    // The name it makes up for a conversation nobody named is not a name for the desk.
+                    state.office.session_named(&id, &session.name, session.name_source != "derived");
                     state.office.set_session(&id, &session.session_id);
                     if slow && !session.cwd.is_empty() {
                         cwd = session.cwd;
@@ -789,6 +794,13 @@ impl Handle {
             if slow {
                 let (project, repo, branch) = status::project(Path::new(&cwd));
                 state.office.set_place(&id, project, repo, branch);
+            }
+            // A desk still under the name it was seated with takes the topic its program
+            // has put in its terminal's title, once it has been given something to do.
+            if kind.topic == harness::TopicFrom::TerminalTitle {
+                if let Some(topic) = status::topic(&title, &[&kind.name, &kind.tag, &kind.program]) {
+                    state.office.topic(&id, &topic);
+                }
             }
             let watched = state.focused && state.watched.contains(&id);
             // Before the look: what it printed while it was still drawing its opening screen is not news.
@@ -1158,6 +1170,7 @@ mod tests {
             worktree: vec![],
             status: StatusFrom::Activity,
             trust: TrustFrom::None,
+            topic: harness::TopicFrom::None,
             package: String::new(),
             update: vec![],
             install: vec![],

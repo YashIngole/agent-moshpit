@@ -129,6 +129,25 @@ impl Hub {
     }
 
     pub fn revoke(&self, desk: &str) { self.state.lock().unwrap().grants.retain(|_, owner| owner != desk); }
+
+    /// A desk has been taken away. Whatever it had been asked to do and had not finished
+    /// is over: left open, each such task would count against the session that asked,
+    /// and against the office, for ever.
+    pub fn abandoned(&self, desk: &str) {
+        let mut state = self.state.lock().unwrap();
+        let mut journal = state.journal.clone();
+        let mut any = false;
+        for task in journal.tasks.iter_mut().filter(|task| task.to == desk && !task.status.finished()) {
+            task.status = TaskStatus::Failed;
+            task.summary = "The session was removed before it reported a result.".into();
+            task.updated_ms = now_ms();
+            any = true;
+        }
+        if any {
+            // If it cannot be saved, the tasks stay as they were on disk and in memory alike.
+            let _ = self.commit(&mut state, journal);
+        }
+    }
     pub fn shutdown(&self) {
         self.stopping.store(true, Ordering::Relaxed);
         self.state.lock().unwrap().grants.clear();
@@ -302,7 +321,8 @@ impl Hub {
                 for session in handle.snapshot().agents {
                     if self.visible(handle, caller, &session.id).is_ok() {
                         let parent = self.state.lock().unwrap().journal.tasks.iter().find(|t| t.to == session.id && t.spawned).map(|t| t.from.clone());
-                        sessions.push(json!({"session":session,"mcp_connected":self.connected(&session.id),"parent_session_id":parent}));
+                        let connected = self.connected(&session.id);
+                        sessions.push(json!({"session":session_for_agents(session, caller),"mcp_connected":connected,"parent_session_id":parent}));
                     }
                 }
                 Ok(json!({"sessions":sessions}))
@@ -381,6 +401,18 @@ impl Hub {
             _ => Err("Unknown Moshpit tool.".into()),
         }
     }
+}
+
+/// What one session is told about a session: everything about itself, and about
+/// another, everything but how it was launched. Another desk's extra instructions,
+/// folders, tool rules and arguments are that desk's own business.
+fn session_for_agents(view: AgentView, asking: &str) -> Value {
+    let own = view.id == asking;
+    let mut value = serde_json::to_value(view).expect("A desk's view contains only serializable data");
+    if !own {
+        value.as_object_mut().expect("A desk's view is an object").remove("launch");
+    }
+    value
 }
 
 /// What an agent is told about a program it could start a session of.

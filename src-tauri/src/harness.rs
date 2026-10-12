@@ -64,6 +64,17 @@ pub enum TrustFrom {
     None,
 }
 
+/// Where the office learns what a conversation is about, to name a desk nobody has named.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TopicFrom {
+    /// The few words the program puts in its terminal's title once it has something to do.
+    TerminalTitle,
+    /// It says nothing the office can read. The desk keeps the name it was seated with.
+    #[default]
+    None,
+}
+
 /// One row of the table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Harness {
@@ -103,6 +114,9 @@ pub struct Harness {
     /// Which visible startup trust dialog can be recognized.
     #[serde(default)]
     pub trust: TrustFrom,
+    /// Where the topic of a conversation can be read.
+    #[serde(default)]
+    pub topic: TopicFrom,
     /// Its package on npm, which installs it, updates it when it has no way of
     /// its own, and says which version is the latest. Empty when it is not there.
     #[serde(default)]
@@ -140,6 +154,7 @@ fn row(id: &str, name: &str, tag: &str, program: &str) -> Harness {
         worktree: Vec::new(),
         status: StatusFrom::Activity,
         trust: TrustFrom::None,
+        topic: TopicFrom::None,
         package: String::new(),
         update: Vec::new(),
         install: Vec::new(),
@@ -178,6 +193,7 @@ pub fn built_in() -> Vec<Harness> {
             worktree: words(&["--worktree"]),
             status: StatusFrom::ClaudeSessions,
             trust: TrustFrom::Claude,
+            topic: TopicFrom::TerminalTitle,
             package: "@anthropic-ai/claude-code".into(),
             update: words(&["update"]),
             login: words(&["auth", "login"]),
@@ -185,14 +201,16 @@ pub fn built_in() -> Vec<Harness> {
             ..row("claude", "Claude Code", "Claude", "claude")
         },
         Harness {
-            // Codex rings its terminal when it wants an answer or has finished, if asked to.
+            // Codex rings its terminal when it wants an answer or has finished, if asked to,
+            // and titles it with its session's id and then what the conversation is about.
             launch: crate::launch::Provider::Codex,
-            args: words(&["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]"]),
+            args: words(&["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\",\"thread-title\"]"]),
             task: TaskArg::Last,
             resume: words(&["resume", "{session}"]),
             session: SessionFrom::CodexRollouts,
             worktree: words(&["--worktree"]),
             trust: TrustFrom::Codex,
+            topic: TopicFrom::TerminalTitle,
             package: "@openai/codex".into(),
             update: words(&["update"]),
             login: words(&["login"]),
@@ -596,8 +614,10 @@ fn in_folder(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 /// How a found file is started. On Windows, npm installs a program as a small
-/// `.cmd` script that calls `node` with the real one. Starting `node` with that
-/// script directly keeps `cmd.exe`, and its reading of `&` and `%`, out of the way.
+/// `.cmd` script that calls the real one: `node` with a script, or, for a package
+/// that ships a program of its own (Claude Code does), that program. Starting the
+/// real one directly keeps `cmd.exe`, and its reading of `&` and `%`, out of the way,
+/// and makes the process the office started the program itself, not a shell around it.
 fn as_started(file: &Path) -> Found {
     let plain = Found { program: file.to_string_lossy().into_owned(), before: Vec::new(), through_shell: false };
     let is_script = file.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"));
@@ -607,6 +627,7 @@ fn as_started(file: &Path) -> Found {
     let dir = file.parent().unwrap_or(Path::new("."));
     let script = std::fs::read_to_string(file).ok().and_then(|text| npm_script(&text)).map(|rest| dir.join(rest));
     match script.filter(|s| s.is_file()) {
+        Some(program) if program.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe")) => Found { program: program.to_string_lossy().into_owned(), ..plain },
         Some(script) => {
             let beside = dir.join("node.exe");
             let node = if beside.is_file() { Some(beside) } else { real_node() };
@@ -627,15 +648,17 @@ fn real_node() -> Option<PathBuf> {
     folders().iter().map(|dir| dir.join(name)).find(|file| file.is_file())
 }
 
-/// The script an npm `.cmd` file runs, as a path from the folder the file is in.
+/// What an npm `.cmd` file runs, as a path from the folder the file is in: a script
+/// for `node`, or a program of the package's own.
 fn npm_script(text: &str) -> Option<String> {
     // The last line reads: "%_prog%"  "%dp0%\node_modules\pkg\bin\cli.js" %*
+    // or, with no `node` in it:    "%dp0%\node_modules\pkg\bin\tool.exe"   %*
     let marker = "\"%dp0%\\";
     let from = text.rfind(marker)? + marker.len();
     let rest = &text[from..];
     let to = rest.find('"')?;
     let path = &rest[..to];
-    (path.ends_with(".js") || path.ends_with(".mjs") || path.ends_with(".cjs")).then(|| path.replace('\\', "/"))
+    [".js", ".mjs", ".cjs", ".exe"].iter().any(|kind| path.to_lowercase().ends_with(kind)).then(|| path.replace('\\', "/"))
 }
 
 /// Whether a word can be handed to `cmd.exe` without it meaning more than it says.
@@ -838,7 +861,7 @@ mod tests {
 
     #[test]
     fn each_program_takes_its_task_its_own_way() {
-        assert_eq!(start_args(&known("codex"), None, "Ignored", "Type the API", false), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]", "Type the API"]);
+        assert_eq!(start_args(&known("codex"), None, "Ignored", "Type the API", false), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\",\"thread-title\"]", "Type the API"]);
         assert_eq!(start_args(&known("antigravity"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         assert_eq!(start_args(&known("gemini"), None, "", "Write docs", false), ["--prompt-interactive", "Write docs"]);
         // A program known only by name is never handed words it may not understand.
@@ -849,7 +872,7 @@ mod tests {
     fn carrying_on_needs_whatever_the_program_needs() {
         assert_eq!(resume_args(&known("claude"), Some("abc")).unwrap(), ["--resume", "abc"]);
         assert_eq!(resume_args(&known("claude"), None), None);
-        assert_eq!(resume_args(&known("codex"), Some("abc")).unwrap(), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\"]", "resume", "abc"]);
+        assert_eq!(resume_args(&known("codex"), Some("abc")).unwrap(), ["-c", "tui.notifications=true", "-c", "tui.terminal_title=[\"session-id\",\"thread-title\"]", "resume", "abc"]);
         // Hermes carries on its latest conversation without being told which.
         assert_eq!(resume_args(&known("hermes"), None).unwrap(), ["--continue"]);
         // So does Antigravity CLI, which keeps its conversations by folder.
@@ -868,6 +891,26 @@ mod tests {
         let codex = "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\r\nIF EXIST \"%dp0%\\node.exe\" (\r\n  SET \"_prog=%dp0%\\node.exe\"\r\n) ELSE (\r\n  SET \"_prog=node\"\r\n)\r\n\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js\" %*\r\n";
         assert_eq!(npm_script(codex).unwrap(), "node_modules/@openai/codex/bin/codex.js");
         assert_eq!(npm_script("@echo off\r\npython \"%~dp0\\tool.py\" %*\r\n"), None);
+        // A package that ships a program of its own, as Claude Code's does: no `node` in it.
+        let claude = "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe\"   %*\r\n";
+        assert_eq!(npm_script(claude).unwrap(), "node_modules/@anthropic-ai/claude-code/bin/claude.exe");
+    }
+
+    #[test]
+    fn a_script_npm_wrote_over_a_program_of_its_own_is_started_as_that_program() {
+        let dir = std::env::temp_dir().join(format!("moshpit-shim-exe-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("pkg")).unwrap();
+        std::fs::write(dir.join("pkg").join("tool.exe"), "not really a program").unwrap();
+        let shim = dir.join(if cfg!(windows) { "tool.cmd" } else { "tool" });
+        std::fs::write(&shim, "@ECHO off\r\n\"%dp0%\\pkg\\tool.exe\"   %*\r\n").unwrap();
+        let found = find(&shim.to_string_lossy());
+        let _ = std::fs::remove_dir_all(&dir);
+        if cfg!(windows) {
+            // Itself: no shell around it to misread a task, and its own process to be asked about.
+            let found = found.unwrap();
+            assert_eq!((found.program.replace('/', "\\").to_lowercase(), found.before.len(), found.through_shell), (dir.join("pkg").join("tool.exe").to_string_lossy().to_lowercase(), 0, false));
+            assert_eq!(command_line(&found, &["fix it & calc".into()]).unwrap().1, ["fix it & calc"]);
+        }
     }
 
     #[test]

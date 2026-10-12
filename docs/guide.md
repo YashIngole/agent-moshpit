@@ -28,15 +28,17 @@ Press **+ new agent** (`n` on the floor, `Ctrl+Shift+N` anywhere, or **New agent
 
 The form asks who, what and where, in that order. The folder is filled in with the one you most likely mean: the terminal you are in, else where you last started an agent, else the room with the most people. Everything with a good default is folded into one **More options** line that says what it is set to.
 
-- **Who should take it?** The programs found on this computer. Ones the office can install sit behind **+N to install**. Choosing one shows the exact command, and the button becomes **Install … and start**: the install runs in a pane where you can watch it, and the agent then starts in that pane.
-- **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Antigravity CLI, Gemini CLI). Leave it empty and say it in their terminal. Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
+- **Who should take it?** The programs found on this computer. Ones the office can install sit behind **+N to install**. Choosing one shows the exact command, and the button becomes **Install … and start**: the install runs in a pane where you can watch it, and the agent then starts in that pane. A program nobody is signed in to says so here; it asks you to sign in when it starts.
+- **What should they do?** Optional, and offered only for programs that take a task as they start (Claude Code, Codex, Antigravity CLI, Gemini CLI). Leave it empty and say it in their terminal, or press the microphone beside it and say it here (see [Voice input](#voice-input)). Hermes, and the programs the office knows only by name, start in the folder and wait for you there.
 - **Folder.** Filled in for you; type another, browse for it, or pick one used before.
 - **Work on a separate copy**, where the program can (Claude Code, Codex, Hermes). The program is asked to make a git worktree of its own (`--worktree`), so several agents can change one project without colliding.
 - **More options:**
-  - **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2".
+  - **Name.** Optional. Left empty it is the start of the task, or the program and folder: "Claude in web", then "Claude in web 2". A desk still called by its program and folder takes a better name after your first prompt: what Claude Code or Codex calls the conversation, once, and it keeps it. A name you give, here, with **Rename** or with `/rename` in the program, is yours and is not replaced.
   - **Model and Effort**, for Claude Code and Codex. The model picker reads your installed CLI's catalog, including each model's supported effort levels. It checks again when the form opens after the 15-minute cache expires, and every 15 minutes while the form stays visible. **Refresh** checks immediately. Newly available models and effort levels need no app update; availability follows your CLI and account. **Custom model…** accepts a model ID or alias, even when discovery fails. **Use CLI settings** passes no override.
   - **Permissions.** Claude offers Manual, Auto, Accept edits, Plan, Don't ask and Bypass permissions when the installed version supports them. Codex offers workspace and read-only sandboxes, automatic approval review, YOLO and custom sandbox/approval settings. Each choice explains its behavior; the choices are not interchangeable between programs.
   - **Advanced launch settings.** Additional folders; Codex profiles and live search; or Claude tool allow/deny rules, Chrome integration and extra instructions. Options appear when the installed CLI exposes them. **Reset to CLI settings** clears this program's overrides.
+    - **Plugins**, for Claude Code: a tick box for each plugin Claude Code already has installed, on or off for this desk only. Your Claude Code settings stay as they are. Installing a plugin is still done in Claude Code.
+    - **Extra arguments**, for Claude Code and Codex: anything the program takes that has no setting here, typed as on a command line. Quotes keep a value with spaces together; nothing is run through a shell. They are passed each time the desk starts or carries on. The ones that say which conversation a desk is (`--resume`, `--continue`, `--session-id`, `--print` and their short forms) are refused, with the reason: the office sets those itself.
 
 `Ctrl+Enter` starts the agent from anywhere in the form. Closing the form keeps what you typed in it. Each program keeps its own launch draft when you switch between them. Explicit launch settings are saved with the desk and reused on restart, Carry on and **Start another like this**. They describe how the desk starts; the CLI can change settings later in its terminal.
 
@@ -70,9 +72,13 @@ A status is always a word and a pose as well as a colour. Four colours carry mea
 Click a desk and their terminal opens to the right of the floor, with the keyboard in it. A click on another desk shows that one in the same pane, except that a pane whose agent needs you or is in trouble is never the one put away, and on a screen wide enough for both the new one opens beside it. Hold `Ctrl` as you click, or press `Ctrl+Enter` on a desk, to open it beside the others instead: two sit side by side, more make a grid, as many as you like. Do the same on a desk that is already open and its pane is put away again, with its program still running.
 
 - **Each pane is headed by its agent**: face, name, status, what the agent says it is doing (else project and branch), and program.
-- **The grid stays as you made it.** A new pane goes beside its neighbour, and a closed one gives its room to a neighbour; nothing else moves. Drag any edge between two panes, or double-click one to make them all even. Drag a pane by its header onto another to swap the two.
+- **The room stays as you made it.** A new pane goes beside its neighbour, and a closed one gives its room to a neighbour; nothing else moves. Drag any edge between two panes, or double-click one to make them all even. No pane is dragged narrower or shorter than it can be read at, however the panes are nested.
+- **Put a pane where you want it.** Drag it by its header over another pane. Dropped on a side of that pane, it goes on that side of it, so two can be stacked or one can run the height of two; dropped in the middle or on the header, the two change places; dropped at an edge of the room, it takes that whole side. A blue outline shows where it will land before you let go, and `Esc` leaves everything where it was. Nothing moves, and no program redraws, until the drop.
+- **Arrange them all at once.** With two or more terminals open, **arrange** in the bar lays them out **In a grid**, **Side by side**, **Stacked**, or with **This one large** and the others beside it or below it; "this one" is the pane the keyboard is in. The notice that follows has **Undo**. The same menu makes them even and moves this terminal a step. In a narrow window these are in the **⋯** menu.
+- **By keyboard.** `Ctrl+Shift` and an arrow moves the keyboard to the pane on that side. With `Alt` as well, the pane itself moves that way: it changes places with its neighbour, or with none there takes that whole side of the room. In a text field outside the terminals, `Ctrl+Shift` and an arrow still selects by the word.
 - **Give one pane the room** with `Ctrl+Shift+Enter`, the button in its header, or a double-click on the header. A **+N** chip lists the ones waiting behind it and puts them back.
 - **Put a pane away** with its × or `Ctrl+Shift+W`. The program keeps running at its desk.
+- **A program that is signed out says so.** When a program ends because nobody is signed in to it (after `/logout` in Claude Code, say), its pane says "Claude Code is signed out." with a **Sign in** button, which starts it there to ask you. See **Agent programs** under [The ⋯ menu](#the--menu) for who is signed in and for switching account.
 - **Hide the terminals, and bring them back,** with `Ctrl` + `` ` `` or the button in the bar. The same panes return. Pick a desk while you are on the floor and they return with that desk among them. `Esc` is not used for this, because the programs use it themselves.
 - **The floor beside the terminals** keeps the width you drag it to. Two or more panes, more than ten agents, or a laptop-sized window start with the strip, until you choose a width yourself. Below 300 pixels it becomes a strip: a list of names, each with its status and program, with whoever needs you, is in trouble or is done gathered on top under **waiting**. Double-click that edge, or choose **Compact floor** in the menu, to switch between the strip and the usual width.
 - In a window narrower than 760 pixels the terminals take the whole window and the floor waits behind them.
@@ -145,6 +151,26 @@ A green tick means they finished something you have not seen. Bring their termin
 
 The office tells you when an agent needs you, is done, or hit a problem, unless you are looking at that agent's selected terminal. Panes behind a form, a menu or another zoomed pane are not treated as read. On Windows a click on the notification opens the office with that desk's terminal beside the others, and starts the office first if it had quit; a newer notification about a desk takes the place of the older one.
 
+## Agents working together
+
+Claude Code and Codex agents started from the office can work with each other, in the same project. You ask one of them in your own words, and it uses the office to do it:
+
+- "Start another session in this folder to review your changes, and bring back what it finds." The agent starts a second desk with that task and reads its result. A session an agent starts is always its own program, with its own launch settings and permissions: Claude Code starts Claude Code, Codex starts Codex.
+- "Send these findings to the agent called Fix checkout." A message goes to that agent's inbox.
+- "Check your inbox and tell me what the others said."
+
+Nothing is ever typed into anybody's terminal, and nothing answers a permission question for you. A message is another agent's words, not yours: each one tells the agent reading it so, and that it grants no permission. Starting a session and sending a task or a message are still the program's, and yours, to allow.
+
+**⋯ → Agent messages** shows what was sent and how far each thing got, in four steps that each claim only what the office knows: **saved**, **told** (and by which way), **read in full**, and **acknowledged**, which is the agent saying it arrived. Acknowledged is a receipt. It is not the agent agreeing to do anything.
+
+The same panel chooses how Claude Code is told of something new. It applies to sessions started or carried on afterwards; a running one keeps what it was started with.
+
+- **At the next step of its work**, on by default. After a tool call, with your next prompt, and once more as a turn ends, where it keeps the turn going until the message is read.
+- **Wake it when it is idle**, on by default. An agent sitting at its prompt starts a turn when something comes for it. That turn uses your tokens, and nobody at the keyboard asked for it; turn this off if you would rather it waited for you.
+- **Push it in as it arrives**, off by default. This uses Claude Code's Channels, a research preview that may change. Claude Code asks you to confirm in its terminal each time such a session starts. A pushed message is read, but Claude Code may not acknowledge it unless the first choice is on as well.
+
+Codex has none of these: a Codex agent finds what is new with its next call to the office, or when it checks its inbox. An agent that is not running is told when it is carried on. [How it works, and its limits](internal-mcp.md).
+
 ## A desk's menu: rename, restart, stop, remove
 
 Right-click a desk on the floor, in the strip or on a pane's header, press `Shift+F10` on it, or use the ⋯ on its pane.
@@ -176,8 +202,9 @@ What does not come back is a terminal's scrollback beyond that last screen.
 
 ## The ⋯ menu
 
-- **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. A program you install while the office is open, yourself or with a button here, is found without restarting it: the office looks again when you open this panel or **New agent**, and when you come back to its window. That includes Node.js. Most of these programs are installed with npm, which comes with Node.js; on a computer without it, the panel and **New agent** say so before you press anything, with a **get Node.js** button, and install as usual once it is there. This panel also chooses the editor that file paths open in.
+- **Agent programs.** Every program the office knows, with its version, whether a newer one is out, and a button to install or update it. The command that will run is written beside the button, and it runs in a pane. Under a program that can say, the panel shows who is signed in to it, in the program's own words, with a button to **sign in** or **switch account**: the program's own command, written beside the button, runs in a pane and opens your browser. One account at a time for each program; desks running now keep their sign-in until they are restarted. A program you install while the office is open, yourself or with a button here, is found without restarting it: the office looks again when you open this panel or **New agent**, and when you come back to its window. That includes Node.js. Most of these programs are installed with npm, which comes with Node.js; on a computer without it, the panel and **New agent** say so before you press anything, with a **get Node.js** button, and install as usual once it is there. This panel also chooses the editor that file paths open in.
 - **Voice input.** Enable voice, choose where speech becomes words (this computer, or a cloud provider with your own key), download or remove the model, add, test or remove keys, word hints, the microphone and the shortcut.
+- **Agent messages.** What agents have sent each other, how far each thing got, and how Claude Code is told of something new. See [Agents working together](#agents-working-together).
 - **Configuration warning**, while a startup warning is unresolved. Opens the warning again after it has been dismissed, with its file action. Moving between desks never clears it.
 - **Compact floor**, while terminals are open.
 - **Make the terminals even**, when more than one is open.
@@ -203,6 +230,8 @@ What does not come back is a terminal's scrollback beyond that last screen.
 | `Ctrl+Shift+Space` | Voice, when enabled: hold to talk, or tap to start and tap to finish (configurable in Voice input). Into the terminal in front, or the task in New agent |
 | `Alt+1` … `Alt+9` | The keyboard to pane 1 to 9 |
 | `Ctrl+Shift+]` / `Ctrl+Shift+[` | The keyboard to the next pane, or the one before |
+| `Ctrl+Shift` and an arrow | The keyboard to the pane on that side |
+| `Ctrl+Shift+Alt` and an arrow | Move this pane that way: it changes places with its neighbour, or takes that whole side of the room |
 | `Ctrl+Shift+Enter` | Give this pane the room, and put the others back |
 | `Ctrl+Shift+W` | Put this pane away; its program keeps running |
 | `Ctrl+Shift+F` | Find in what this terminal has shown |

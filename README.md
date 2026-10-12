@@ -15,6 +15,7 @@ Run multiple Claude Code, Codex and other coding agents side by side in one desk
 - **Real terminals.** Each agent is the `claude`, `codex` or `agy` you already have, with your own sign-in and settings. The app draws none of the conversation and keeps no API key.
 - **Who needs you.** When an agent stops on a question, a hand goes up at its desk, an amber band names it, the tray icon changes and you get a notification.
 - **Side by side.** Open terminals in a grid beside the floor. Resize, rearrange and zoom them. [Every shortcut](docs/guide.md#keys) is listed in the app.
+- **Agents work together.** Ask a Claude Code or Codex agent to start another session for a review, or to send its findings to the agent at another desk. Messages go through the office, never into a terminal, and **⋯ → Agent messages** shows whether each one was read and acknowledged. [How](docs/guide.md#agents-working-together).
 - **Stays out of the way.** Close the window and the agents keep working from the tray. After a restart every desk is back with its last screen, and Claude Code, Codex, Antigravity CLI and Hermes carry on their conversations.
 - **Fourteen CLIs, and yours.** Claude Code, Codex, Antigravity CLI, Hermes, Gemini CLI, OpenCode, Copilot CLI, Amp, Qwen Code, Crush, Cursor CLI, Aider, Goose and Droid. Add another with [a few lines of JSON](docs/programs.md#adding-a-program-of-your-own).
 - **Updates when you say.** When a newer version is out, the ⋯ menu offers it. One click fetches it, checks it against the app's own key and starts the office again.
@@ -70,7 +71,7 @@ Voice is off by default. On this computer, the only request is the model downloa
 
 - [Guide](docs/guide.md): using the app, settings, and where its files are kept
 - [Programs](docs/programs.md): the CLIs it knows, and adding your own in `harnesses.json`
-- [Internal MCP](docs/internal-mcp.md): automatic desk naming, activity reports, delegated sessions and task results
+- [Internal MCP](docs/internal-mcp.md): automatic desk naming, activity reports, delegated sessions, task results, and messages between agents with their receipts
 - [Development](docs/development.md): building from source, how the code is laid out, tests
 - [Known limits](docs/limits.md)
 - [Code signing policy](docs/code-signing-policy.md), with what the app sends

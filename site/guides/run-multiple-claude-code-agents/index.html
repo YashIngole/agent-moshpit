@@ -38,7 +38,7 @@
             "url": "https://agentmoshpit.com/guides/run-multiple-claude-code-agents/",
             "mainEntityOfPage": "https://agentmoshpit.com/guides/run-multiple-claude-code-agents/",
             "datePublished": "2026-10-09",
-            "dateModified": "2026-10-12",
+            "dateModified": "2026-10-13",
             "inLanguage": "en",
             "image": ["https://agentmoshpit.com/img/guide-new-agent.webp", "https://agentmoshpit.com/img/terminals.webp"],
             "author": { "@type": "Organization", "name": "Agent Moshpit", "url": "https://agentmoshpit.com/" },
@@ -73,7 +73,7 @@
               {
                 "@type": "Question",
                 "name": "Can two Claude Code sessions talk to each other?",
-                "acceptedAnswer": { "@type": "Answer", "text": "Not by themselves. Anthropic documents agent teams, an experimental feature that is off by default, for sessions that share tasks and message each other. Agent Moshpit does not connect agents to each other; it shows them to you." }
+                "acceptedAnswer": { "@type": "Answer", "text": "Not by themselves. Anthropic documents agent teams, an experimental feature that is off by default, for sessions that share tasks and message each other. In Agent Moshpit, sessions started from the app in one project can: ask one to start another, or to send another a message or a task, and the app shows whether it was read and acknowledged." }
               },
               {
                 "@type": "Question",
@@ -273,7 +273,7 @@ set -as terminal-features 'xterm*:extkeys'</code></pre>
             <dt>Will parallel Claude Code sessions overwrite each other's changes?</dt>
             <dd>In the same checkout they can. Start each one in a git worktree of its own with <code>claude --worktree</code> and a name, or tick <b>Work on a separate copy</b> in Agent Moshpit.</dd>
             <dt>Can two Claude Code sessions talk to each other?</dt>
-            <dd>Not by themselves. Anthropic documents <a href="https://code.claude.com/docs/en/agent-teams">agent teams</a>, an experimental feature that is off by default, for sessions that share tasks and message each other. Agent Moshpit does not connect agents to each other; it shows them to you.</dd>
+            <dd>Not by themselves. Anthropic documents <a href="https://code.claude.com/docs/en/agent-teams">agent teams</a>, an experimental feature that is off by default, for sessions that share tasks and message each other. In Agent Moshpit, sessions started from the app in one project can: ask one to start another, or to send another a message or a task, and the app shows whether it was read and acknowledged.</dd>
             <dt>Can I run multiple Claude Code agents on Windows?</dt>
             <dd>Yes. Claude Code runs natively on Windows, and so does Agent Moshpit, which is used there every day. tmux is the exception: on Windows it needs WSL. <a href="/guides/coding-agents-on-windows/">More on Windows</a>.</dd>
           </dl>

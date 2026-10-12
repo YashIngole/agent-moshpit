@@ -39,7 +39,7 @@ Neighbours, as looked at in the two reviews of 2026-10-08 and 2026-10-09 (source
 
 - The user's own installed CLIs, with their own sign-ins, settings and models. The office knows fourteen by name and five in detail: Claude Code, Codex, Antigravity CLI, Hermes and Gemini CLI. Four were read from each program's `--help` on 2026-10-08 (Claude Code 2.1.290, Codex 0.160.0, Gemini CLI 0.2.1, Hermes 0.21.2); Antigravity CLI, which replaced Gemini CLI for personal Google accounts, was read from Google's documentation on 2026-10-09 and has not been run. A user can add a program, or replace a row, in `harnesses.json`.
 - What the office shows but does not own: the conversation, approvals, slash commands, models, accounts, worktrees and history. All of that is the program's and is seen through its terminal. New agent also offers optional model, effort and permission launch overrides for Claude and Codex, requested by the owner on 2026-10-09. Models and effort levels come from the installed CLI's catalog, so new releases need no app update.
-- What the office does own: the desks (which program, its name, its folder, the id of its conversation when known, and explicit launch overrides), how the panes are laid out, the reading of each agent's status, and getting the user's attention (the band, the tray, notifications, the window's title).
+- What the office does own: the desks (which program, its name, its folder, the id of its conversation when known, and explicit launch overrides), how the panes are laid out, the reading of each agent's status, getting the user's attention (the band, the tray, notifications, the window's title), and what agents started from it send each other: the tasks and messages, and what is known of whether each arrived.
 - The desktop: a tray icon, system notifications, and a window that may be small and kept at the side of the screen, or closed entirely.
 - Windows first.
 - Typical load: 2 to 8 agents at once. The design must stay usable to about 20; the demo's `crowd` scene has 20 for checking this.
@@ -85,6 +85,8 @@ Decided while building the CLI office (2026-10-08 and 09), also the builder's de
 
 Voice engines (decided 2026-10-12): the owner found Whisper's recognition "damn bad" and its streaming not seamless, and chose English only, NVIDIA's Parakeet family (or similar) on the computer, and bring-your-own-key cloud with all four of Deepgram, OpenAI, AssemblyAI and ElevenLabs. Whisper and the language setting went. Keys live in the system keychain, never in the window or a file. Cloud is never chosen for the user and never a fallback. [Decision record](docs/research/voice-engines-2026-10.md).
 
+Version 0.8.0 (decided 2026-10-12 and 13). The owner chose: one account at a time for each program, shown and switched in the Programs panel, with no per-desk accounts; arranging terminals by dragging, an Arrange menu and keys; plugins as tick boxes for one desk, and one field for any other arguments; counting installer downloads with Cloudflare; an OpenRouter key for voice; and, for agents messaging each other, receipts, a hook fallback and Claude Code's Channels in the same release, with the preview kept opt-in and a working fallback. The builder's defaults within that, which can be changed: the hooks on, waking an idle session on (a woken turn uses the user's tokens, and the panel says so), pushes off. The office still types nothing into a terminal and answers no question for the user; what one agent sends another is that agent's words, and says so.
+
 No longer true: connecting models from inside the app (asked for by the owner on 2026-10-06 and built for the Hermes client) went with that client. Each program is signed in and set up its own way.
 
 Open decisions:
@@ -106,7 +108,7 @@ As built, the office is drawn after hours: dark graphite rooms, people at desks 
 - `spikes/cli-office/pty-proof/`: the proof program and its result from 2026-10-08.
 - `docs/plan-cli-office.md` and `docs/mockups/`: the plan for the CLI office and the mockups drawn for it before it was built. They are not pictures of the built app, and the plan differs from what was built in places.
 - `docs/reviews/ux-sweep-2026-10-08.md` and `docs/reviews/ux-sweep-2026-10-09.md`, with their screenshots: two walks through the built app, flow by flow, each ending with what was changed and what was not checked.
-- `docs/office.png`, `docs/terminals.png`, `docs/strip.png` and `docs/new-agent.png`: the built window showing its demo data, taken on 2026-10-09 for the README and taken again on 2026-10-12 for 0.6.0.
+- `docs/office.png`, `docs/terminals.png`, `docs/strip.png` and `docs/new-agent.png`: the built window showing its demo data, taken on 2026-10-09 for the README, and taken again on 2026-10-12 for 0.6.0 and on 2026-10-13 for 0.8.0.
 - `docs/first-real-terminals.png`: the first real Claude Code and Codex in panes, in an earlier, light look.
 - `DESIGN.md`: the look as built, rewritten on 2026-10-09 from `src/styles/tokens.css` and the components. `.impeccable/design.json` is made from it by `tools/make-design-json.mjs`.
 - From the first version, kept for the record and no longer describing the app: `docs/reviews/codebase-review-2026-10-06.md`, and the pictures `docs/office-day.png`, `docs/office-night.png`, `docs/room.png` and `docs/models.png`.

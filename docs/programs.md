@@ -28,6 +28,10 @@ Model names are not maintained in an app release. Codex discovery reads `codex d
 
 Catalogs are cached for 15 minutes, scoped by program, executable/script version, folder and Codex profile. Refresh bypasses the cache. Concurrent requests are coalesced, the cache holds at most 32 contexts, output is bounded, and probe processes have a timeout and descendant cleanup. A failed refresh retains the last usable catalog; custom IDs and inherited settings remain usable. An older CLI without the discovery command can be updated or used with a custom ID.
 
+For Claude Code the catalog also lists the plugins it has installed (`claude plugin list --json`, read in the desk's folder), so the form can offer each as a tick box. A desk's choices go to Claude Code as `--settings {"enabledPlugins": {...}}`, the key its own settings file uses, and only the ones that differ from its own state are sent. **Extra arguments** are passed as the words they were typed as, after the office's own launch settings and before its conversation and notification arguments; the arguments that choose or name a conversation are refused.
+
+Who is signed in is asked of the program itself and shown to you. It is not handed to agents: what an agent is told about the programs through the office's MCP tools leaves it out. Codex is started with its terminal title set to its session's id and its thread's title, which is how a Codex desk learns both.
+
 Explicit launch overrides are stored in `desks.json` and are passed again when the desk carries on. Old desks without overrides continue to inherit the CLI's settings. The app keeps its session-identification and notification arguments, and passes overrides as individual arguments rather than constructing a shell command.
 
 ## Adding a program of your own
@@ -66,6 +70,9 @@ Put a file called `harnesses.json` in the data folder (see [Where things are kep
 | `package` | | Its package on npm, which installs it, updates it when it has no way of its own, and says which version is the newest. |
 | `update` | | Words that make the program update itself. |
 | `install` | | A command that installs it, program first, for something npm does not install. |
+| `topic` | | Where the office learns what a conversation is about, to name a desk nobody has named: `"terminal_title"` (the few words the program puts in its terminal's title once it has something to do) or `"none"` (the default: the desk keeps the name it was seated with). |
+| `login` | | Words that make the program sign someone in, as in `["auth", "login"]`. With these, **Agent programs** offers **sign in** and **switch account**, and runs them in a pane. Empty: signing in is done in its own terminal. |
+| `account` | | Words that make it say who is signed in, asking nothing, as in `["auth", "status", "--json"]`. The office runs them when it starts, when **Agent programs** opens, and after a sign-in, and shows the answer there. Empty: it cannot say, and nothing is shown. |
 
 A file that cannot be read, or a row that cannot be used, is reported in a strip at the top of the window when the office starts, with a button that opens the file, at the line when the mistake has one. In JSON a `\` in a Windows path is written `\\`.
 

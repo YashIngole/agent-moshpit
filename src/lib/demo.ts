@@ -244,7 +244,8 @@ export function demoBridge(): Bridge {
   const failVoice = (message: string) => {
     clearTimeout(recordingLimit)
     clearInterval(hearing)
-    voiceChange({ phase: 'error', agent: null, started_ms: null, busy: false, partial: '', detail: '', level: 0, transcribing_ms: null, message })
+    // What went wrong is still about the desk it was for, as the core keeps it.
+    voiceChange({ phase: 'error', started_ms: null, busy: false, partial: '', detail: '', level: 0, transcribing_ms: null, message })
     endField()
   }
   const finishVoice = () => {
@@ -255,7 +256,7 @@ export function demoBridge(): Bridge {
     const target = voice.field ? null : voice.agent!
     voiceChange({ phase: 'transcribing', level: 0, transcribing_ms: Date.now() })
     setTimeout(() => {
-      if (epoch !== voiceEpoch || (target !== null && (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size))) return
+      if (epoch !== voiceEpoch || (target !== null && !agents.some(a => a.id === target && a.running))) return
       if (['silence', 'short', 'inference-error'].includes(voiceScene) && !settled) {
         failVoice(voiceScene === 'silence' ? 'No clear speech was heard. Check the microphone and try again.' : voiceScene === 'short' ? 'That recording was too short. Speak for at least half a second, then stop.' : 'The local speech engine stopped unexpectedly. Words already typed stay. Try again.')
         return
@@ -273,14 +274,15 @@ export function demoBridge(): Bridge {
     const engine = voiceSettings.engine
     if (engine === 'local' && voice.unsupported) throw `${voice.unsupported} Choose a cloud provider in Voice input instead.`
     if (engine !== 'local' && !voice.providers.some(p => p.id === engine && p.configured)) throw `Add your ${providerName(engine)} key in Voice input first.`
-    if (target !== null && (!agents.some(a => a.id === target && a.running) || !followers.get(target)?.size)) throw 'Select a visible terminal whose program is running before recording.'
+    // As in the core: a recording starts only into a terminal in front, and then stays with its program.
+    if (target !== null && (!agents.some(a => a.id === target && a.running) || !seen.visible.includes(target))) throw 'Select a visible terminal whose program is running before recording.'
     if (voice.busy) throw 'The previous recording is finishing. Try again in a moment.'
     if (engine === 'local' && !voice.models.some(m => m.id === voiceSettings.local_model && m.ready)) throw 'Download the local speech model in Voice input first, then try again.'
     cancelVoice()
     if (voiceSettings.microphone && !['Built-in microphone', 'USB microphone'].includes(voiceSettings.microphone)) {
-      voiceChange({ phase: 'error', field: target === null, message: 'The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.' }); return
+      voiceChange({ phase: 'error', agent: target, field: target === null, message: 'The selected microphone is disconnected. Open Voice input, refresh microphones and choose an available input.' }); return
     }
-    if (voiceScene === 'mic-error') { voiceChange({ phase: 'error', field: target === null, message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
+    if (voiceScene === 'mic-error') { voiceChange({ phase: 'error', agent: target, field: target === null, message: 'The microphone could not start. Check system microphone access and the default input device.' }); return }
     const epoch = voiceEpoch
     heard = 0
     settled = 0
@@ -448,7 +450,7 @@ export function demoBridge(): Bridge {
       fn(encoder.encode(printed.get(id) ?? ''), true)
       if (!followers.has(id)) followers.set(id, new Set())
       followers.get(id)!.add(fn)
-      return () => { followers.get(id)?.delete(fn); if (voice.agent === id) cancelVoice() }
+      return () => { followers.get(id)?.delete(fn) }
     },
     type: (id, data) => {
       seen.typed.push({ agent: id, data })
@@ -512,7 +514,6 @@ export function demoBridge(): Bridge {
     watch: (ids, visible = ids) => {
       seen.watched = [...ids]
       seen.visible = [...visible]
-      if (voice.agent && !visible.includes(voice.agent)) cancelVoice()
       if (agents.some(a => ids.includes(a.id) && a.unread)) {
         agents = agents.map(a => (ids.includes(a.id) ? { ...a, unread: false } : a))
         publish()

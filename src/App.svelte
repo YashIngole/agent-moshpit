@@ -34,8 +34,11 @@
   })
 
   $effect(() => {
-    const target = voice.view.agent
-    if (target && (!office.open.has(target) || !office.agents.some(a => a.id === target && a.running))) voice.cancel()
+    const target = voice.active ? voice.view.agent : null
+    // A recording stays with its program whatever the window shows: a menu, a panel, another
+    // terminal. It ends when the program does, or its desk is taken away.
+    if (target && !office.agents.some(a => a.id === target && a.running)) voice.cancel()
+    office.recording = target ?? ''
     voice.panel = office.panel?.kind === 'voice'
   })
 
@@ -200,7 +203,8 @@
   {/if}
   <KnockBand />
   <div class="work" style:--floor="{office.floorWidth}px">
-    <VoiceStatus />
+    <!-- A recording's bar is in the terminal it types into (see Panes); here when that is not in front. -->
+    {#if !voice.dock}<VoiceStatus />{/if}
     <Floor />
     {#if office.terminals}
       <!-- A separator that can be moved is a control: it takes focus and the arrow keys. -->

@@ -230,6 +230,10 @@
   .bar > .counts {
     flex-shrink: 1;
   }
+  /* The chip first: its name is cut short with dots, where a count would run under whatever is beside it. */
+  .bar > .attention {
+    flex-shrink: 100;
+  }
   .demo {
     flex: none;
     padding: 1px var(--s-2);

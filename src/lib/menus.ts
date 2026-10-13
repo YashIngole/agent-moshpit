@@ -3,6 +3,7 @@
 import { tick } from 'svelte'
 import { bridge } from './bridge'
 import { office, type MenuItem } from './office.svelte'
+import { CLICK_KEY } from './platform'
 import { terms } from './terms'
 import type { Agent } from './types'
 import { resumeAction, resumeHint } from './words'
@@ -11,10 +12,11 @@ import { resumeAction, resumeHint } from './words'
 export function deskItems(agent: Agent): MenuItem[] {
   const items: MenuItem[] = []
   const shown = office.open.has(agent.id)
-  if (!shown) items.push({ label: 'Open their terminal', keys: 'Enter', run: () => office.show(agent.id) })
-  if (!shown && (office.terminals || office.stowed.root !== null)) {
-    items.push({ label: 'Open beside the others', keys: 'Ctrl+Enter', run: () => office.show(agent.id, true) })
-  }
+  if (!shown) items.push({ label: 'Open their terminal', keys: 'Enter', run: () => office.visit(agent.id) })
+  // The other way to open it: in place of the one in use where terminals open beside each
+  // other, and beside the others in a narrow window, where one shows at a time.
+  if (!shown && !office.narrow && office.terminals) items.push({ label: 'Open in place of the one in use', keys: `${CLICK_KEY}+click`, run: () => office.swapIn(agent.id) })
+  if (!shown && office.narrow && (office.terminals || office.stowed.root !== null)) items.push({ label: 'Open beside the others', keys: 'Ctrl+Enter', run: () => office.show(agent.id) })
   items.push({ label: 'Rename', keys: 'F2', run: () => office.startRename(agent.id) })
   items.push({ label: 'Start another like this', run: () => office.openNew(agent.cwd, agent.harness, agent.launch) })
   if (agent.running) {
@@ -37,7 +39,7 @@ export function deskItems(agent: Agent): MenuItem[] {
       label: resumeAction(agent),
       hint: resumeHint(agent),
       run: () => {
-        office.show(agent.id)
+        office.visit(agent.id)
         void office.wake(agent.id)
       }
     })

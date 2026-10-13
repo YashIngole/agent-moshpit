@@ -248,8 +248,8 @@ try {
   await page.locator('.pane', { hasText: 'Second' }).getByRole('button', { name: 'Put this terminal away' }).click()
   check('a pane can be put away on its own', await until(async () => (await page.locator('.pane').count()) === 1))
   check('its program keeps running', nodes(child.pid).length === 2)
-  await desk('Second').click({ modifiers: ['Control'] })
-  check('Ctrl and a click on a desk opens it beside the others', await until(async () => (await page.locator('.pane').count()) === 2))
+  await desk('Second').click()
+  check('a click on a desk opens it beside the others', await until(async () => (await page.locator('.pane').count()) === 2))
 
   // ── stopping, and starting again ─────────────────────────────────────────
   await page.locator('.pane', { hasText: 'Second' }).getByRole('button', { name: /^More for/ }).click()

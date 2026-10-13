@@ -74,6 +74,9 @@ export const PROVIDERS: Record<VoiceProvider, { model: string; keys: string; pri
   elevenlabs: { model: 'Scribe v2 Realtime', keys: 'https://elevenlabs.io/app/settings/api-keys', pricing: 'https://elevenlabs.io/pricing/api', privacy: 'ElevenLabs keeps request logs unless your plan has zero retention. Word hints cost extra with ElevenLabs.' },
   openrouter: { model: 'ElevenLabs Scribe v2', keys: 'https://openrouter.ai/settings/keys', pricing: 'https://openrouter.ai/elevenlabs/scribe-v2', privacy: 'What OpenRouter and ElevenLabs keep of it follows your OpenRouter privacy settings.', phrased: true, hints: false }
 }
+/** What every finished recording says. Its words are in the terminal, or the field, for anyone
+ *  looking, so it is said aloud and not shown; a note that asks for a second look is shown. */
+export const PLAIN_NOTICES = ['Inserted. Press Enter in the terminal to send.', 'Added to the task.']
 export const isProvider = (engine: VoiceEngine): engine is VoiceProvider => engine !== 'local'
 /** The engine types a phrase at a time, a moment after each pause, and shows no words meanwhile. */
 export const isPhrased = (engine: VoiceEngine): boolean => engine !== 'local' && !!PROVIDERS[engine].phrased

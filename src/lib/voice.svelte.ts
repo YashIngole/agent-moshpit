@@ -1,8 +1,11 @@
 import { bridge } from './bridge'
-import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, keyProblem, type VoiceField, type VoiceInputs, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
+import { DEFAULT_VOICE, EMPTY_VOICE, HOLD_MS, keyProblem, PLAIN_NOTICES, type VoiceEngine, type VoiceField, type VoiceInputs, type VoiceProvider, type VoiceSettings, type VoiceView } from './voice'
 import { office } from './office.svelte'
 import { terms } from './terms'
 import { tick } from 'svelte'
+
+/** Voice's own controls: the keyboard in one of them goes back to the terminal once the words are in. */
+const OWN = '.voice-status, .voice'
 
 class Voice {
   settings = $state<VoiceSettings>({ ...DEFAULT_VOICE })
@@ -13,9 +16,14 @@ class Voice {
   inputs = $state<VoiceInputs>({ devices: [], default: null })
   inputsLoading = $state(false)
   inputsProblem = $state('')
+  /** The microphone's menu in the top bar is open. */
+  picking = $state(false)
   panel = false
-  /** "Inserted", shown for a moment after a recording's words are typed. */
+  /** What a recording said as it ended, for a moment after its words are typed. */
   notice = $state('')
+  /** A notice that only says the words went in. They can be seen where they went: it is said
+   *  aloud, and shown only when its terminal is not in front. */
+  plain = $derived(PLAIN_NOTICES.includes(this.notice))
   /** A field in the window that takes dictation while it is there: the task in New agent.
    *  With one, a recording is for it; the panel it is in covers every terminal. */
   form = $state.raw<VoiceField | null>(null)
@@ -24,6 +32,21 @@ class Voice {
   ready = $derived(this.settings.engine === 'local'
     ? !this.view.unsupported && this.view.models.some(m => m.id === this.settings.local_model && m.ready)
     : this.view.providers.some(p => p.id === this.settings.engine && p.configured))
+  /** Every engine that could be used right now: this computer's, once its model is there, and each provider with a key. */
+  engines = $derived<VoiceEngine[]>([
+    ...(!this.view.unsupported && this.view.models.some(m => m.id === this.settings.local_model && m.ready) ? ['local' as const] : []),
+    ...this.view.providers.filter(p => p.configured).map(p => p.id)
+  ])
+  /**
+   * The terminal a recording's bar sits in: the one its words go into, while that is on
+   * screen with nothing over it. Anywhere else the bar floats over the work and names it.
+   */
+  dock = $derived.by((): string => {
+    const id = this.view.agent
+    // Something that could not start is about no terminal: the last one recorded into is not its place.
+    if (!id || this.view.field || this.problem || office.panel) return ''
+    return office.open.has(id) && (!office.zoomed || office.zoomed === id) ? id : ''
+  })
   #polling = false
   #alive = false
   #request = 0
@@ -52,7 +75,7 @@ class Voice {
     const hide = () => { if (document.hidden) this.cancel() }
     const leave = () => this.cancel()
     const focus = (event: FocusEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest('.voice-status, .mic')) this.#restoreFocus = false
+      if (!(event.target instanceof Element) || !event.target.closest(OWN)) this.#restoreFocus = false
     }
     document.addEventListener('visibilitychange', hide)
     window.addEventListener('pagehide', leave)
@@ -89,10 +112,10 @@ class Voice {
     if (view.field && !this.form && !this.acting && ['preparing', 'listening'].includes(view.phase)) this.cancel()
     // Stop is a button; return its keyboard to the same terminal after insertion.
     // A user who moved elsewhere while waiting keeps their focus.
-    if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) {
+    if (inserted && view.agent && (this.#restoreFocus || document.activeElement?.closest(OWN))) {
       const target = view.agent
       await tick()
-      if (this.#alive && request === this.#request && (this.#restoreFocus || document.activeElement?.closest('.voice-status, .mic'))) terms.get(target)?.focus()
+      if (this.#alive && request === this.#request && (this.#restoreFocus || document.activeElement?.closest(OWN))) terms.get(target)?.focus()
       this.#restoreFocus = false
     }
   }
@@ -115,11 +138,32 @@ class Voice {
     if (this.view.phase !== 'listening' && (this.active || this.view.busy)) return
     // The Stop button disappears while transcribing. Remember its focus before
     // the browser hands focus to the body, and revoke this if the user moves on.
-    if (this.view.phase === 'listening') this.#restoreFocus = !!document.activeElement?.closest('.voice-status, .mic')
+    if (this.view.phase === 'listening') this.#restoreFocus = !!document.activeElement?.closest(OWN)
     this.acting = true
     try {
       await this.act(() => this.view.phase === 'listening' ? bridge.voiceStop() : this.form ? this.#startField(this.form) : this.#startPane(agent))
     } finally { this.acting = false }
+  }
+  /**
+   * Change a setting from the microphone's menu. Changing one ends a recording, so one that
+   * was going starts again where it was, with the new microphone or engine: the words
+   * already typed stay, and nobody has to find the button again.
+   */
+  async retune(patch: Partial<VoiceSettings>) {
+    if (this.changing || this.acting) return
+    const going = ['preparing', 'listening'].includes(this.view.phase) ? { agent: this.view.agent, form: this.view.field ? this.form : null } : null
+    await this.configure(patch)
+    if (!going || this.problem || !this.settings.enabled || !this.ready) return
+    // The recording that was cancelled lets go of the microphone first.
+    for (let i = 0; i < 40 && this.view.busy; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await this.refresh()
+    }
+    const { agent, form } = going
+    if (this.acting || this.active || (form ? this.form !== form : !agent)) return
+    this.acting = true
+    try { await this.act(() => form ? this.#startField(form) : this.#startPane(agent!)) }
+    finally { this.acting = false }
   }
   #startPane(agent: string) {
     // Say again which terminals are in front of the user: a recording starts only into one
@@ -218,7 +262,7 @@ class Voice {
    *  already ended (its time ran out) needs nothing, and says nothing. */
   async finish() {
     if (this.acting || !['listening', 'preparing'].includes(this.view.phase)) return
-    this.#restoreFocus = !!document.activeElement?.closest('.voice-status, .mic')
+    this.#restoreFocus = !!document.activeElement?.closest(OWN)
     this.acting = true
     try { await bridge.voiceStop() } catch { /* It ended on its own; the view shows how. */ }
     finally { this.acting = false }

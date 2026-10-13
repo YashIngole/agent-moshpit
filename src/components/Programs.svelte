@@ -6,6 +6,7 @@
   import { onMount } from 'svelte'
   import { bridge } from '../lib/bridge'
   import { office } from '../lib/office.svelte'
+  import { CLICK_KEY } from '../lib/platform'
   import { WHERE_TO_GET, type Harness, type Job } from '../lib/types'
 
   let first = $state<HTMLElement>()
@@ -153,7 +154,7 @@
           {/each}
         </div>
         <p class="note">
-          Ctrl and a click on a file path in a terminal opens it in {office.editor?.name}, at its line. A desk’s menu opens its
+          {CLICK_KEY} and a click on a file path in a terminal opens it in {office.editor?.name}, at its line. A desk’s menu opens its
           folder there too.
         </p>
       {:else}

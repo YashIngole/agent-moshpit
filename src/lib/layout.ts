@@ -260,14 +260,6 @@ export function count(layout: Layout): number {
   return leaves(layout.root).length
 }
 
-/** How many panes stand side by side, when that is all the room is: one, or a single row of them. Otherwise none. */
-export function sideBySide(layout: Layout): number {
-  const root = layout.root
-  if (!root) return 0
-  if (isPane(root)) return 1
-  return root.dir === 'row' && root.parts.every(part => isPane(part.node)) ? root.parts.length : 0
-}
-
 /** Whether two layouts are the same picture: every pane in the same place. */
 export function samePicture(a: Layout, b: Layout): boolean {
   if (a === b) return true

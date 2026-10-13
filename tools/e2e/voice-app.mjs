@@ -83,6 +83,15 @@ try {
   const first = Date.now() - listening
   assert.equal((await view()).phase, 'listening', 'The first words are typed before the recording stops')
   console.log(`ok local words typed while still listening: "fellow Americans" ${first} ms after listening began (said at about 3 s)`)
+  // A panel over its terminal does not end a recording: what is said meanwhile is typed all the same.
+  await page.keyboard.press('Control+Shift+Slash')
+  await page.getByRole('heading', { name: 'Keys', exact: true }).waitFor()
+  await sleep(2500)
+  assert.equal((await view()).phase, 'listening', 'A panel over the terminal must not end the recording')
+  await page.keyboard.press('Escape')
+  await page.getByRole('heading', { name: 'Keys', exact: true }).waitFor({ state: 'detached' })
+  await until(async () => /asknot/i.test(await terminal()), 15_000)
+  console.log('ok a panel over its terminal does not end the recording, and the words said meanwhile are typed')
   await sleep(Math.max(0, 11_500 - (Date.now() - listening)))
   const stop = Date.now()
   await invoke('voice_stop')

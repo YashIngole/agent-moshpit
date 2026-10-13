@@ -21,7 +21,6 @@ import {
   putBeside,
   samePicture,
   shape,
-  sideBySide,
   swap,
   trade,
   type Layout,
@@ -234,7 +233,6 @@ describe('laying out terminals', () => {
     expect(parse({ root: { dir: 'row', parts: [{ size: 1, node: { id: 'a' } }] } })).toEqual(arrange(['a']))
     const nested = { root: { dir: 'row', parts: [{ size: 1, node: { id: 'a' } }, { size: 3, node: row('b', 'c', 'd') }] } }
     const flat = parse(nested)
-    expect(sideBySide(flat)).toBe(4)
     expect(picture(flat)).toEqual({ a: [0, 0, 25, 100], b: [25, 0, 25, 100], c: [50, 0, 25, 100], d: [75, 0, 25, 100] })
     // Nothing the office builds is this deep.
     let deep: Node = { id: 'z' }
@@ -257,10 +255,6 @@ describe('laying out terminals', () => {
     expect(ids(arrange(['a', 'b', 'c'], 'main-beside', 'b'))).toEqual(['b', 'a', 'c'])
     expect(samePicture(of(row(column('a', 'b'), column('c', 'd'))), of(column(row('a', 'c'), row('b', 'd'))))).toBe(true)
     expect(samePicture(arrange(['a', 'b']), arrange(['b', 'a']))).toBe(false)
-  })
-
-  it('says when the room is nothing but panes side by side', () => {
-    expect([EMPTY, arrange(['a']), arrange(['a', 'b']), arrange(['a', 'b', 'c']), arrange(['a', 'b', 'c'], 'side'), arrange(['a', 'b'], 'stacked')].map(sideBySide)).toEqual([0, 1, 2, 0, 3, 0])
   })
 })
 

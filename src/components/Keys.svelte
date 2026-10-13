@@ -3,6 +3,7 @@
   // terminal belongs to its program.
   import { onMount } from 'svelte'
   import { office } from '../lib/office.svelte'
+  import { CLICK_KEY } from '../lib/platform'
   import { voice } from '../lib/voice.svelte'
   import { shortcutLabel } from '../lib/voice'
 
@@ -44,7 +45,7 @@
       title: 'On the floor',
       keys: [
         ['Arrow keys', 'From desk to desk'],
-        ['Enter', 'Open their terminal'],
+        ['Enter', office.narrow ? 'Open their terminal, in place of the one showing' : 'Open their terminal beside the others, or go to it'],
         ['Ctrl+Enter', 'Open it beside the others, or put it away again'],
         ['F2', 'Rename'],
         ['Delete', 'Take the desk away (it can be brought back for a moment)'],
@@ -54,8 +55,11 @@
     {
       title: 'With the mouse',
       keys: [
-        ['Ctrl and a click', 'Open a desk beside the others, or put it away again'],
-        ['Ctrl and a click on a file path', editor ? `Open it in ${editor}, at its line` : 'Show it in its folder (no editor was found)'],
+        // Where the floor is beside the terminals a click adds one or puts it away; in a narrow window it goes to one.
+        ...(office.narrow
+          ? ([['Click a desk', 'Open their terminal, in place of the one showing'], [`${CLICK_KEY} and a click`, 'Open it beside the others, or put it away again']] as [string, string][])
+          : ([['Click a desk', 'Open their terminal beside the others, or put it away again'], [`${CLICK_KEY} and a click`, 'Open it in place of the terminal in use, so the others keep their size']] as [string, string][])),
+        [`${CLICK_KEY} and a click on a file path`, editor ? `Open it in ${editor}, at its line` : 'Show it in its folder (no editor was found)'],
         ['Ctrl and the wheel', 'Bigger or smaller text, over a terminal'],
         ['Right-click', 'A desk’s menu, or a terminal’s'],
         ['Middle-click', 'Take a desk away'],

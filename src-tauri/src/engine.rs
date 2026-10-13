@@ -102,7 +102,7 @@ struct State {
     office: Office,
     /// Selected terminals being read, for completion flags and notifications.
     watched: HashSet<String>,
-    /// Uncovered terminal panes, including the recording's original pane after a focus change.
+    /// Uncovered terminal panes: a recording can be started into one of these, and no other.
     visible: HashSet<String>,
     /// Whether the window is in front. A terminal behind another app is not being watched.
     focused: bool,
@@ -549,14 +549,19 @@ impl Handle {
         Ok(())
     }
 
+    /// Where a recording may start: a terminal in front of the user, whose program is running.
     pub fn voice_target(&self, id: &str) -> Option<crate::voice::Target> {
         let state = self.inner.state.lock().unwrap();
         if !state.visible.contains(id) || !state.office.get(id)?.running { return None; }
         Some(crate::voice::Target { agent: id.into(), run: self.inner.terms.generation(id)? })
     }
 
+    /// Whether a recording still has somewhere to type: the same run of the same program.
+    /// Once started it stays with that program, whatever the window shows meanwhile: a menu,
+    /// a panel or another terminal in front does not end what is being said.
     pub fn voice_live(&self, target: &crate::voice::Target) -> bool {
-        self.voice_target(&target.agent).as_ref() == Some(target)
+        let state = self.inner.state.lock().unwrap();
+        state.office.get(&target.agent).is_some_and(|d| d.running) && self.inner.terms.generation(&target.agent) == Some(target.run)
     }
 
     /// Words a dictation into this desk is likely to contain, for a cloud provider to expect:
@@ -583,8 +588,8 @@ impl Handle {
         if text.is_empty() || text.len() > 32 * 1024 { return Err("The voice text was empty or too long and discarded.".into()); }
         let text = if space { format!(" {text}") } else { text };
         let mut state = self.inner.state.lock().unwrap();
-        if !state.visible.contains(&target.agent) || !state.office.get(&target.agent).is_some_and(|d| d.running) {
-            return Err("The recording's pane closed or its program stopped. Its text was discarded.".into());
+        if !state.office.get(&target.agent).is_some_and(|d| d.running) {
+            return Err("The recording's program stopped. Its text was discarded.".into());
         }
         self.inner.terms.write_generation(&target.agent, target.run, text.as_bytes())?;
         state.voice_used.insert(target.agent.clone());
@@ -1336,7 +1341,7 @@ mod tests {
     }
 
     #[test]
-    fn voice_pins_a_live_run_rejects_stale_or_hidden_panes_and_does_not_save_echo() {
+    fn voice_starts_into_a_visible_pane_stays_with_its_run_and_does_not_save_echo() {
         let shell = Arc::new(Quiet::default());
         let engine = start(shell.clone(), vec![shell_kind()], vec![], vec![]);
         let spec = NewAgent { harness: "shell".into(), cwd: std::env::temp_dir().to_string_lossy().into_owned(), prompt: String::new(), title: "Voice fixture".into(), worktree: false, launch: Default::default() };
@@ -1351,9 +1356,12 @@ mod tests {
         assert!(engine.voice_write(&target, b"focus-change", false).is_ok());
         let invalid = crate::voice::Target { run: target.run + 100, ..target.clone() };
         assert!(engine.voice_write(&invalid, b"must-not-reach-the-terminal", false).is_err());
+        // Covered by a menu or a panel, or put away: nothing new starts into it, and the
+        // recording already going there carries on.
         engine.watch(vec![], vec![]);
-        assert!(!engine.voice_live(&target));
-        assert!(engine.voice_write(&target, b"also-discarded", false).is_err());
+        assert!(engine.voice_target(&id).is_none());
+        assert!(engine.voice_live(&target));
+        assert!(engine.voice_write(&target, b"said-while-covered", false).is_ok());
         engine.watch(vec![id.clone()], vec![id.clone()]);
         assert!(engine.voice_write(&target, b"voice\r\ntext\x1b[31m\x03", true).is_ok());
         engine.restart(&id, 80, 24).unwrap();

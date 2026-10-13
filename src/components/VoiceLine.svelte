@@ -19,10 +19,11 @@
   const phase = $derived(voice.view.phase)
   const seconds = $derived(Math.max(0, Math.floor((now - (voice.view.started_ms ?? now)) / 1000)))
   const error = $derived(phase === 'error' || !!voice.problem)
-  /** "Added to the task." is said aloud only: the words are in the field for anyone looking. A
-   *  note that asks for a second look is shown. */
-  const plain = $derived(voice.notice === 'Added to the task.')
-  const shown = $derived(voice.active || error || (!!voice.notice && !plain))
+  /** That the words were added is said aloud only: they are in the field for anyone looking. A
+   *  note that asks for a second look is shown. A recording into a terminal, still going
+   *  behind this form, is not this line's: its own bar shows it. */
+  const plain = $derived(voice.plain)
+  const shown = $derived(voice.active ? voice.view.field : error || (!!voice.notice && !plain))
   const shortcut = $derived(voice.settings.shortcut === 'none' ? '' : shortcutLabel(voice.settings.shortcut))
 
   function stop() {
@@ -69,7 +70,10 @@
     </div>
     {#if phase === 'listening' || phase === 'transcribing'}
       <!-- The phrase being spoken; phrases already finished are in the field. -->
-      <p class="words" class:waiting={!voice.view.partial}>{voice.view.partial || (phase === 'listening' ? (voice.view.detail ? `${voice.view.detail} Start speaking; nothing is lost.` : seconds >= 2 && voice.view.level < 3 ? 'No sound detected. Check that your microphone is unmuted, or cancel and choose another input.' : isPhrased(voice.view.engine) ? 'Speak. Each phrase is added to the task a moment after you pause.' : 'Speak. Your words are added to the task as they settle.') : '')}</p>
+      {#if voice.view.partial}<p class="words">{voice.view.partial}</p>
+      {:else if phase === 'listening' && voice.view.detail}<p class="words waiting">{voice.view.detail} Start speaking; nothing is lost.</p>
+      {:else if phase === 'listening' && seconds >= 2 && voice.view.level < 3}<p class="words waiting">No sound from {voice.view.microphone || 'the microphone'}. <button type="button" class="link" onmousedown={event => event.preventDefault()} onclick={() => voice.picking = true}>Change microphone</button></p>
+      {:else if phase === 'listening' && isPhrased(voice.view.engine)}<p class="words waiting">Added a moment after each pause.</p>{/if}
     {/if}
     {#if phase === 'listening'}
       <div class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={voice.view.level}><span style:transform={`scaleX(${voice.view.level / 100})`}></span></div>
@@ -105,8 +109,9 @@
   .close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
   /* The newest words stay in sight: a long phrase is cut at its start, not its end. */
   .words { display: flex; flex-direction: column-reverse; max-height: 2.8em; padding-right: var(--s-2); overflow: hidden; color: var(--ink); }
-  .words.waiting { color: var(--ink-2); }
-  .meter { width: 72px; height: 4px; border-radius: var(--pill); background: var(--wall); overflow: hidden; }
+  .words.waiting { display: block; color: var(--ink-2); }
+  .link { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .meter { width: 72px; height: 4px; border-radius: 999px; background: var(--wall); overflow: hidden; }
   .meter span { display: block; height: 100%; background: var(--work); transform-origin: left; transition: transform 80ms linear; }
   .dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--work); animation: pulse 1.2s ease-in-out infinite; }
   .spin { width: 11px; height: 11px; flex: none; border: 2px solid var(--wall); border-top-color: var(--work); border-radius: 50%; animation: spin 0.8s linear infinite; }

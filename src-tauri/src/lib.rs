@@ -605,8 +605,7 @@ fn term_attach(handle: State<'_, Handle>, agent: String, on_data: Channel<Invoke
 }
 
 #[tauri::command]
-fn term_detach(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agent: String, token: u64) {
-    voice.cancel_agent(&agent);
+fn term_detach(handle: State<'_, Handle>, agent: String, token: u64) {
     handle.detach(&agent, token);
 }
 
@@ -792,11 +791,10 @@ fn rename(handle: State<'_, Handle>, agent: String, title: String) {
     handle.rename(&agent, &title);
 }
 
-/// Terminals being read and uncovered panes available for an existing voice recording.
+/// Terminals being read, and the uncovered panes a voice recording may be started into.
 #[tauri::command]
-fn watch(handle: State<'_, Handle>, voice: State<'_, voice::Voice>, agents: Vec<String>, visible: Option<Vec<String>>) {
+fn watch(handle: State<'_, Handle>, agents: Vec<String>, visible: Option<Vec<String>>) {
     let visible = visible.unwrap_or_else(|| agents.clone());
-    voice.watch(&visible);
     handle.watch(agents, visible);
 }
 

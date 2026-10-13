@@ -3,9 +3,10 @@
 import { tick } from 'svelte'
 import { SvelteSet } from 'svelte/reactivity'
 import { bridge } from './bridge'
+import { CLICK_KEY } from './platform'
 import { groupProjects } from './projects'
 import { terms } from './terms'
-import { EMPTY, arrange, close, count, even, has, ids, land, move, moveEdge, neighbour, only, open, parse, samePicture, sideBySide, swap, type Aim, type Layout, type Least, type Room, type Shape, type Side } from './layout'
+import { EMPTY, arrange, close, count, even, has, ids, land, move, moveEdge, neighbour, only, open, parse, samePicture, swap, type Aim, type Layout, type Least, type Room, type Shape, type Side } from './layout'
 import type { Agent, Editor, Harness, Job, LaunchOptions, NewAgentSpec, Newer, Phase, Snapshot } from './types'
 import { mixed as manyPrograms } from './words'
 
@@ -71,8 +72,6 @@ export const FLOOR_WIDTH = { least: 200, strip: 264, usual: 420, terminals: 420 
 export const LIST_BELOW = 300
 /** More agents than this, and the floor draws them smaller, so a crowd fits on a screen or two. */
 export const CROWD = 10
-/** A terminal this wide holds a CLI's usual 80 columns and more: a plain click opens one beside another when both get this. */
-const ROOMY_PANE = 720
 /** The terminals' text size, in pixels. */
 export const FONT_SIZE = { least: 9, usual: 13, most: 24 }
 /** How long a removed desk can be brought back. */
@@ -200,6 +199,8 @@ class Office {
   menu = $state<Menu | null>(null)
   /** What is being said at the foot of the window. */
   toast = $state<Toast | null>(null)
+  /** The desk being dictated into, while a recording is going (kept by App.svelte). */
+  recording = $state('')
   /** The pane files are being dragged over. */
   dropTarget = $state('')
   /** The pane whose find bar is open. */
@@ -280,6 +281,12 @@ class Office {
   terminals = $derived(this.layout.root !== null)
   /** The desks whose terminal is on screen. */
   open = $derived(new Set(ids(this.layout)))
+  #width = $state(window.innerWidth)
+  /**
+   * A window too narrow for the floor beside the terminals: one or the other is seen. A
+   * desk there is somewhere to go, not something to tick, so one terminal shows at a time.
+   */
+  narrow = $derived(this.#width <= 760)
   /** Whether the floor beside the terminals is narrow enough to be a list of names. */
   listed = $derived(this.terminals && this.floorWidth < LIST_BELOW)
 
@@ -344,7 +351,10 @@ class Office {
     // A removal still waiting to be undone happens now: the window is going.
     const onLeave = () => this.#removeNow()
     document.addEventListener('visibilitychange', onVisibility)
-    const onResize = () => this.#adaptFloor()
+    const onResize = () => {
+      this.#width = window.innerWidth
+      this.#adaptFloor()
+    }
     window.addEventListener('resize', onResize)
     window.addEventListener('pagehide', onLeave)
     this.#syncClock()
@@ -383,7 +393,7 @@ class Office {
     if (this.#opening && snapshot.agents.some(a => a.id === this.#opening)) {
       const id = this.#opening
       this.#opening = ''
-      this.#openBeside(id)
+      this.show(id)
     }
   }
 
@@ -391,13 +401,8 @@ class Office {
   #opening = ''
 
   #openWhenHere(id: string) {
-    if (this.snapshot?.agents.some(a => a.id === id)) this.#openBeside(id)
+    if (this.snapshot?.agents.some(a => a.id === id)) this.show(id)
     else this.#opening = id
-  }
-
-  /** Open a desk's terminal beside the others, as the band does: nobody's pane is taken from under them. */
-  #openBeside(id: string) {
-    this.show(id, this.terminals || this.stowed.root !== null)
   }
 
   /** True once for an agent that joined after the window opened: their desk plays the walk-in. */
@@ -431,25 +436,65 @@ class Office {
   }
 
   /**
-   * Show a desk's terminal: in the pane the keyboard is in, unless `beside` asks
-   * for a pane of its own. Someone away is shown as they were left, not started:
-   * their pane offers to carry on.
+   * Show a desk's terminal, in a pane of its own beside the others, and give it the
+   * keyboard; one that is there already is gone to. Nobody's pane is taken to make room.
+   * Someone away is shown as they were left, not started: their pane offers to carry on.
    */
-  show(id: string, beside = false) {
-    if (!this.agents.some(a => a.id === id)) return
-    this.panel = null
-    this.menu = null
-    this.problem = ''
-    this.#place(id, beside)
+  show(id: string) {
+    if (!this.#clear(id)) return
+    this.#place(id, true)
   }
 
   /**
-   * Ctrl and a click on a desk, or Ctrl+Enter: their terminal beside the others. On a
-   * desk whose terminal is there already, it is put away again; their program keeps running.
+   * A click on a desk; `held`, with Ctrl (Cmd on a Mac). Beside the terminals, a click adds
+   * their terminal or puts it away again, and never takes another's place; the key held
+   * swaps it into the terminal in use, so the others keep their size. In a narrow window it
+   * is the other way about: a click goes to their terminal in place of the one showing, and
+   * the key held opens it beside.
    */
-  toggleBeside(id: string) {
-    if (has(this.layout, id)) this.closePane(id)
-    else this.show(id, true)
+  pick(id: string, held = false) {
+    if (this.narrow) return held ? this.toggle(id) : this.swapIn(id)
+    if (held) return this.swapIn(id)
+    const adds = this.terminals && !has(this.layout, id)
+    this.toggle(id)
+    // What a second click does, and how to keep the room as it is, said the first time only.
+    if (adds) this.hint('click-toggles', `Click a desk again to put its terminal away. ${CLICK_KEY} and a click swaps it into the terminal in use instead.`)
+  }
+
+  /** Enter on a desk: their terminal, or the keyboard to it when it is there. Nothing is put away. */
+  visit(id: string) {
+    if (this.narrow) this.swapIn(id)
+    else this.show(id)
+  }
+
+  /**
+   * Their terminal beside the others, and on a desk whose terminal is there to be seen,
+   * put away again; their program keeps running. Two are gone to instead of put away:
+   * someone who needs you, whose terminal is where the answer goes, and one waiting behind
+   * a terminal that has the room, which would otherwise be put away unseen.
+   */
+  toggle(id: string) {
+    const seen = has(this.layout, id) && (!this.zoomed || this.zoomed === id)
+    if (seen && this.agents.find(a => a.id === id)?.phase !== 'needs_you') this.closePane(id)
+    else this.show(id)
+  }
+
+  /**
+   * Their terminal in place of the one in use, so the others keep their size. Which one
+   * made room is said, with a way back.
+   */
+  swapIn(id: string) {
+    if (!this.#clear(id)) return
+    this.#place(id, false)
+  }
+
+  /** Before a desk's terminal is shown: nothing lies over the terminals. False when the desk has gone. */
+  #clear(id: string): boolean {
+    if (!this.agents.some(a => a.id === id)) return false
+    this.panel = null
+    this.menu = null
+    this.problem = ''
+    return true
   }
 
   /** Start a desk's program again, or carry on its conversation, in its pane. */
@@ -484,7 +529,7 @@ class Office {
     if (layout.root === null && this.stowed.root !== null) layout = this.stowed
     if (!has(layout, id)) {
       const near = has(layout, this.focused) ? this.focused : (ids(layout).at(-1) ?? '')
-      const from = beside || !near || this.#roomBeside(layout) ? '' : this.#makesRoom(layout, near)
+      const from = beside || !near ? '' : this.#makesRoom(layout, near)
       if (!from) layout = open(layout, id, near || undefined, this.#room())
       else {
         // A grid someone built, or a pane other than the one in use: which made room is said, with a way back.
@@ -493,38 +538,31 @@ class Office {
       }
     }
     if (this.zoomed && this.zoomed !== id) this.zoomed = ''
+    // One that is on screen already is gone to: its terminal is handed the keyboard. A new one takes it as it is drawn.
+    const there = has(this.layout, id)
     this.focused = id
     this.#lay(layout)
+    if (there) void tick().then(() => terms.get(id)?.focus())
   }
 
   /**
-   * The pane a plain click puts away to show another: the one in use, unless its agent
-   * needs you or is in trouble, then the calmest other one. None when every pane is
-   * someone who needs you: the new one opens beside them instead.
+   * The pane that is put away when another is swapped in: the one in use, unless its agent
+   * needs you or is in trouble, or it is being dictated into, then the calmest other one.
+   * None when every pane is one of those: the new one opens beside them instead.
    */
   #makesRoom(layout: Layout, near: string): string {
     const urgent = (id: string) => {
       const phase = this.agents.find(a => a.id === id)?.phase
-      return phase === 'needs_you' || phase === 'failed'
+      return phase === 'needs_you' || phase === 'failed' || id === this.recording
     }
     if (!urgent(near)) return near
     const calm = ids(layout).filter(id => !urgent(id))
     return calm.at(-1) ?? ''
   }
 
-  /** Whether the terminals are wide enough for one more beside them, each still a usual terminal's width. */
-  #roomBeside(layout: Layout): boolean {
-    const beside = sideBySide(layout)
-    if (beside === 0 || this.zoomed) return false
-    const width = window.innerWidth - (window.innerWidth <= 760 ? 0 : Math.min(this.floorWidth, window.innerWidth - 420))
-    return width / (beside + 1) >= ROOMY_PANE
-  }
-
   #sayMadeRoom(from: string, to: string, before: Layout) {
     const name = (id: string) => this.agents.find(a => a.id === id)?.title ?? 'A terminal'
-    // How to keep both is said the first time only.
-    const lesson = this.#once('beside') ? ' Ctrl and a click opens one beside the others.' : ''
-    this.say(`${name(from)} made room for ${name(to)}.${lesson}`, {
+    this.say(`${name(from)} made room for ${name(to)}.`, {
       label: 'Undo',
       run: () => {
         if (!this.agents.some(a => a.id === from)) return
@@ -787,7 +825,7 @@ class Office {
     }
   }
 
-  /** Tell the core which terminals are in front of the user, so their flags come down. */
+  /** Tell the core which terminals are in front of the user: their flags come down, and a recording can start into one. */
   #report() {
     const visible = document.hidden || this.panel || this.menu ? [] : this.zoomed ? [this.zoomed] : ids(this.layout)
     bridge.watch(visible.includes(this.focused) ? [this.focused] : [], visible)
@@ -1060,7 +1098,7 @@ class Office {
     const here = this.terminals && this.open.has(this.focused) ? this.focused : ''
     const at = waiting.findIndex(a => a.id === here)
     const next = waiting.find((a, i) => i > at && a.id !== here) ?? waiting.find(a => a.id !== here) ?? waiting[0]!
-    this.#openBeside(next.id)
+    this.show(next.id)
   }
 
   /** Bring the next desk in one of these states into view, and give it the keyboard. */
@@ -1074,7 +1112,7 @@ class Office {
     const desk = desks[(after + 1) % desks.length]!
     this.#lastFound = desk.dataset.desk ?? ''
     if (desk.getBoundingClientRect().width === 0) {
-      this.show(this.#lastFound, true)
+      this.show(this.#lastFound)
       return
     }
     desk.scrollIntoView({ block: 'center', inline: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })

@@ -332,15 +332,6 @@ impl Voice {
             state.cancel();
         }
     }
-    pub fn watch(&self, agents: &[String]) {
-        let mut state = self.state.lock().unwrap();
-        // A recording for a terminal ends when that terminal is covered or put away. One
-        // for a field in the window is in a panel, which covers every terminal: the window
-        // ends it when the field goes.
-        if state.target.as_ref().is_some_and(|t| !t.is_field() && !agents.contains(&t.agent)) {
-            state.cancel();
-        }
-    }
     pub fn shutdown(&self) {
         self.cancel();
         self.cancel_download();
@@ -445,8 +436,8 @@ impl Voice {
     /// One recording, typed into its terminal as its words are settled. Ok carries a note to
     /// show instead of the usual one.
     fn record(&self, engine: &Handle, target: &Target, epoch: u64, mode: &Arc<AtomicU8>, settings: &Settings, model: &'static models::Model) -> Result<Option<String>, String> {
-        // A terminal can be covered or its program can end under a recording; a field is
-        // the window's, which cancels the recording itself when the field goes.
+        // A program can end under a recording; a field is the window's, which cancels the
+        // recording itself when the field goes. What the window shows meanwhile ends nothing.
         let live = || target.is_field() || engine.voice_live(target);
         if mode.load(Ordering::Acquire) == 2 || !live() {
             return Err("Recording cancelled.".into());
@@ -913,9 +904,6 @@ mod tests {
         words.take(Event::Tentative("and one more".into()), false).unwrap();
         assert_eq!((got.lock().unwrap().len(), voice.view().partial.as_str()), (4, "and one more"));
 
-        // Covering every terminal, as the panel the field is in does, does not end it.
-        voice.watch(&[]);
-        assert!(voice.state.lock().unwrap().accepts(epoch, &target));
         // The window no longer taking words ends it, and says so.
         open.store(false, Ordering::Release);
         assert!(words.take(Event::Committed { text: "late".into(), boundary: true }, false).unwrap_err().contains("form was closed"));
@@ -929,7 +917,7 @@ mod tests {
         assert!(state.field.is_none() && !state.view.field && state.target.is_none());
         drop(state);
 
-        // A recording for a terminal still ends when that terminal is covered.
+        // A recording for a terminal ends with that desk's program, and with no other's.
         let pane = Target { agent: "desk".into(), run: 1 };
         {
             let mut state = voice.state.lock().unwrap();
@@ -937,7 +925,9 @@ mod tests {
             state.target = Some(pane.clone());
         }
         let epoch = voice.state.lock().unwrap().epoch;
-        voice.watch(&[]);
+        voice.cancel_agent("another desk");
+        assert!(voice.state.lock().unwrap().accepts(epoch, &pane));
+        voice.cancel_agent("desk");
         assert!(!voice.state.lock().unwrap().accepts(epoch, &pane));
         engine.shutdown();
         let _ = std::fs::remove_dir_all(&scratch);

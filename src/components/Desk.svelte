@@ -4,6 +4,7 @@
   import { onMount, tick, untrack } from 'svelte'
   import { askToRemove, openDeskMenu } from '../lib/menus'
   import { office } from '../lib/office.svelte'
+  import { menuClick, withClickKey } from '../lib/platform'
   import { elapsed } from '../lib/time'
   import type { Agent } from '../lib/types'
   import { describe, doing, STATUS_WORD } from '../lib/words'
@@ -58,7 +59,7 @@
   function onKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      office.toggleBeside(agent.id)
+      office.toggle(agent.id)
     } else if (event.key === 'F2') {
       event.preventDefault()
       office.startRename(agent.id)
@@ -84,7 +85,13 @@
     aria-current={open ? 'true' : undefined}
     title={office.listed ? agent.title : undefined}
     bind:this={button}
-    onclick={event => (event.ctrlKey || event.metaKey ? office.toggleBeside(agent.id) : office.show(agent.id))}
+    onclick={event => {
+      // A Mac's Control-click is its right-click: the menu has opened, and that is all it asked for.
+      if (menuClick(event)) return
+      // Enter and Space arrive as a click nobody pressed: they open a terminal or go to it, and put nothing away.
+      if (event.detail === 0) office.visit(agent.id)
+      else office.pick(agent.id, withClickKey(event))
+    }}
     onauxclick={event => {
       if (event.button === 1) {
         event.preventDefault()

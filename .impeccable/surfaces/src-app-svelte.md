@@ -57,7 +57,7 @@ A critique on 2026-10-12 (`.impeccable/critique/2026-10-11T18-49-30Z__src-app-sv
 - A desk's line under its name appears only when it says something new; the time comes before the program tag, and the tag only when more than one program is at work.
 - The empty desk in each room became a + on the room's sign; head counts went.
 - While terminals are open the band is an amber chip in the bar, so terminals never move when a hand goes up. Ctrl+Shift+A, or the chip, goes to whoever needs you, then the next.
-- A plain click never puts away a pane whose agent needs you or is in trouble, and opens beside the others when they are wide enough. Two terminals or more, or a crowd, bring the strip of names by themselves.
+- A plain click never puts away a pane whose agent needs you or is in trouble, and opens beside the others when they are wide enough. Two terminals or more, or a crowd, bring the strip of names by themselves. (The click itself changed in 0.9.0, below.)
 - New agent asks who, what and where, with the folder filled in, and folds name, model and permissions into one line.
 - Menus are one line an item, with keys at the end and hints only where something ends or is kept; settings are tick boxes.
 - The microphone is an icon at rest.
@@ -74,3 +74,16 @@ Carried over from the first version's brief and not looked at again since:
 - Sounds (off by default if added).
 - Things in a room besides desks (a door, a plant on the floor, a whiteboard). One attempt at a door read as a drawing error and was removed.
 - Whether Hermes pets can stand in for the built-in people.
+
+## The second pass (2026-10-13)
+
+The owner found the window still cluttered, voice above all, and reported three faults: no way to choose a microphone without opening setup, a recording that stopped when they moved around the window, and, on a Mac, a Control-click that both opened a desk's menu and toggled its terminal. Version 0.9.0 is the result:
+
+- The microphone in the bar is one control in two parts: the button, and an arrow that lists the microphones and, when more than one is ready, the engines.
+- A recording says so in a small bar inside the terminal it types into, and floats over the work, naming the agent, only when that terminal is not in front. It says far less: no destination, microphone name or shortcut hint at rest, and nothing once the words are typed.
+- A recording stays with its terminal's program whatever the window shows. It ends when it is stopped or cancelled, when the program ends, or when the window is minimised or closed.
+- The Voice input panel says each thing once; the fine print is in a closed disclosure.
+- A click on a desk adds their terminal or puts it away, and never takes another's place. The owner leaned this way and asked for an opinion first; the builder agreed, and proposed three things the owner then chose: an agent who needs you is gone to and not put away, Ctrl (Cmd on a Mac) and a click swaps a desk into the terminal in use, and Enter never puts anything away. The builder's own addition: a window too narrow for the floor beside the terminals keeps showing one terminal at a time.
+- On a Mac, Cmd is the key held with a click, and a Control-click only opens the menu.
+
+Not looked at in this pass: the Agent messages and Agent programs panels, which say more than they need to in the same way the Voice panel did.

@@ -56,10 +56,9 @@
 <aside class="panel" aria-label="Voice input">
   <header><h2>Voice input</h2><button type="button" class="close" aria-label="Close" bind:this={first} onclick={() => office.closePanel()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></svg></button></header>
   <div class="body">
-    <p>Speak instead of typing, in English. Your words appear as you talk and are typed into the terminal as they settle. Review them, then press Enter to send.</p>
     <label class="enable"><input type="checkbox" checked={voice.settings.enabled} disabled={voice.changing} onchange={e => void voice.configure({ enabled: e.currentTarget.checked })} />Enable voice input</label>
     <div class="readiness" role="status">
-      {#if !voice.settings.enabled}<p>Enable voice, then choose where your speech is turned into words.</p>
+      {#if !voice.settings.enabled}<p>Speak instead of typing, in English. Your words are typed into the terminal as you talk; you press Enter to send.</p>
       {:else if local && voice.view.unsupported}<p>{voice.view.unsupported} Choose Cloud below to use voice on this computer.</p>
       {:else if local && voice.view.verifying}<p>Checking your downloaded models…</p>
       {:else if local && !voice.ready}<p>Download {selected?.label ?? 'the speech model'} to finish setup{other ? `, or use ${other.label}, which is already downloaded` : ''}.</p>
@@ -70,20 +69,20 @@
       {:else if voice.inputsProblem}<p>Refresh microphones to check your input.</p>
       {:else if missingMic}<p>Choose an available microphone to finish setup.</p>
       {:else if !voice.settings.microphone && !voice.inputs.default}<p>Choose a microphone below, or connect one and refresh.</p>
-      {:else}<p>Ready. Close setup, select a running terminal, and press Voice{voice.settings.shortcut !== 'none' ? `, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak` : ''}. In New agent, the microphone beside the task takes what you say as the task.</p>{/if}
+      {:else}<p>Ready. Press the microphone{voice.settings.shortcut !== 'none' ? `, or hold ${shortcutLabel(voice.settings.shortcut)} while you speak` : ''}.</p>{/if}
     </div>
-    {#if bridge.demo}<p class="note">Demo: simulated audio, downloads and keys. No microphone or network is used.</p>{/if}
+    {#if bridge.demo}<p class="note">Demo: simulated audio, downloads and keys.</p>{/if}
 
     <section aria-labelledby="voice-engine">
       <h3 id="voice-engine">Speech engine</h3>
-      <label class="choice"><input type="radio" name="voice-engine" checked={local} disabled={voice.changing} onchange={() => void voice.configure({ engine: 'local' })} /><span><strong>On this computer · English</strong><small>NVIDIA Nemotron, downloaded once. Nothing you say leaves this computer.</small></span></label>
-      <label class="choice"><input type="radio" name="voice-engine" checked={!local} disabled={voice.changing} onchange={useCloud} /><span><strong>Cloud · your own key</strong><small>Deepgram, OpenAI, AssemblyAI, ElevenLabs or OpenRouter, paid by you. Your audio goes to the provider while you dictate.</small></span></label>
+      <label class="choice"><input type="radio" name="voice-engine" checked={local} disabled={voice.changing} onchange={() => void voice.configure({ engine: 'local' })} /><span><strong>On this computer · English</strong><small>Private: nothing you say leaves this computer.</small></span></label>
+      <label class="choice"><input type="radio" name="voice-engine" checked={!local} disabled={voice.changing} onchange={useCloud} /><span><strong>Cloud · your own key</strong><small>Your audio goes to the provider you choose, billed to you.</small></span></label>
     </section>
 
     {#if local}
       <section aria-labelledby="voice-models">
         <h3 id="voice-models">Local model</h3>
-        <p class="note">Downloaded from Hugging Face when you choose; no account needed. While in use it takes about 1 GB of memory, freed 5 minutes after your last recording.</p>
+        <p class="note">NVIDIA Nemotron, downloaded once from Hugging Face. About 1 GB of memory while in use.</p>
         {#if voice.view.unsupported}<p class="error" role="alert">{voice.view.unsupported}</p>{/if}
         {#if voice.view.verifying}<p role="status">Checking downloaded models…</p>{/if}
         {#each voice.view.models as model (model.id)}
@@ -130,7 +129,7 @@
                 {#if provider.configured}<button type="button" class="button quiet" disabled={keyBusy} onclick={() => { editing = false; draft = ''; keyNote = null }}>Cancel</button>{/if}
               </div>
             </form>
-            <p class="note">Checked with {provider.name}, then kept in your system keychain. It is never shown again or written to a file.</p>
+            <p class="note">Checked with {provider.name}, then kept in your system keychain, never in a file.</p>
           {/if}
           {#if keyNote}
             <p class={keyNote.ok ? 'note' : 'error'} role={keyNote.ok ? 'status' : 'alert'}>{keyNote.text}</p>
@@ -147,7 +146,7 @@
       {:else}
       <section aria-labelledby="voice-words-heading">
         <h3 id="voice-words-heading">Word hints</h3>
-        <p class="note">Names and terms {provider.name} should expect, sent with the audio. Program names such as Claude and Codex are always included.</p>
+        <p class="note">Names and terms {provider.name} should expect. Program names are always included.</p>
         {#if voice.settings.vocabulary.length}
           <ul class="chips">{#each voice.settings.vocabulary as word (word)}<li>{word}<button type="button" aria-label="Remove {word}" disabled={voice.changing} onclick={() => void voice.configure({ vocabulary: voice.settings.vocabulary.filter(w => w !== word) })}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg></button></li>{/each}</ul>
         {/if}
@@ -161,7 +160,7 @@
     {/if}
 
     <section>
-      <div class="section-heading"><label for="voice-microphone">Microphone</label><button type="button" class="button quiet" disabled={voice.inputsLoading} onclick={() => void voice.loadInputs()}>Refresh microphones</button></div>
+      <div class="section-heading"><label for="voice-microphone">Microphone</label><button type="button" class="close" aria-label="Refresh microphones" title="Look again for microphones" disabled={voice.inputsLoading} onclick={() => void voice.loadInputs()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.500-3.500M13 2.500v3h-3" /></svg></button></div>
       <select id="voice-microphone" value={voice.settings.microphone ?? ''} disabled={voice.changing || voice.inputsLoading} onchange={e => void voice.configure({ microphone: e.currentTarget.value || null })}>
         <option value="">System default{voice.inputs.default ? ` · ${voice.inputs.default}` : ''}</option>
         {#if missingMic}<option value={voice.settings.microphone ?? ''}>{voice.settings.microphone} · disconnected</option>{/if}
@@ -171,15 +170,23 @@
       {#if voice.inputsProblem}<p class="error" role="alert">{voice.inputsProblem}</p>
       {:else if missingMic}<p class="error" role="alert">This microphone is disconnected. Choose an available input above.</p>
       {:else if !voice.inputsLoading && !voice.inputs.devices.length}<p class="note">No microphone found. Connect one and refresh.</p>{/if}
-      <p class="note">The microphone opens only when you start recording. The input meter should move when you speak.</p>
     </section>
     <section>
       <label for="voice-shortcut">Shortcut</label>
       <select id="voice-shortcut" value={voice.settings.shortcut} disabled={voice.changing} onchange={e => void voice.configure({ shortcut: e.currentTarget.value as VoiceSettings['shortcut'] })}>{#each ['space', 'altspace', 'none'] as shortcut}<option value={shortcut}>{shortcutLabel(shortcut as VoiceSettings['shortcut'])}</option>{/each}</select>
-      <p class="note">Hold it while you speak and let go to finish, or tap it to talk hands-free and tap again to finish. Works inside this window while voice is enabled; change or turn it off if your program uses the same key.</p>
+      <p class="note">Hold it while you speak, or tap to start and tap again to finish.</p>
     </section>
-    <p class="note">Recordings stay in memory and are discarded when they end. Cancelling stops the recording; words already typed stay in the terminal for you to keep or delete. Voice input leaves your clipboard alone.</p>
-    <p class="note">Closing or minimizing the window cancels recording.</p>
+    <!-- Worth knowing once, and in nobody's way after that. -->
+    <details>
+      <summary>Privacy and limits</summary>
+      <ul>
+        <li>Recordings stay in memory and are discarded when they end. Your clipboard is left alone.</li>
+        <li>Words are typed, never sent. Cancelling drops only the words not yet typed.</li>
+        <li>A recording stays with its terminal while you look elsewhere in the window. Minimizing or closing the window ends it.</li>
+        <li>The shortcut works inside this window. Change it if your program uses the same keys.</li>
+        <li>The local model frees its memory 5 minutes after your last recording.</li>
+      </ul>
+    </details>
     {#if voice.problem}<p class="error" role="alert">{voice.problem}</p>{/if}
   </div>
 </aside>
@@ -190,7 +197,7 @@
   h2 { font-size: var(--t-xl); font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
   .close { display: grid; width: 30px; height: 30px; margin-right: -6px; place-items: center; border: 0; border-radius: var(--r-1); background: transparent; color: var(--ink-2); }
   .close:hover { background: var(--inset); color: var(--ink); }
-  .close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  .close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .body { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); overflow-y: auto; font-size: var(--t-md); line-height: 1.4; }
   .note, small { color: var(--ink-2); font-size: var(--t-sm); }
   .enable, .model label, .choice { display: flex; align-items: center; gap: var(--s-2); }
@@ -205,7 +212,11 @@
   .readiness button { justify-self: start; white-space: normal; text-align: left; }
   .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
   .section-heading label { font-weight: 650; }
-  .section-heading button { min-height: 32px; padding-inline: var(--s-2); font-size: var(--t-sm); }
+  .section-heading .close { margin-right: 0; }
+  .section-heading .close:disabled { opacity: 0.55; }
+  details { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); color: var(--ink-2); font-size: var(--t-sm); }
+  summary { width: fit-content; color: var(--ink); font-size: var(--t-md); font-weight: 650; cursor: pointer; }
+  details ul { display: grid; gap: var(--s-2); margin: var(--s-2) 0 0; padding-left: var(--s-4); }
   .model { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); padding: var(--s-2) 0; }
   .model label { min-width: 0; }
   small { display: block; margin-top: 2px; }
@@ -220,7 +231,7 @@
   .row { display: flex; gap: var(--s-2); align-items: center; }
   .row .button { flex: none; padding: 0 var(--s-3); }
   .chips { display: flex; flex-wrap: wrap; gap: var(--s-1); padding: 0; margin: 0; list-style: none; }
-  .chips li { display: inline-flex; align-items: center; gap: 2px; padding: 2px 2px 2px var(--s-2); border: 1px solid var(--line); border-radius: var(--pill); background: var(--inset); font-size: var(--t-sm); max-width: 100%; overflow-wrap: anywhere; }
+  .chips li { display: inline-flex; align-items: center; gap: 2px; padding: 2px 2px 2px var(--s-2); border: 1px solid var(--line); border-radius: 999px; background: var(--inset); font-size: var(--t-sm); max-width: 100%; overflow-wrap: anywhere; }
   .chips button { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); }
   .chips button:hover { background: var(--wall); color: var(--ink); }
   .chips svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }

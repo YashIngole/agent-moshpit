@@ -43,8 +43,10 @@ async function launch() {
 const browser = await launch()
 const errors = []
 
-async function open(query, width = 1280, height = 800) {
+/** `platform`: the system the window is told it is on, for what differs between them. */
+async function open(query, width = 1280, height = 800, platform = '') {
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: 'light' })
+  if (platform) await context.addInitScript(name => Object.defineProperty(navigator, 'platform', { get: () => name }), platform)
   // All demo clipboard effects stay in this context, never the system clipboard.
   await context.addInitScript(() => {
     navigator.clipboard.writeText = async () => {}
@@ -77,6 +79,8 @@ const boxes = async page => (await laidOut(page)).map(({ x, y, w, h }) => ({ x, 
 /** The names on the panes, in the order they are laid out. */
 const paneTitles = async page => (await laidOut(page)).map(pane => pane.title)
 const desk = (page, n) => page.locator(`.floor button[data-desk="demo-${n}"]`)
+/** A click with Ctrl held (Cmd on a Mac): their terminal in place of the one in use. */
+const HELD = { modifiers: ['ControlOrMeta'] }
 
 /** Keep asking until it is true, or give up. */
 async function until(fn, ms = 6000) {
@@ -116,19 +120,27 @@ try {
   check('the terminal is drawn', await until(async () => (await page.locator('.pane .xterm').count()) === 1))
   check('and says what its program printed', await until(async () => ((await page.locator('.pane .xterm-accessibility-tree').innerText()) ?? '').includes('Refactor auth middleware')))
 
-  // A plain click shows another desk in the same pane; Ctrl and a click gives it a pane of its own.
+  // A click on another desk gives it a pane of its own beside the first, and takes nobody's place.
   await desk(page, 5).click()
-  check('a plain click shows the next desk in the same pane', (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API')
-  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
-  check('Ctrl and a click opens a second pane', await until(async () => (await panes(page)) === 2))
+  check('a click on another desk opens it beside the first, which stays', await until(async () => (await panes(page)) === 2) && (await page.locator('.pane h2', { hasText: 'Refactor auth middleware' }).count()) === 1)
+  check('what a second click does, and how to swap one in, is said the first time', await until(async () => ((await page.locator('.toast').textContent()) ?? '').includes('Click a desk again to put its terminal away')))
   let b = await boxes(page)
   check('two panes sit side by side, evenly', b.length === 2 && b[0].y === b[1].y && Math.abs(b[0].w - b[1].w) <= 2, JSON.stringify(b))
   // The same again on a desk that is open puts its pane away; the one beside it stays, and nobody is stopped.
-  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
-  check('Ctrl and a click on an open desk puts its pane away again', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API'))
+  await desk(page, 2).click()
+  check('a click on an open desk puts its pane away again', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API'))
   check('and their program keeps running', ((await desk(page, 2).getAttribute('class')) ?? '').includes('working') && ((await desk(page, 2).getAttribute('aria-current')) ?? '') !== 'true')
-  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
-  check('and once more brings it back beside the other', await until(async () => (await panes(page)) === 2))
+  // With Ctrl (Cmd on a Mac) their terminal takes the place of the one in use: the room keeps its shape.
+  await desk(page, 6).click(HELD)
+  check('Ctrl and a click shows a desk in place of the terminal in use', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Bump dependencies'))
+  await desk(page, 5).click(HELD)
+  await until(async () => ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API')
+  // Enter on a desk opens their terminal or goes to it, and puts nothing away.
+  await desk(page, 5).focus()
+  await page.keyboard.press('Enter')
+  check('Enter on an open desk goes to its terminal and does not put it away', (await panes(page)) === 1 && await until(async () => (await focused(page)).includes('xterm')))
+  await desk(page, 2).click()
+  check('and a click brings the other back beside it', await until(async () => (await panes(page)) === 2))
   b = await boxes(page)
 
   // ── dragging the edge between two ──
@@ -146,11 +158,11 @@ try {
   check('a double click makes them even again', Math.abs(b[0].w - b[1].w) <= 2, JSON.stringify(b))
 
   // ── any number: three, four, and back down ──
-  await desk(page, 4).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 4).click()
   await until(async () => (await panes(page)) === 3)
   b = await boxes(page)
   check('three panes are two above one', b.filter(p => p.y === b[0].y).length === 2 && b.filter(p => p.y > b[0].y).length === 1, JSON.stringify(b))
-  await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 6).click()
   await until(async () => (await panes(page)) === 4)
   b = await boxes(page)
   check('four panes are two by two', new Set(b.map(p => p.x)).size === 2 && new Set(b.map(p => p.y)).size === 2, JSON.stringify(b))
@@ -172,7 +184,7 @@ try {
   // so nothing else would ever say it. (A guess at the whole room's width drew it garbled.)
   const sizing = await open('demo=office&still')
   await desk(sizing, 2).click()
-  await desk(sizing, 3).click({ modifiers: ['ControlOrMeta'] })
+  await desk(sizing, 3).click()
   await until(async () => (await panes(sizing)) === 2)
   const awayPane = sizing.locator('.pane[data-pane="demo-3"]')
   const sizeOf = () => awayPane.locator('.term-host').getAttribute('data-size')
@@ -285,7 +297,7 @@ try {
   page = await open('demo=crowd&still', 1440, 900)
   const desks = page.locator('.floor button[data-desk]')
   await desks.nth(0).click()
-  for (const n of [1, 2, 3, 6, 8]) await desks.nth(n).click({ modifiers: ['ControlOrMeta'] })
+  for (const n of [1, 2, 3, 6, 8]) await desks.nth(n).click()
   await until(async () => (await panes(page)) === 6)
   b = await boxes(page)
   check('six panes are three by two', new Set(b.map(p => p.x)).size === 3 && new Set(b.map(p => p.y)).size === 2, JSON.stringify(b))
@@ -295,13 +307,13 @@ try {
   // ── what a vibe coder reaches for every day (docs/reviews/ux-sweep-2026-10-08.md) ──
   page = await open('demo=office&still')
   await desk(page, 2).click()
-  await desk(page, 4).click({ modifiers: ['ControlOrMeta'] })
-  await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 4).click()
+  await desk(page, 5).click()
   await until(async () => (await panes(page)) === 3)
   await page.keyboard.press('Control+Backquote')
   await until(async () => (await panes(page)) === 0)
-  await desk(page, 6).click()
-  check('picking someone from the floor brings the grid back, with them in it', await until(async () => (await panes(page)) === 3 && (await page.locator('.pane h2', { hasText: 'Bump dependencies' }).count()) === 1))
+  await desk(page, 6).click(HELD)
+  check('swapping someone in from the floor brings the grid back, with them in it', await until(async () => (await panes(page)) === 3 && (await page.locator('.pane h2', { hasText: 'Bump dependencies' }).count()) === 1))
   // A pane is there a moment before its terminal is, and the terminal takes the keyboard
   // when it comes: a desk focused in between would lose it again.
   await until(async () => (await focused(page)).includes('xterm'))
@@ -325,7 +337,7 @@ try {
   check('which renames, carries on, shows and copies the folder', (await page.getByRole('menuitem').allTextContents()).join('|').match(/Rename.*Carry on.*Show their folder.*Copy the folder path/) !== null)
   await page.keyboard.press('Escape')
   check('Escape closes it', await until(async () => (await page.locator('.menu-sheet').count()) === 0))
-  await desk(page, 3).click()
+  await desk(page, 3).click(HELD)
   check('opening an away desk shows them as they were left, without starting them', await until(async () => (await page.locator('.pane .ended').count()) >= 1) && ((await desk(page, 3).getAttribute('class')) ?? '').includes('asleep'))
   await desk(page, 3).click({ button: 'middle' })
   check('a middle click takes a desk off the floor', await until(async () => (await desk(page, 3).count()) === 0))
@@ -394,7 +406,7 @@ try {
   page = await open('demo=office&still')
   const typed = () => page.evaluate(() => window.__demo.typed.map(t => t.data).join(''))
   await desk(page, 1).click()
-  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 2).click()
   await until(async () => (await panes(page)) === 2)
   const claude = page.locator('.pane', { hasText: 'Fix the checkout total' })
   await claude.locator('.term-host').click()
@@ -465,7 +477,7 @@ try {
   page = await open('demo=office&still&open=demo-4')
   check('a clicked notification opens that desk’s terminal', await until(async () => (await page.locator('.pane h2', { hasText: 'Type the orders API' }).count()) === 1))
   // The strip gathers whoever wants a look above the rooms, and says which program each row is.
-  await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 2).click()
   check('two terminals bring the strip of names by themselves', await until(async () => (await page.locator('.seat.listed').count()) > 0))
   const waitingRows = await page.locator('.room.waiting .desk').evaluateAll(rows => rows.map(r => r.className.split(' ').find(c => ['needs_you', 'failed', 'done'].includes(c))))
   check('the strip puts a Waiting group above the rooms: needs you, then trouble, then done', JSON.stringify(waitingRows) === JSON.stringify(['needs_you', 'failed']) || JSON.stringify(waitingRows) === JSON.stringify(['needs_you', 'failed', 'done']), JSON.stringify(waitingRows))
@@ -560,7 +572,7 @@ try {
   await page.keyboard.press('Escape')
 
   // The scroll position survives a trip to the floor.
-  await desk(page, 2).click()
+  await desk(page, 2).click(HELD)
   await until(async () => (await panes(page)) === 1)
   const pane2 = page.locator('.pane').first()
   await pane2.locator('.term-host').click()
@@ -606,8 +618,8 @@ try {
   await page.keyboard.press('Escape')
 
   // The +N chip lists the terminals behind and switches to one.
-  await desk(page, 4).click({ modifiers: ['ControlOrMeta'] })
-  await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 4).click()
+  await desk(page, 6).click()
   await until(async () => (await panes(page)) === 3)
   await page.locator('.pane', { hasText: 'Refactor auth middleware' }).getByRole('button', { name: 'Give this terminal the room' }).click()
   await page.getByRole('button', { name: /more terminals behind this one/ }).click()
@@ -618,7 +630,7 @@ try {
 
   page = await open('demo=office&still')
   await desk(page, 2).click()
-  await desk(page, 4).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 4).click()
   await page.locator('.pane', { hasText: 'Refactor auth middleware' }).getByRole('button', { name: 'Give this terminal the room' }).click()
   await page.keyboard.press('Alt+2')
   check('Alt+2 while zoomed reports only the newly visible terminal to the core', await until(async () => JSON.stringify(await page.evaluate(() => window.__demo.watched)) === '["demo-4"]'))
@@ -659,17 +671,17 @@ try {
   await page.locator('.pane').getByRole('button', { name: 'Put this terminal away' }).click()
   await until(async () => (await panes(page)) === 0)
 
-  // A grid of two, then the floor, then a plain click on a third desk: one pane makes room, and says so.
+  // A grid of two, then the floor, then a third desk swapped in: one pane makes room, and says so.
   await desk(page, 2).click()
-  await desk(page, 4).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 4).click()
   await until(async () => (await panes(page)) === 2)
   await page.keyboard.press('Control+Backquote')
   await until(async () => (await panes(page)) === 0)
-  await desk(page, 6).click()
+  await desk(page, 6).click(HELD)
   const titles = () => page.locator('.pane h2').allTextContents()
   await until(async () => (await titles()).includes('Bump dependencies'))
   const made = ((await page.locator('.toast').textContent()) ?? '').trim()
-  check('a plain click from the floor that replaces a pane says which one made room', /made room for Bump dependencies/.test(made), made)
+  check('a desk swapped in from the floor says which pane made room', /made room for Bump dependencies/.test(made), made)
   const gone = made.split(' made room')[0]
   await page.locator('.toast').getByRole('button', { name: 'Undo' }).click()
   check('and Undo puts it back', await until(async () => (await titles()).includes(gone) && !(await titles()).includes('Bump dependencies')), JSON.stringify(await titles()))
@@ -683,7 +695,7 @@ try {
     return { keys: lefts('aside.panel dt'), whats: lefts('aside.panel dd'), text: document.querySelector('aside.panel')?.textContent ?? '' }
   })
   check('the Keys sheet lines its keys up in one column and what they do in another', columns.keys.length === 1 && columns.whats.length === 1, JSON.stringify([columns.keys, columns.whats]))
-  check('and lists Ctrl+Q, and Ctrl and a click on a file path with the editor’s name', columns.text.includes('Ctrl+Q') && /Ctrl and a click on a file path\s*Open it in Cursor, at its line/.test(columns.text))
+  check('and lists Ctrl+Q, and Ctrl and a click on a file path with the editor’s name', columns.text.includes('Ctrl+Q') && /(Ctrl|Cmd) and a click on a file path\s*Open it in Cursor, at its line/.test(columns.text) && /Click a desk\s*Open their terminal beside the others, or put it away again/.test(columns.text))
   await page.context().close()
 
   page = await open('demo=office&still&noeditor')
@@ -747,17 +759,29 @@ try {
   }
   page = await voiceOffice()
   check('voice reserves no terminal shortcut while off by default', await page.getByRole('button', { name: 'Start voice input' }).isEnabled())
+  // The microphone's own menu: which one is in use, and the way to another, without opening setup.
+  await page.getByRole('button', { name: 'Microphone and speech engine' }).click()
+  check('the arrow beside the microphone lists the microphones, the one in use ticked', await until(async () => await page.getByRole('menuitemradio', { name: 'USB microphone' }).getAttribute('aria-checked') === 'true') && await page.getByRole('menuitemradio', { name: /^System default/ }).getAttribute('aria-checked') === 'false')
+  check('with one engine ready there is no engine to choose', await page.getByRole('menu', { name: 'Voice input' }).getByText('Speech engine').count() === 0)
+  await page.keyboard.press('Escape')
+  check('Escape closes it and nothing is recording', await page.getByRole('menu', { name: 'Voice input' }).count() === 0 && await page.getByRole('button', { name: 'Stop recording' }).count() === 0)
+  const atRest = await page.locator('.bar .new').boundingBox()
+  await page.locator('.pane[data-pane="demo-2"] .xterm-helper-textarea').focus()
   await page.getByRole('button', { name: 'Start voice input' }).click()
-  check('voice visibly listens in blue', await until(async () => (await page.locator('.voice-status').innerText()).includes('Listening to Refactor auth middleware')) && await page.locator('.voice-status .state').evaluate(el => getComputedStyle(el).color === 'rgb(130, 170, 255)'))
+  check('the microphone does not take the keyboard from the terminal', await page.locator('.pane[data-pane="demo-2"] .xterm-helper-textarea').evaluate(el => el === document.activeElement))
+  // The bar is in the terminal the words go into, so it need not name it to the eye; it is named aloud.
+  check('voice visibly listens in blue, in the terminal it types into', await until(async () => ((await page.locator('.pane[data-pane="demo-2"] .voice-status .state').textContent()) ?? '').includes('Listening to Refactor auth middleware')) && await page.locator('.voice-status .state').evaluate(el => getComputedStyle(el).color === 'rgb(130, 170, 255)'))
   check('voice shows the words as they are spoken', await until(async () => (await page.locator('.voice-status .words').innerText()).includes('Fix the checkout')))
-  check('voice uses the chosen microphone and displays incoming audio', await page.locator('.voice-status').innerText().then(text => text.includes('USB microphone')) && await page.getByRole('meter', { name: 'Microphone input level' }).getAttribute('aria-valuenow') === '36')
-  await page.locator('[data-desk="demo-6"]').click({ modifiers: ['ControlOrMeta'] })
+  check('voice uses the chosen microphone and displays incoming audio', await page.getByRole('meter', { name: 'Microphone input level' }).getAttribute('title') === 'USB microphone' && await page.getByRole('meter', { name: 'Microphone input level' }).getAttribute('aria-valuenow') === '36')
+  const bar = await page.locator('.bar .new').boundingBox()
+  check('the bar does not move when a recording starts', bar !== null && JSON.stringify(bar) === JSON.stringify(atRest))
+  await page.locator('[data-desk="demo-6"]').click()
   check('focus changes mark only the selected pane as read while keeping both voice panes visible', await until(async () => await page.evaluate(() => JSON.stringify(window.__demo.watched) === '["demo-6"]' && ['demo-2', 'demo-6'].every(id => window.__demo.visible.includes(id)))))
   await page.getByRole('button', { name: 'Stop and insert' }).click()
   check('voice shows it is typing the last words', await until(async () => (await page.locator('.voice-status').innerText()).includes('Typing the last words')))
   check('voice inserts into the original session without Enter after focus changes', await until(async () => await page.evaluate(() => window.__demo.typed.some(t => t.agent === 'demo-2' && t.data === 'Fix the checkout total'))))
   check('voice never submits or leaves controls in its text', await page.evaluate(() => window.__demo.typed.every(t => !/[\r\n\x00-\x1f\x7f]/.test(t.data))))
-  await page.getByRole('button', { name: 'Dismiss voice notice' }).click()
+  check('the words are in the terminal, so no notice is left over it', await until(async () => await page.getByRole('button', { name: 'Start voice input' }).count() === 1) && await page.locator('.voice-status').count() === 0)
   await page.getByRole('button', { name: 'Start voice input' }).click()
   await page.getByRole('button', { name: 'Cancel voice input' }).click()
   const cancelled = await page.evaluate(() => window.__demo.typed.length)
@@ -765,9 +789,29 @@ try {
   check('cancelling voice inserts nothing', await page.evaluate(() => window.__demo.typed.length) === cancelled)
   await page.getByRole('button', { name: 'Start voice input' }).click()
   await page.getByRole('button', { name: 'Stop and insert' }).click()
+  // The recording is its program's, not its pane's: put away while the last words come, they still go in.
   await page.keyboard.press('Control+Shift+W')
-  await sleep(850)
-  check('closing a pane during transcription discards its stale result', await page.evaluate(() => window.__demo.typed.length) === cancelled)
+  check('putting its pane away while the last words come still types them into its program', await until(async () => await page.evaluate(n => window.__demo.typed.length > n && window.__demo.typed.slice(n).every(t => t.agent === 'demo-6'), cancelled)))
+  check('and says where they went, with the way to it', await until(async () => ((await page.locator('.voice-status').textContent()) ?? '').includes('Typed into Bump dependencies')) && await page.locator('.voice-status .where').count() === 1)
+  await page.context().close()
+
+  // On a Mac a Control-click is the system's right-click: it opens the menu and does nothing else. Cmd asks for more.
+  page = await open('demo=office&still', 1280, 800, 'MacIntel')
+  await desk(page, 2).click()
+  // As the system sends it: the press, the menu, then the click as well.
+  const onDesk = await desk(page, 5).boundingBox()
+  await page.keyboard.down('Control')
+  await page.mouse.move(onDesk.x + 20, onDesk.y + 20)
+  await page.mouse.down()
+  await desk(page, 5).dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: onDesk.x + 20, clientY: onDesk.y + 20 })
+  await page.mouse.up()
+  await page.keyboard.up('Control')
+  check('on a Mac, a Control-click on a desk opens its menu and no terminal', (await page.locator('.menu-sheet').count()) === 1 && (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Refactor auth middleware')
+  await page.keyboard.press('Escape')
+  await desk(page, 5).click({ modifiers: ['Meta'] })
+  check('and Cmd and a click shows it in place of the terminal in use', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API'))
+  await page.keyboard.press('Control+Shift+Slash')
+  check('the keys list names Cmd for the clicks there', (await page.locator('.panel').innerText()).includes('Cmd and a click') && !(await page.locator('.panel').innerText()).includes('Ctrl and a click'))
   await page.context().close()
 
   for (const [scene, message] of [['mic-error', 'microphone could not start'], ['silence', 'No clear speech'], ['short', 'too short'], ['inference-error', 'speech engine stopped']]) {
@@ -840,7 +884,7 @@ try {
   await page.getByRole('button', { name: 'New agent', exact: true }).click()
   check('covering a waiting terminal does not remove its attention cue', await page.locator('.bar .attention').count() === 1)
   check('covered terminals are not reported as watched', await until(async () => (await page.evaluate(() => window.__demo.watched.length)) === 0))
-  check('covered terminals are not available for voice insertion', await page.evaluate(() => window.__demo.visible.length === 0))
+  check('a recording cannot be started into a covered terminal', await page.evaluate(() => window.__demo.visible.length === 0))
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: /Show them/ }).click()
   await page.getByRole('menuitem', { name: /in trouble/ }).click()
@@ -878,7 +922,7 @@ try {
 
   page = await open('demo=office&still', 1024, 700)
   await desk(page, 2).click()
-  await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
+  await desk(page, 5).click()
   check('two laptop panes start with a compact floor', await page.locator('.floor').evaluate(el => el.getBoundingClientRect().width < 300))
   await page.getByRole('button', { name: 'More', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: /Compact floor/ }).click()
@@ -919,15 +963,34 @@ try {
   page = await open('demo=office&still')
   await page.getByRole('button', { name: 'Open their terminal' }).click()
   await until(async () => (await panes(page)) === 1)
-  await desk(page, 2).click()
-  check('a plain click never puts away someone who needs you', await until(async () => (await panes(page)) === 2 && (await page.locator('.pane h2', { hasText: 'Fix the checkout total' }).count()) === 1))
+  await desk(page, 2).click(HELD)
+  check('a desk swapped in never takes the place of someone who needs you', await until(async () => (await panes(page)) === 2 && (await page.locator('.pane h2', { hasText: 'Fix the checkout total' }).count()) === 1))
+  // Nor does a click on their own desk put them away: it goes to their terminal, where the answer is wanted.
+  await desk(page, 1).click()
+  check('a click on someone who needs you goes to their terminal and does not put it away', await until(async () => ((await page.locator('.pane.typing h2').textContent()) ?? '') === 'Fix the checkout total') && (await panes(page)) === 2)
   await page.context().close()
 
   page = await open('demo=office&still', 2400, 1000)
   await desk(page, 2).click()
   await until(async () => (await panes(page)) === 1)
+  await page.keyboard.press('Control+Backquote')
+  await until(async () => (await panes(page)) === 0)
   await desk(page, 5).click()
-  check('in a window wide enough for both, a plain click opens a terminal beside the other', await until(async () => (await panes(page)) === 2))
+  check('a click from the floor brings back the terminals that were open, with the new one beside them', await until(async () => (await panes(page)) === 2))
+  await page.context().close()
+
+  // A narrow window shows the floor or the terminals, never both: a desk there is somewhere to go.
+  page = await open('demo=office&still', 420, 760)
+  await desk(page, 2).click()
+  await until(async () => (await panes(page)) === 1)
+  await page.keyboard.press('Control+Backquote')
+  await until(async () => (await panes(page)) === 0)
+  await desk(page, 5).click()
+  check('in a narrow window a click goes to their terminal, one at a time', await until(async () => (await panes(page)) === 1 && ((await page.locator('.pane h2').textContent()) ?? '') === 'Docs pass for the API'))
+  await page.keyboard.press('Control+Backquote')
+  await until(async () => (await panes(page)) === 0)
+  await desk(page, 6).click(HELD)
+  check('and the key held opens one beside it', await until(async () => (await panes(page)) === 2))
   await page.context().close()
 
   page = await open('demo=office&still')
@@ -1071,8 +1134,8 @@ try {
   {
     const room = await open('demo=office&still')
     await desk(room, 2).click()
-    await desk(room, 5).click({ modifiers: ['ControlOrMeta'] })
-    await desk(room, 6).click({ modifiers: ['ControlOrMeta'] })
+    await desk(room, 5).click()
+    await desk(room, 6).click()
     await until(async () => (await panes(room)) === 3)
     await sleep(300)
     // Every pane as the page first made it, and a count of any taken out of the page since.
@@ -1274,7 +1337,7 @@ try {
     for (const width of [1101, 901, 761, 621, 420, 340]) {
       const bar = await open('demo=office&still', 1280, 720)
       await bar.getByRole('button', { name: 'Open their terminal' }).click()
-      await desk(bar, 2).click({ modifiers: ['ControlOrMeta'] })
+      await desk(bar, 2).click()
       await until(async () => (await panes(bar)) === 2)
       await bar.setViewportSize({ width, height: 720 })
       await sleep(300)

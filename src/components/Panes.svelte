@@ -12,8 +12,10 @@
   import { terms } from '../lib/terms'
   import { elapsed } from '../lib/time'
   import type { Agent, Job } from '../lib/types'
+  import { voice } from '../lib/voice.svelte'
   import { STATUS_WORD, doing, place, resumeAction, resumeHint } from '../lib/words'
   import Person from './Person.svelte'
+  import VoiceStatus from './VoiceStatus.svelte'
   const terminalView = import('./TerminalView.svelte')
 
   /** Where each pane and each edge is, as shares of the room. Panes come in reading order. */
@@ -369,6 +371,8 @@
             </button>
           </form>
         {/if}
+        <!-- A recording into this terminal says so here, in the terminal its words go into. -->
+        {#if voice.dock === pane.id}<VoiceStatus docked below={office.finding === pane.id} />{/if}
         {#if office.dropTarget === pane.id}
           <p class="drop" aria-hidden="true">Drop to paste the paths into {agent?.title ?? 'this terminal'}</p>
         {/if}

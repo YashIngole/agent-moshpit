@@ -13,6 +13,7 @@
   import { termItems } from '../lib/menus'
   import { office } from '../lib/office.svelte'
   import { findPaths } from '../lib/paths'
+  import { CLICK_KEY, menuClick, withClickKey } from '../lib/platform'
   import { backTab, scrolledBack, terms, typedPath } from '../lib/terms'
 
   interface Props {
@@ -102,12 +103,14 @@
     made.loadAddon(fit)
     // An address is opened in the browser, and only if it is one that may be.
     made.loadAddon(
-      new WebLinksAddon((_event, address) => {
+      new WebLinksAddon((event, address) => {
+        // A Mac's Control-click opens the terminal's menu, and nothing else.
+        if (menuClick(event)) return
         if (webAddress(address)) bridge.openPage(address)
         else office.say('Only https addresses, and http ones on this computer, are opened from a terminal.')
       })
     )
-    // A file path is opened in the editor at its line with Ctrl and a click, as in VS Code's terminal.
+    // A file path is opened in the editor at its line with Ctrl and a click (Cmd on a Mac), as in VS Code's terminal.
     made.registerLinkProvider({
       provideLinks(row, callback) {
         const text = made.buffer.active.getLine(row - 1)?.translateToString(true) ?? ''
@@ -115,9 +118,10 @@
           range: { start: { x: found.start + 1, y: row }, end: { x: found.start + found.length, y: row } },
           text: found.path,
           activate(event: MouseEvent) {
-            if (!(event.ctrlKey || event.metaKey)) {
+            if (menuClick(event)) return
+            if (!withClickKey(event)) {
               const editor = office.editor
-              office.hint('file-links', editor ? `Hold Ctrl and click a file path to open it in ${editor.name} at that line.` : 'Hold Ctrl and click a file path to show it in its folder.')
+              office.hint('file-links', editor ? `Hold ${CLICK_KEY} and click a file path to open it in ${editor.name} at that line.` : `Hold ${CLICK_KEY} and click a file path to show it in its folder.`)
               return
             }
             office.openFile(id, found.path, found.line)

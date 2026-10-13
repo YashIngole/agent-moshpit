@@ -1239,11 +1239,17 @@ try {
     await room.locator('.pane[data-pane="demo-5"]').getByRole('button', { name: 'Put this terminal away' }).click()
     check('with one terminal open there is no Arrange', await until(async () => (await panes(room)) === 1 && (await room.getByRole('button', { name: 'Arrange', exact: true }).count()) === 0))
 
-    // In a form, Ctrl+Shift and an arrow still selects by the word.
+    // In a form, Ctrl+Shift and an arrow is the field's own: the office does not take it, and
+    // where it selects by the word it still does. (macOS selects by the word with Option.)
     await room.getByRole('button', { name: 'New agent', exact: true }).click()
     await room.locator('#new-task').fill('alpha beta')
+    await room.evaluate(() => addEventListener('keydown', event => { if (event.key === 'ArrowLeft') window.__arrow = event }, { capture: true }))
     await room.keyboard.press('Control+Shift+ArrowLeft')
-    check('in a text field Ctrl+Shift+Left still selects a word', await room.evaluate(() => document.activeElement?.id === 'new-task' && document.activeElement.value.slice(document.activeElement.selectionStart, document.activeElement.selectionEnd) === 'beta'))
+    const field = await room.evaluate(() => {
+      const el = document.activeElement
+      return { here: el?.id === 'new-task', taken: window.__arrow?.defaultPrevented, chosen: el?.value?.slice(el.selectionStart, el.selectionEnd) }
+    })
+    check('in a text field Ctrl+Shift+Left is left to the field', field.here && field.taken === false && (process.platform === 'darwin' || field.chosen === 'beta'), JSON.stringify(field))
     await room.context().close()
 
     // What an earlier office kept, rows of panes with their shares, is still read.

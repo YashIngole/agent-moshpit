@@ -291,7 +291,8 @@ try {
   check(await until(async () => await line.count() === 0), 'the status line goes when the recording ends')
   check(await taskFocused(), 'the keyboard is still in the task after Stop')
   check(await typedInTerminals() === 0, 'nothing is typed into a terminal by a recording for the task')
-  await form.keyboard.press('Control+z')
+  // Undo is Cmd+Z on macOS and Ctrl+Z elsewhere.
+  await form.keyboard.press('ControlOrMeta+z')
   check(await until(async () => (await said()).length < 'Fix the checkout total'.length), 'Undo takes dictated words back')
 
   // The shortcut, from another field of the form: after what is there, with one space.

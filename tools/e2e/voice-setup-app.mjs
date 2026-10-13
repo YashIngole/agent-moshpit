@@ -56,7 +56,7 @@ try {
   assert.equal(view.unsupported, '', 'This computer can run the local engine')
   assert(!view.models.some(model => model.ready))
   assert.deepEqual(view.models.map(m => m.id), ['nemotron-streaming-en-q8', 'nemotron-streaming-en-q4'])
-  assert.deepEqual(view.providers.map(p => [p.id, p.configured]), [['deepgram', false], ['openai', false], ['assemblyai', false], ['elevenlabs', false]])
+  assert.deepEqual(view.providers.map(p => [p.id, p.configured]), [['deepgram', false], ['openai', false], ['assemblyai', false], ['elevenlabs', false], ['openrouter', false]])
   await page.getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('button', { name: 'Set up voice input' }).click()
   assert.equal(await microphones.inputValue(), selected)

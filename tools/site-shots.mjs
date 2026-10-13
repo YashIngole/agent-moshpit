@@ -84,6 +84,8 @@ if (process.argv.includes('--serve')) {
       // A pretend dense screen draws a terminal at the wrong size on the graphics card (a real
       // one does not), so the terminals here are drawn the plain way: the same letters, as text.
       await context.route(/addon-webgl/, route => route.abort())
+      // What a second click on a desk does is said once, the first time a terminal opens beside another: not in a picture.
+      await context.addInitScript(() => localStorage.setItem('moshpit.hints', JSON.stringify(['click-toggles'])))
       const page = await context.newPage()
       await page.goto(`${base}demo/?demo=office&still`)
       await page.waitForSelector('.floor button[data-desk]')
@@ -113,7 +115,7 @@ if (process.argv.includes('--serve')) {
     // Claude Code and Codex in one window: one waiting for an answer, one at work.
     page = await office(1240, 800)
     await desk(page, 1).click()
-    await desk(page, 2).click({ modifiers: ['ControlOrMeta'] })
+    await desk(page, 2).click()
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 2)
     await page.waitForTimeout(600)
     await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
@@ -124,8 +126,8 @@ if (process.argv.includes('--serve')) {
     // The floor as a strip beside three terminals, with whoever is waiting gathered on top.
     page = await office(1240, 800)
     await desk(page, 2).click()
-    await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
-    await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
+    await desk(page, 5).click()
+    await desk(page, 6).click()
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 3)
     // Three terminals bring the strip by themselves; the edge's double-click is only needed if not.
     if ((await page.locator('.seat.listed').count()) === 0) await page.locator('.grip').dblclick()
@@ -139,7 +141,7 @@ if (process.argv.includes('--serve')) {
     // Four terminals in a grid, with someone outside it still waiting.
     page = await office(1240, 800)
     await desk(page, 2).click()
-    for (const n of [4, 5, 6]) await desk(page, n).click({ modifiers: ['ControlOrMeta'] })
+    for (const n of [4, 5, 6]) await desk(page, n).click()
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 4)
     await page.waitForTimeout(600)
     await page.evaluate(() => document.querySelector('.floor').scrollTo(0, 0))
@@ -153,8 +155,8 @@ if (process.argv.includes('--serve')) {
     // Two agents at work and one idle, side by side with the floor: the page's opening.
     page = await office(1240, 800)
     await desk(page, 2).click()
-    await desk(page, 5).click({ modifiers: ['ControlOrMeta'] })
-    await desk(page, 6).click({ modifiers: ['ControlOrMeta'] })
+    await desk(page, 5).click()
+    await desk(page, 6).click()
     await page.waitForFunction(() => document.querySelectorAll('.pane').length === 3)
     // Three terminals start beside the strip of names; the opening shows the people at their desks.
     if ((await page.locator('.seat.listed').count()) > 0) await page.locator('.grip').dblclick()

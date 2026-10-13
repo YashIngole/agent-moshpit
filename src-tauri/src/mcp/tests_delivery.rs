@@ -29,7 +29,7 @@ fn watch(f: &Fixture, token: &str, after: u64, push: &str) -> BufReader<TcpStrea
     stream.set_read_timeout(Some(Duration::from_millis(1500))).unwrap();
     let mut reader = BufReader::new(stream);
     protocol::write_frame(reader.get_mut(), &json!({"token":token,"watch":{"after":after,"push":push,"client":"test-client 1.0","protocol":"2025-11-25"}})).unwrap();
-    assert_eq!(frame(&mut reader), Some(json!({"watching":true})));
+    assert_eq!(expected(&mut reader), json!({"watching":true}));
     reader
 }
 
@@ -42,6 +42,19 @@ fn frame(reader: &mut BufReader<TcpStream>) -> Option<Value> {
             return Some(value);
         }
     }
+}
+
+/// The next thing written down a held connection, when one is expected: waited for however
+/// slow the machine. Each item is saved to disk before it is written, and a disk can take
+/// longer over that than a quiet connection is listened to (`watch` gives up a read after
+/// a second and a half, which is right for hearing that nothing comes).
+fn expected(reader: &mut BufReader<TcpStream>) -> Value {
+    for _ in 0..20 {
+        if let Some(value) = frame(reader) {
+            return value;
+        }
+    }
+    panic!("nothing was written down the held connection in half a minute")
 }
 
 fn until(mut ready: impl FnMut() -> bool) -> bool {
@@ -161,7 +174,7 @@ fn a_hook_is_told_what_is_new_once_and_asking_shows_that_hooks_run() {
         stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         let mut reader = BufReader::new(stream);
         protocol::write_frame(reader.get_mut(), &json!({"token":token,"hook":{"event":"PostToolBatch"}})).unwrap();
-        frame(&mut reader).unwrap()
+        expected(&mut reader)
     };
     // Nothing new: nothing to say. But it asked, and that is seen.
     assert_eq!(ask(&token), json!({"value":{"context":null}}));
@@ -191,7 +204,7 @@ fn a_hook_is_told_what_is_new_once_and_asking_shows_that_hooks_run() {
         stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         let mut reader = BufReader::new(stream);
         protocol::write_frame(reader.get_mut(), &json!({"token":token,"hook":{"event":"Stop"}})).unwrap();
-        frame(&mut reader).unwrap()
+        expected(&mut reader)
     };
     let again = stop(&token);
     let context = again["value"]["context"].as_str().unwrap();
@@ -262,7 +275,7 @@ fn a_session_started_with_pushes_is_written_to_as_things_come_and_again_after_a_
     let sent = f.call(&f.a, "send_message", json!({"session_id":f.b,"body":"Pushed finding","request_key":"push-1"})).unwrap();
     assert_eq!((sent["delivery"]["how"].as_str(), sent["delivery"]["recipient_live"].as_bool()), (Some("channel"), Some(true)));
     let id = sent["message"]["id"].as_str().unwrap().to_string();
-    let event = frame(&mut held).unwrap()["event"].clone();
+    let event = expected(&mut held)["event"].clone();
     assert_eq!((event["kind"].as_str(), event["id"].as_str()), (Some("message"), Some(id.as_str())));
     assert!(event["channel"]["content"].as_str().unwrap().contains("Pushed finding"));
     assert_eq!(event["channel"]["meta"]["id"], id);
@@ -273,7 +286,7 @@ fn a_session_started_with_pushes_is_written_to_as_things_come_and_again_after_a_
     assert!(f.call(&f.b, "set_activity", json!({"activity":"x"})).unwrap().get("agent_moshpit_inbox").is_none());
     // Nothing more is written for it while this connection lasts.
     let second = message(&f, "Second pushed finding", "push-2");
-    assert_eq!(frame(&mut held).unwrap()["event"]["id"], second);
+    assert_eq!(expected(&mut held)["event"]["id"], second);
     assert!(frame(&mut held).is_none());
 
     // The same subprocess connecting again, from where it had got to, is told nothing twice.
@@ -284,7 +297,7 @@ fn a_session_started_with_pushes_is_written_to_as_things_come_and_again_after_a_
     drop(again);
     // A new subprocess (the program started again) knows of nothing: everything unread is said again.
     let mut fresh = watch(&f, &token, 0, "channel");
-    let replayed: Vec<String> = (0..2).map(|_| frame(&mut fresh).unwrap()["event"]["id"].as_str().unwrap().to_string()).collect();
+    let replayed: Vec<String> = (0..2).map(|_| expected(&mut fresh)["event"]["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(replayed, [id.clone(), second.clone()]);
     // Read after a push: pushes do reach this session, and that is now known.
     f.call(&f.b, "get_message", json!({"message_id":id})).unwrap();
@@ -300,11 +313,11 @@ fn a_session_started_with_pushes_is_written_to_as_things_come_and_again_after_a_
     let mut asking = watch(&f, &asker, 0, "channel");
     let task = f.queued();
     f.call(&f.b, "report_result", json!({"task_id":task.id,"status":"completed","summary":"All reviewed"})).unwrap();
-    let result = frame(&mut asking).unwrap()["event"].clone();
+    let result = expected(&mut asking)["event"].clone();
     assert_eq!((result["kind"].as_str(), result["id"].as_str()), (Some("result"), Some(task.id.as_str())));
     assert!(result["channel"]["content"].as_str().unwrap().contains("completed: All reviewed"));
     // And the task itself was pushed to the one it was assigned to.
-    assert_eq!(frame(&mut quiet).unwrap()["event"]["kind"], "task");
+    assert_eq!(expected(&mut quiet)["event"]["kind"], "task");
 }
 
 #[test]
@@ -335,7 +348,7 @@ fn a_push_that_goes_unread_is_said_again_by_a_way_that_is_known_to_arrive() {
     let token = with_pushes(&f, &f.b);
     let mut held = watch(&f, &token, 0, "channel");
     let id = message(&f, "Dropped on the floor", "grace");
-    assert_eq!(frame(&mut held).unwrap()["event"]["id"], id);
+    assert_eq!(expected(&mut held)["event"]["id"], id);
     // The program was not taking pushes after all. For a while that cannot be told from slowness.
     assert!(f.call(&f.b, "set_activity", json!({"activity":"x"})).unwrap().get("agent_moshpit_inbox").is_none());
     // Long enough unread, and the next call's answer says it, as it would have with no pushes at all.
@@ -365,7 +378,7 @@ fn many_sessions_watching_do_not_keep_a_call_waiting_and_a_stopped_one_is_let_go
         stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         let mut reader = BufReader::new(stream);
         protocol::write_frame(reader.get_mut(), &json!({"token":token,"name":"check_inbox","arguments":{}})).unwrap();
-        frame(&mut reader).unwrap()
+        expected(&mut reader)
     };
     for _ in 0..MAX_CALLS + 4 {
         assert!(call(&a).get("value").is_some());
@@ -392,7 +405,7 @@ fn many_sessions_watching_do_not_keep_a_call_waiting_and_a_stopped_one_is_let_go
         stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         let mut reader = BufReader::new(stream);
         protocol::write_frame(reader.get_mut(), &json!({"token":b,(what):{}})).unwrap();
-        frame(&mut reader).unwrap()
+        expected(&mut reader)
     };
     assert!(refuse("watch").get("error").is_some() && refuse("wait").get("error").is_some());
     assert!(call(&a).get("value").is_some());
@@ -418,18 +431,18 @@ fn an_idle_session_that_waits_is_woken_once_and_only_its_newest_wait_is_kept() {
     std::thread::sleep(Duration::from_millis(1500));
     assert_eq!(state(&f, &f.b, Kind::Message, &early).0, "saved");
     let _connected = watch(&f, &token, 0, "none");
-    assert!(frame(&mut first).unwrap()["value"]["context"].as_str().unwrap().contains(&early));
+    assert!(expected(&mut first)["value"]["context"].as_str().unwrap().contains(&early));
     f.call(&f.b, "acknowledge", json!({"id":early})).unwrap();
     // The turn before left one waiting; the turn after starts another. The older is let go, with nothing to say.
     let mut older = wait(&token);
     assert!(until(|| f.hub.held.load(Ordering::Relaxed) == 2));
     let mut newer = wait(&token);
-    assert_eq!(frame(&mut older), Some(json!({"value":{"context":null}})));
+    assert_eq!(expected(&mut older), json!({"value":{"context":null}}));
     // Nothing new: the newer goes on waiting, and is the only one that does.
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(f.hub.held.load(Ordering::Relaxed), 2);
     let id = message(&f, "Wake up: a finding", "wake");
-    let woken = frame(&mut newer).unwrap();
+    let woken = expected(&mut newer);
     assert!(woken["value"]["context"].as_str().unwrap().contains(&id), "{woken}");
     assert_eq!(state(&f, &f.b, Kind::Message, &id), ("notified".to_string(), "wake".to_string()));
     // Said: the hook at the next step has nothing to add, and the next wait goes on waiting.
@@ -438,7 +451,7 @@ fn an_idle_session_that_waits_is_woken_once_and_only_its_newest_wait_is_kept() {
     assert!(until(|| f.hub.held.load(Ordering::Relaxed) == 2));
     // A session that is stopped has its wait let go.
     f.hub.revoke(&f.b);
-    assert_eq!(frame(&mut next), Some(json!({"value":{"context":null}})));
+    assert_eq!(expected(&mut next), json!({"value":{"context":null}}));
 }
 
 #[test]

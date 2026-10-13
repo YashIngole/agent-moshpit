@@ -291,9 +291,12 @@ try {
   check(await until(async () => await line.count() === 0), 'the status line goes when the recording ends')
   check(await taskFocused(), 'the keyboard is still in the task after Stop')
   check(await typedInTerminals() === 0, 'nothing is typed into a terminal by a recording for the task')
-  // Undo is Cmd+Z on macOS and Ctrl+Z elsewhere.
+  // Undo is Cmd+Z on macOS and Ctrl+Z elsewhere. It takes back the last piece that went in:
+  // all of it when Stop came early, and the second half when both pieces were heard.
+  const dictated = await said()
   await form.keyboard.press('ControlOrMeta+z')
-  check(await until(async () => (await said()).length < 'Fix the checkout total'.length), 'Undo takes dictated words back')
+  const undone = await until(async () => dictated.startsWith(await said()) && (await said()).length < dictated.length)
+  check(undone, `Undo takes dictated words back${undone ? '' : `: ${JSON.stringify(dictated)} became ${JSON.stringify(await said())}`}`)
 
   // The shortcut, from another field of the form: after what is there, with one space.
   await task.fill('Look at the cart')

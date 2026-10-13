@@ -302,9 +302,12 @@ try {
   await until(async () => (await panes(page)) === 0)
   await desk(page, 6).click()
   check('picking someone from the floor brings the grid back, with them in it', await until(async () => (await panes(page)) === 3 && (await page.locator('.pane h2', { hasText: 'Bump dependencies' }).count()) === 1))
+  // A pane is there a moment before its terminal is, and the terminal takes the keyboard
+  // when it comes: a desk focused in between would lose it again.
+  await until(async () => (await focused(page)).includes('xterm'))
   await desk(page, 1).focus()
   await page.keyboard.press('Control+Enter')
-  check('Ctrl+Enter on a desk opens it beside the others', await until(async () => (await panes(page)) === 4))
+  check('Ctrl+Enter on a desk opens it beside the others', await until(async () => (await panes(page)) === 4), `${await panes(page)} panes, keyboard in ${await focused(page)}`)
 
   const spot = title => page.locator('.pane', { hasText: title }).evaluate(p => `${Math.round(p.getBoundingClientRect().x)},${Math.round(p.getBoundingClientRect().y)}`)
   const [one, two] = await paneTitles(page)
